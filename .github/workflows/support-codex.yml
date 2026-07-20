@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     outputs:
       has_ticket: ${{ steps.claim.outputs.has_ticket }}
       has_patch: ${{ steps.diff.outputs.has_patch }}
@@ -42,13 +43,17 @@ jobs:
 
       - name: Claim one authorized support ticket
         id: claim
-        env:
-          SUPPORT_EXECUTOR_TOKEN: ${{ secrets.GSIPRO_SUPPORT_EXECUTOR_TOKEN }}
         run: |
           set -euo pipefail
           executor_id="github-codex-${GITHUB_RUN_ID}"
+          oidc_response="$(curl --fail --silent --show-error \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
+          support_token="$(jq -r '.value' <<<"$oidc_response")"
+          test -n "$support_token"
+          echo "::add-mask::$support_token"
           queue="$(curl --fail --silent --show-error \
-            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Authorization: Bearer ${support_token}" \
             "${SUPPORT_URL}/api/support/agent/queue")"
           ticket_id="$(jq -r '.data[0].package.ticket.id // empty' <<<"$queue")"
           if [ -z "$ticket_id" ]; then
@@ -58,7 +63,7 @@ jobs:
           claim_body="$(jq -n --arg executorId "$executor_id" '{action:"CLAIM",executorId:$executorId}')"
           claimed="$(curl --fail --silent --show-error \
             --request POST \
-            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Authorization: Bearer ${support_token}" \
             --header "Content-Type: application/json" \
             --data "$claim_body" \
             "${SUPPORT_URL}/api/support/agent/tickets/${ticket_id}")"
@@ -106,14 +111,16 @@ jobs:
       - name: Return unsuccessful attempt to the queue
         if: always() && steps.claim.outputs.has_ticket == 'true' && steps.diff.outputs.has_patch != 'true'
         env:
-          SUPPORT_EXECUTOR_TOKEN: ${{ secrets.GSIPRO_SUPPORT_EXECUTOR_TOKEN }}
           TICKET_ID: ${{ steps.claim.outputs.ticket_id }}
           LEASE_ID: ${{ steps.claim.outputs.lease_id }}
           EXECUTOR_ID: ${{ steps.claim.outputs.executor_id }}
         run: |
+          oidc_response="$(curl --fail --silent --show-error --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
+          support_token="$(jq -r '.value' <<<"$oidc_response")"
+          echo "::add-mask::$support_token"
           body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" '{action:"REPORT_FAILURE",executorId:$executorId,leaseId:$leaseId,summary:"O Codex não produziu uma alteração segura nesta tentativa; o chamado retornou para avaliação."}')"
           curl --fail --silent --show-error --request POST \
-            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Authorization: Bearer ${support_token}" \
             --header "Content-Type: application/json" --data "$body" \
             "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"
 
@@ -124,6 +131,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write
     env:
       SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
     steps:
@@ -156,15 +164,17 @@ jobs:
 
       - name: Report pull request to G-SIPRO
         env:
-          SUPPORT_EXECUTOR_TOKEN: ${{ secrets.GSIPRO_SUPPORT_EXECUTOR_TOKEN }}
           TICKET_ID: ${{ needs.generate_fix.outputs.ticket_id }}
           LEASE_ID: ${{ needs.generate_fix.outputs.lease_id }}
           EXECUTOR_ID: ${{ needs.generate_fix.outputs.executor_id }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
           REVISION: ${{ steps.pr.outputs.revision }}
         run: |
+          oidc_response="$(curl --fail --silent --show-error --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
+          support_token="$(jq -r '.value' <<<"$oidc_response")"
+          echo "::add-mask::$support_token"
           body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" --arg pullRequestUrl "$PR_URL" --arg revision "$REVISION" '{action:"REPORT_PROGRESS",executorId:$executorId,leaseId:$leaseId,summary:"Correção proposta pelo Codex e enviada para revisão humana.",pullRequestUrl:$pullRequestUrl,revision:$revision}')"
           curl --fail --silent --show-error --request POST \
-            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Authorization: Bearer ${support_token}" \
             --header "Content-Type: application/json" --data "$body" \
             "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"

@@ -19,7 +19,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
   return runWithRequestContext(context, async () => {
     try {
-      const actor = requireSupportExecutor(request);
+      const actor = await requireSupportExecutor(request);
       const { id } = await route.params;
       const input = supportAgentCommandSchema.parse(await request.json());
       const database = getDatabase();

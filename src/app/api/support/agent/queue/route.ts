@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
   return runWithRequestContext(context, async () => {
     try {
-      requireSupportExecutor(request);
+      await requireSupportExecutor(request);
       const tickets = await getDatabase().supportTicket.findMany({
         where: {
           executionLeaseId: null,
