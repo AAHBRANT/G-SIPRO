@@ -13,11 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://gsipro:ci-only@localhost:5433/gsipro?schema=public
-      ENTRA_TENANT_ID: 00000000-0000-4000-8000-000000000000
-      ENTRA_CLIENT_ID: 00000000-0000-4000-8000-000000000000
-      ENTRA_CLIENT_SECRET: build-only-not-a-client-secret
-      AUTH_SECRET: build-only-auth-secret-0000000000000000
-      AUTH_URL: http://localhost:3001
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -32,3 +27,9 @@ jobs:
       - run: pnpm db:validate
       - run: pnpm check
       - run: pnpm build
+        env:
+          ENTRA_TENANT_ID: 00000000-0000-4000-8000-000000000000
+          ENTRA_CLIENT_ID: 00000000-0000-4000-8000-000000000000
+          ENTRA_CLIENT_SECRET: build-only-not-a-client-secret
+          AUTH_SECRET: build-only-auth-secret-0000000000000000
+          AUTH_URL: http://localhost:3001
