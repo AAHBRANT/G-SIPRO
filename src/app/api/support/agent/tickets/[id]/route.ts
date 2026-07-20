@@ -31,7 +31,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             where: {
               id,
               executionLeaseId: null,
-              executionAttempts: { lt: 5 },
+              executionAttempts: { lt: 2 },
               OR: [{ status: "TRIAGED", approvalRequired: false }, { status: "APPROVED" }],
             },
             data: {
@@ -67,7 +67,18 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         return NextResponse.json({ data: { id, status: ticket.status, heartbeat: true }, correlationId: context.correlationId });
       }
 
+      if (input.action === "REPORT_PROGRESS") {
+        const note = `${input.summary}${input.pullRequestUrl ? `\nPull Request: ${input.pullRequestUrl}` : ""}${input.revision ? `\nRevisão: ${input.revision}` : ""}`;
+        await database.$transaction(async (transaction) => {
+          await transaction.supportTicket.update({ where: { id }, data: { executionHeartbeatAt: new Date() } });
+          await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: "IN_PROGRESS", note, actorLabel: input.executorId } });
+          await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: actor.actorType, actorId: input.executorId, action: "SUPPORT_AGENT_PROGRESS", entityType: "SUPPORT_TICKET", entityId: id, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-agent", metadata: { leaseId: input.leaseId, pullRequestUrl: input.pullRequestUrl ?? null, revision: input.revision ?? null } } });
+        });
+        return NextResponse.json({ data: { id, status: "IN_PROGRESS", progress: true }, correlationId: context.correlationId });
+      }
+
       const completed = input.action === "COMPLETE";
+      const retryStatus = ticket.approvalRequired ? "APPROVED" : "TRIAGED";
       const note = completed
         ? supportExecutionResolution(input)
         : `Falha informada pelo executor ${input.executorId}: ${input.summary}`;
@@ -75,16 +86,17 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         const changed = await transaction.supportTicket.updateMany({
           where: { id, status: "IN_PROGRESS", executionLeaseId: input.leaseId, executorId: input.executorId },
           data: {
-            status: completed ? "RESOLVED" : "IN_PROGRESS",
+            status: completed ? "RESOLVED" : retryStatus,
             resolution: completed ? note : ticket.resolution,
             resolvedAt: completed ? new Date() : null,
             resolvedById: null,
             executionHeartbeatAt: new Date(),
+            executionLeaseId: completed ? input.leaseId : null,
           },
         });
         if (changed.count !== 1) throw new ConflictError("A reserva expirou ou foi alterada.");
         await transaction.supportTicketUpdate.create({
-          data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: completed ? "RESOLVED" : "IN_PROGRESS", note, actorLabel: input.executorId },
+          data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: completed ? "RESOLVED" : retryStatus, note, actorLabel: input.executorId },
         });
         await transaction.auditEvent.create({
           data: {
@@ -96,7 +108,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
           },
         });
       });
-      return NextResponse.json({ data: { id, status: completed ? "RESOLVED" : "IN_PROGRESS" }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { id, status: completed ? "RESOLVED" : retryStatus }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }

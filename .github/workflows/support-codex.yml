@@ -1,0 +1,170 @@
+name: G-SIPRO Support Codex
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: gsipro-support-codex
+  cancel-in-progress: false
+
+jobs:
+  generate_fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_ticket: ${{ steps.claim.outputs.has_ticket }}
+      has_patch: ${{ steps.diff.outputs.has_patch }}
+      ticket_id: ${{ steps.claim.outputs.ticket_id }}
+      ticket_code: ${{ steps.claim.outputs.ticket_code }}
+      lease_id: ${{ steps.claim.outputs.lease_id }}
+      executor_id: ${{ steps.claim.outputs.executor_id }}
+    env:
+      DATABASE_URL: postgresql://gsipro:automation-only@localhost:5433/gsipro?schema=public
+      SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies without OpenAI credentials
+        run: pnpm install --frozen-lockfile
+
+      - name: Claim one authorized support ticket
+        id: claim
+        env:
+          SUPPORT_EXECUTOR_TOKEN: ${{ secrets.GSIPRO_SUPPORT_EXECUTOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          executor_id="github-codex-${GITHUB_RUN_ID}"
+          queue="$(curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            "${SUPPORT_URL}/api/support/agent/queue")"
+          ticket_id="$(jq -r '.data[0].package.ticket.id // empty' <<<"$queue")"
+          if [ -z "$ticket_id" ]; then
+            echo "has_ticket=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          claim_body="$(jq -n --arg executorId "$executor_id" '{action:"CLAIM",executorId:$executorId}')"
+          claimed="$(curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "$claim_body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${ticket_id}")"
+          mkdir -p .codex-support
+          jq '.data.package | del(.requester.email, .environment)' <<<"$claimed" > .codex-support/ticket.json
+          echo "has_ticket=true" >> "$GITHUB_OUTPUT"
+          echo "ticket_id=$ticket_id" >> "$GITHUB_OUTPUT"
+          echo "ticket_code=$(jq -r '.data.package.ticket.code' <<<"$claimed")" >> "$GITHUB_OUTPUT"
+          echo "lease_id=$(jq -r '.data.leaseId' <<<"$claimed")" >> "$GITHUB_OUTPUT"
+          echo "executor_id=$executor_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run Codex for the authorized correction
+        if: steps.claim.outputs.has_ticket == 'true'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/support-fix.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          codex-args: '["--ephemeral"]'
+          output-file: codex-output.md
+          allow-users: gutembergp-droid
+
+      - name: Create patch artifact
+        if: steps.claim.outputs.has_ticket == 'true'
+        id: diff
+        run: |
+          git add -N .
+          git diff --binary HEAD -- ':!.codex-support' ':!codex-output.md' > codex.patch
+          if [ -s codex.patch ]; then
+            echo "has_patch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload proposed patch
+        if: steps.diff.outputs.has_patch == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-support-patch
+          path: codex.patch
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Return unsuccessful attempt to the queue
+        if: always() && steps.claim.outputs.has_ticket == 'true' && steps.diff.outputs.has_patch != 'true'
+        env:
+          SUPPORT_EXECUTOR_TOKEN: ${{ secrets.GSIPRO_SUPPORT_EXECUTOR_TOKEN }}
+          TICKET_ID: ${{ steps.claim.outputs.ticket_id }}
+          LEASE_ID: ${{ steps.claim.outputs.lease_id }}
+          EXECUTOR_ID: ${{ steps.claim.outputs.executor_id }}
+        run: |
+          body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" '{action:"REPORT_FAILURE",executorId:$executorId,leaseId:$leaseId,summary:"O Codex não produziu uma alteração segura nesta tentativa; o chamado retornou para avaliação."}')"
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Content-Type: application/json" --data "$body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"
+
+  open_pr:
+    needs: generate_fix
+    if: needs.generate_fix.outputs.has_patch == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: codex-support-patch
+
+      - name: Apply patch and open pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TICKET_CODE: ${{ needs.generate_fix.outputs.ticket_code }}
+        run: |
+          set -euo pipefail
+          git apply --index codex.patch
+          branch="codex/support-${TICKET_CODE,,}-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -m "corrige ${TICKET_CODE} via Codex"
+          git push origin "$branch"
+          printf 'Correção automatizada para `%s`.\n\nRevise as alterações e aguarde o CI antes de incorporar.\n' "$TICKET_CODE" > pr-body.md
+          pr_url="$(gh pr create --base main --head "$branch" --title "Correção automática ${TICKET_CODE}" --body-file pr-body.md)"
+          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Report pull request to G-SIPRO
+        env:
+          SUPPORT_EXECUTOR_TOKEN: ${{ secrets.GSIPRO_SUPPORT_EXECUTOR_TOKEN }}
+          TICKET_ID: ${{ needs.generate_fix.outputs.ticket_id }}
+          LEASE_ID: ${{ needs.generate_fix.outputs.lease_id }}
+          EXECUTOR_ID: ${{ needs.generate_fix.outputs.executor_id }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          REVISION: ${{ steps.pr.outputs.revision }}
+        run: |
+          body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" --arg pullRequestUrl "$PR_URL" --arg revision "$REVISION" '{action:"REPORT_PROGRESS",executorId:$executorId,leaseId:$leaseId,summary:"Correção proposta pelo Codex e enviada para revisão humana.",pullRequestUrl:$pullRequestUrl,revision:$revision}')"
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${SUPPORT_EXECUTOR_TOKEN}" \
+            --header "Content-Type: application/json" --data "$body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"

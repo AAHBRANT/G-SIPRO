@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       const tickets = await getDatabase().supportTicket.findMany({
         where: {
           executionLeaseId: null,
-          executionAttempts: { lt: 5 },
+          executionAttempts: { lt: 2 },
           OR: [
             { status: "TRIAGED", approvalRequired: false },
             { status: "APPROVED" },

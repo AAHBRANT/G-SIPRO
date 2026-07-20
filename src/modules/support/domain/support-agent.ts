@@ -17,6 +17,12 @@ export const supportAgentCommandSchema = z.discriminatedUnion("action", [
     action: z.literal("REPORT_FAILURE"), executorId, leaseId,
     summary: z.string().trim().min(3).max(2_000),
   }),
+  z.object({
+    action: z.literal("REPORT_PROGRESS"), executorId, leaseId,
+    summary: z.string().trim().min(3).max(2_000),
+    pullRequestUrl: z.url().max(1_000).optional(),
+    revision: z.string().trim().max(200).optional(),
+  }),
 ]);
 
 export type SupportAgentCommand = z.infer<typeof supportAgentCommandSchema>;
