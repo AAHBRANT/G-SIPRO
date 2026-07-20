@@ -1,0 +1,10 @@
+DROP TRIGGER IF EXISTS "proposal_comment_invalidate_review" ON "proposal_technical_review_comments"; DROP TRIGGER IF EXISTS "proposal_evidence_invalidate_review" ON "proposal_technical_evidence_links"; DROP TRIGGER IF EXISTS "proposal_content_invalidate_review" ON "proposal_technical_content_versions"; DROP FUNCTION IF EXISTS "invalidate_proposal_section_review"();
+DROP TRIGGER IF EXISTS "proposal_review_append_only" ON "proposal_technical_reviews"; DROP FUNCTION IF EXISTS "reject_proposal_review_mutation"();
+DROP TRIGGER IF EXISTS "proposal_review_guard" ON "proposal_technical_reviews"; DROP FUNCTION IF EXISTS "validate_proposal_review"();
+DROP TRIGGER IF EXISTS "proposal_comment_guard" ON "proposal_technical_review_comments"; DROP FUNCTION IF EXISTS "guard_proposal_comment_mutation"();
+DROP TRIGGER IF EXISTS "proposal_evidence_append_only" ON "proposal_technical_evidence_links"; DROP FUNCTION IF EXISTS "reject_proposal_evidence_mutation"();
+DROP TRIGGER IF EXISTS "proposal_evidence_snapshot_guard" ON "proposal_technical_evidence_links"; DROP FUNCTION IF EXISTS "validate_proposal_evidence_snapshot"();
+DROP TRIGGER IF EXISTS "proposal_content_append_only" ON "proposal_technical_content_versions"; DROP FUNCTION IF EXISTS "reject_proposal_content_mutation"();
+DROP TRIGGER IF EXISTS "proposal_content_chain_guard" ON "proposal_technical_content_versions"; DROP FUNCTION IF EXISTS "enforce_proposal_content_chain"();
+DROP TABLE IF EXISTS "proposal_technical_reviews"; DROP TABLE IF EXISTS "proposal_technical_review_comments"; DROP TABLE IF EXISTS "proposal_technical_evidence_links"; DROP TABLE IF EXISTS "proposal_technical_content_versions";
+DROP TYPE IF EXISTS "ProposalTechnicalReviewDecision"; DROP TYPE IF EXISTS "ProposalTechnicalCommentStatus"; DROP TYPE IF EXISTS "ProposalTechnicalCommentSeverity";

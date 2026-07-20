@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS rectification_impacts_append_only ON "rectification_impacts";DROP TRIGGER IF EXISTS tender_rectifications_append_only ON "tender_rectifications";DROP FUNCTION IF EXISTS prevent_rectification_mutation();DROP TABLE IF EXISTS "rectification_impacts";DROP TABLE IF EXISTS "tender_rectifications";

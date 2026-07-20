@@ -1,0 +1,14 @@
+DELETE FROM profile_permissions WHERE "permissionId" IN (SELECT id FROM permissions WHERE code='ai.execute');
+DELETE FROM permissions WHERE code='ai.execute';
+DROP TRIGGER IF EXISTS trg_deny_ai_extraction_evidence_update ON ai_extraction_evidence;
+DROP TRIGGER IF EXISTS trg_validate_ai_extraction_evidence ON ai_extraction_evidence;
+DROP FUNCTION IF EXISTS gsipro_validate_ai_extraction_evidence();
+DROP TRIGGER IF EXISTS trg_deny_ai_extraction_delete ON ai_extraction_executions;
+DROP FUNCTION IF EXISTS gsipro_deny_ai_extraction_delete();
+DROP TRIGGER IF EXISTS trg_guard_ai_extraction_update ON ai_extraction_executions;
+DROP FUNCTION IF EXISTS gsipro_guard_ai_extraction_update();
+DROP TRIGGER IF EXISTS trg_validate_ai_extraction ON ai_extraction_executions;
+DROP FUNCTION IF EXISTS gsipro_validate_ai_extraction();
+DROP TABLE IF EXISTS ai_extraction_evidence;
+DROP TABLE IF EXISTS ai_extraction_executions;
+DROP TYPE IF EXISTS "AiExtractionStatus";

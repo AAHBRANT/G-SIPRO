@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS analysis_history_append_only ON "analysis_history";DROP FUNCTION IF EXISTS prevent_analysis_history_mutation();DROP TABLE IF EXISTS "analysis_history";DROP TABLE IF EXISTS "requirement_analyses";DROP TYPE IF EXISTS "AnalysisStatus";DROP TYPE IF EXISTS "AnalysisPriority";DROP TYPE IF EXISTS "AnalysisCompetence";

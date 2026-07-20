@@ -1,0 +1,5 @@
+import { describe, expect, it } from "vitest";
+import { RectificationService, type RectificationRepository } from "./rectification-service";
+const a = "00000000-0000-4000-8000-000000000001", b = "00000000-0000-4000-8000-000000000002", c = "00000000-0000-4000-8000-000000000003";
+class FakeRepository implements RectificationRepository { async create(draft: Parameters<RectificationRepository["create"]>[0]) { return { id: a, tenderId: draft.tenderId, previousVersionId: draft.previousVersionId, rectifiedByVersionId: draft.rectifiedByVersionId, impacts: draft.impacts.length, reopenedAnalyses: 1 }; } }
+describe("RectificationService", () => { it("preserves explicit impacts and reports reopened analyses", async () => { const result = await new RectificationService(new FakeRepository()).create({ tenderId: a, previousVersionId: b, rectifiedByVersionId: c, description: "Retificação formal com impacto controlado.", source: "Portal oficial", impacts: [{ requirementId: a, description: "Revalidar capacidade técnica alterada." }] }, a); expect(result).toMatchObject({ impacts: 1, reopenedAnalyses: 1 }); }); });

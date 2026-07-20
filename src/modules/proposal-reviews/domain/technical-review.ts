@@ -1,0 +1,11 @@
+import { z } from "zod";
+export const technicalContentSchema = z.object({ content: z.string().trim().min(20).max(100000), reason: z.string().trim().min(10).max(1000) }).strict();
+export const technicalEvidenceLinkSchema = z.object({ technicalEvidenceId: z.uuid(), locator: z.string().trim().min(3).max(500), justification: z.string().trim().min(10).max(1000) }).strict();
+export const technicalCommentSchema = z.object({ severity: z.enum(["NORMAL", "CRITICAL"]), comment: z.string().trim().min(10).max(2000) }).strict();
+export const technicalCommentResolutionSchema = z.object({ resolution: z.string().trim().min(10).max(2000) }).strict();
+export const technicalReviewSchema = z.object({ decision: z.enum(["APPROVED", "CHANGES_REQUIRED"]), justification: z.string().trim().min(10).max(2000) }).strict();
+export type TechnicalContentDraft = z.infer<typeof technicalContentSchema>;
+export type TechnicalEvidenceLinkDraft = z.infer<typeof technicalEvidenceLinkSchema>;
+export type TechnicalCommentDraft = z.infer<typeof technicalCommentSchema>;
+export type TechnicalCommentResolution = z.infer<typeof technicalCommentResolutionSchema>;
+export type TechnicalReviewDraft = z.infer<typeof technicalReviewSchema>;

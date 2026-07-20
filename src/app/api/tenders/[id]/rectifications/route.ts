@@ -1,0 +1,11 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { requirePermission } from "@/core/authorization/authorization-context";
+import { getDatabase } from "@/core/database/prisma";
+import { toApiError } from "@/core/errors/api-error";
+import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { RectificationService } from "@/modules/rectifications/application/rectification-service";
+import { PrismaRectificationRepository } from "@/modules/rectifications/infrastructure/prisma-rectification-repository";
+import { mapRectificationApiError } from "@/modules/rectifications/presentation/rectification-api";
+export async function GET(request: Request, route: { params: Promise<{ id: string }> }) { const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined }); return runWithRequestContext(context, async () => { try { await requirePermission("rectifications.read"); const tenderId = z.uuid().parse((await route.params).id); const data = await getDatabase().tenderRectification.findMany({ where: { tenderId }, include: { previousVersion: true, rectifiedByVersion: true, impacts: { include: { requirement: true } } }, orderBy: { createdAt: "desc" } }); return NextResponse.json({ data, correlationId: context.correlationId }); } catch (error) { return toApiError(error); } }); }
+export async function POST(request: Request, route: { params: Promise<{ id: string }> }) { const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined }); return runWithRequestContext(context, async () => { try { const authorization = await requirePermission("rectifications.create"); const tenderId = z.uuid().parse((await route.params).id); const input = await request.json() as Record<string, unknown>; const data = await new RectificationService(new PrismaRectificationRepository()).create({ ...input, tenderId }, authorization.actorId, context.correlationId); return NextResponse.json({ data, correlationId: context.correlationId }, { status: 201 }); } catch (error) { try { mapRectificationApiError(error); } catch (mapped) { return toApiError(mapped); } } }); }

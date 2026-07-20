@@ -1,0 +1,15 @@
+DELETE FROM profile_permissions WHERE "permissionId" IN ('e4100000-0000-4000-8000-000000000001','e4100000-0000-4000-8000-000000000002');
+DELETE FROM permissions WHERE id IN ('e4100000-0000-4000-8000-000000000001','e4100000-0000-4000-8000-000000000002');
+DROP TRIGGER IF EXISTS trg_competition_offers_append_only ON competition_offers;
+DROP FUNCTION IF EXISTS gsipro_competition_append_only();
+DROP TRIGGER IF EXISTS trg_validate_offer_chain ON competition_offers;
+DROP FUNCTION IF EXISTS gsipro_validate_offer_chain();
+DROP TRIGGER IF EXISTS trg_validate_competition_lot ON competitions;
+DROP FUNCTION IF EXISTS gsipro_validate_competition_lot();
+DROP TABLE IF EXISTS competition_offers;
+DROP TABLE IF EXISTS competition_participants;
+DROP TABLE IF EXISTS competitions;
+DROP TABLE IF EXISTS competitors;
+DROP TYPE IF EXISTS "CompetitionParticipantStatus";
+DROP TYPE IF EXISTS "CompetitionFactStatus";
+DROP TYPE IF EXISTS "CompetitionStatus";

@@ -1,0 +1,5 @@
+INSERT INTO "permissions"("id","code","module","action","description","createdAt","createdBy")VALUES
+('a4000000-0000-4000-8000-000000000001','deadlines.read','deadlines','read','Consultar prazos e alertas',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'),
+('a4000000-0000-4000-8000-000000000002','deadlines.create','deadlines','create','Registrar prazos e alertas pendentes de confirmação',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'),
+('a4000000-0000-4000-8000-000000000003','deadlines.confirm','deadlines','confirm','Confirmar prazo mediante decisão humana justificada',CURRENT_TIMESTAMP,'00000000-0000-0000-8000-000000000000') ON CONFLICT("code")DO NOTHING;
+INSERT INTO "profile_permissions"("profileId","permissionId","grantedAt","grantedBy")SELECT'a2100000-0000-4000-8000-000000000001',"id",CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'FROM"permissions"WHERE"code"IN('deadlines.read','deadlines.create','deadlines.confirm')ON CONFLICT("profileId","permissionId")DO NOTHING;

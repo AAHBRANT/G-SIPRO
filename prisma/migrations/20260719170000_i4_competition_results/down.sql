@@ -1,0 +1,16 @@
+DELETE FROM profile_permissions WHERE "permissionId"='e4300000-0000-4000-8000-000000000001';
+DELETE FROM permissions WHERE id='e4300000-0000-4000-8000-000000000001';
+DROP TRIGGER IF EXISTS trg_result_validations_append_only ON competition_result_validations;
+DROP TRIGGER IF EXISTS trg_competition_results_append_only ON competition_results;
+DROP TRIGGER IF EXISTS trg_motive_categories_append_only ON competition_motive_categories;
+DROP TRIGGER IF EXISTS trg_validate_result_approval ON competition_result_validations;
+DROP FUNCTION IF EXISTS gsipro_validate_result_approval();
+DROP TRIGGER IF EXISTS trg_validate_competition_result ON competition_results;
+DROP FUNCTION IF EXISTS gsipro_validate_competition_result();
+DROP TRIGGER IF EXISTS trg_validate_motive_category ON competition_motive_categories;
+DROP FUNCTION IF EXISTS gsipro_validate_motive_category();
+DROP TABLE IF EXISTS competition_result_validations;
+DROP TABLE IF EXISTS competition_results;
+DROP TABLE IF EXISTS competition_motive_categories;
+DROP TYPE IF EXISTS "CompetitionMotiveStatus";
+DROP TYPE IF EXISTS "CompetitionOutcome";

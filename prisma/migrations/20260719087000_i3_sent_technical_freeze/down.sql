@@ -1,0 +1,8 @@
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_history ON proposal_technical_section_history;
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_reviews ON proposal_technical_reviews;
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_comments ON proposal_technical_review_comments;
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_evidence ON proposal_technical_evidence_links;
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_content ON proposal_technical_content_versions;
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_requirements ON proposal_technical_section_requirements;
+DROP TRIGGER IF EXISTS trg_freeze_submitted_technical_sections ON proposal_technical_sections;
+DROP FUNCTION IF EXISTS gsipro_guard_submitted_technical_version();

@@ -1,0 +1,20 @@
+{
+  "identifierUris": [
+    "api://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io/e9db2cdd-b997-4e45-8d2e-8b3a64147367"
+  ],
+  "api": {
+    "requestedAccessTokenVersion": 2,
+    "oauth2PermissionScopes": [
+      {
+        "adminConsentDescription": "Permite que o Microsoft Teams autentique o usuário corporativo no G-SIPRO.",
+        "adminConsentDisplayName": "Acessar o G-SIPRO como usuário autenticado",
+        "id": "a2e6b5ef-152e-4a33-9a84-55b5c9f2e2d1",
+        "isEnabled": true,
+        "type": "User",
+        "userConsentDescription": "Permite acessar o G-SIPRO utilizando sua identidade corporativa do Microsoft Teams.",
+        "userConsentDisplayName": "Acessar o G-SIPRO",
+        "value": "access_as_user"
+      }
+    ]
+  }
+}

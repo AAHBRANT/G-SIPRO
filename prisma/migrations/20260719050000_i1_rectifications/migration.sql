@@ -1,0 +1,15 @@
+CREATE TABLE "tender_rectifications" ("id" UUID NOT NULL,"tenderId" UUID NOT NULL,"previousVersionId" UUID NOT NULL,"rectifiedByVersionId" UUID NOT NULL,"description" VARCHAR(1000) NOT NULL,"source" VARCHAR(500) NOT NULL,"createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,"createdBy" UUID NOT NULL,CONSTRAINT "tender_rectifications_pkey" PRIMARY KEY("id"));
+CREATE TABLE "rectification_impacts" ("id" UUID NOT NULL,"rectificationId" UUID NOT NULL,"requirementId" UUID NOT NULL,"description" VARCHAR(1000) NOT NULL,"requiresRevalidation" BOOLEAN NOT NULL DEFAULT true,"createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,"createdBy" UUID NOT NULL,CONSTRAINT "rectification_impacts_pkey" PRIMARY KEY("id"));
+CREATE UNIQUE INDEX "tender_rectifications_rectifiedByVersionId_key" ON "tender_rectifications"("rectifiedByVersionId");
+CREATE INDEX "tender_rectifications_tenderId_createdAt_idx" ON "tender_rectifications"("tenderId","createdAt");
+CREATE INDEX "tender_rectifications_previousVersionId_idx" ON "tender_rectifications"("previousVersionId");
+CREATE UNIQUE INDEX "rectification_impacts_rectificationId_requirementId_key" ON "rectification_impacts"("rectificationId","requirementId");
+CREATE INDEX "rectification_impacts_requirementId_idx" ON "rectification_impacts"("requirementId");
+ALTER TABLE "tender_rectifications" ADD CONSTRAINT "tender_rectifications_tenderId_fkey" FOREIGN KEY("tenderId") REFERENCES "tenders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tender_rectifications" ADD CONSTRAINT "tender_rectifications_previousVersionId_fkey" FOREIGN KEY("previousVersionId") REFERENCES "tender_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tender_rectifications" ADD CONSTRAINT "tender_rectifications_rectifiedByVersionId_fkey" FOREIGN KEY("rectifiedByVersionId") REFERENCES "tender_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "rectification_impacts" ADD CONSTRAINT "rectification_impacts_rectificationId_fkey" FOREIGN KEY("rectificationId") REFERENCES "tender_rectifications"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "rectification_impacts" ADD CONSTRAINT "rectification_impacts_requirementId_fkey" FOREIGN KEY("requirementId") REFERENCES "tender_requirements"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+CREATE OR REPLACE FUNCTION prevent_rectification_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'rectifications are append-only'; END; $$;
+CREATE TRIGGER tender_rectifications_append_only BEFORE UPDATE OR DELETE ON "tender_rectifications" FOR EACH ROW EXECUTE FUNCTION prevent_rectification_mutation();
+CREATE TRIGGER rectification_impacts_append_only BEFORE UPDATE OR DELETE ON "rectification_impacts" FOR EACH ROW EXECUTE FUNCTION prevent_rectification_mutation();

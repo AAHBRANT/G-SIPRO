@@ -1,0 +1,18 @@
+CREATE TYPE "AnalysisCompetence" AS ENUM ('TECHNICAL', 'LEGAL', 'COMMERCIAL', 'FINANCIAL', 'ACCOUNTING');
+CREATE TYPE "AnalysisPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'CRITICAL');
+CREATE TYPE "AnalysisStatus" AS ENUM ('PENDING', 'VALIDATED', 'REJECTED');
+CREATE TABLE "requirement_analyses" ("id" UUID NOT NULL,"requirementId" UUID NOT NULL,"competence" "AnalysisCompetence" NOT NULL,"priority" "AnalysisPriority" NOT NULL DEFAULT 'NORMAL',"assigneeId" UUID NOT NULL,"status" "AnalysisStatus" NOT NULL DEFAULT 'PENDING',"justification" VARCHAR(1000),"decidedAt" TIMESTAMPTZ(6),"decidedById" UUID,"version" INTEGER NOT NULL DEFAULT 1,"createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,"createdBy" UUID NOT NULL,"updatedAt" TIMESTAMPTZ(6) NOT NULL,"updatedBy" UUID NOT NULL,CONSTRAINT "requirement_analyses_pkey" PRIMARY KEY("id"));
+CREATE TABLE "analysis_history" ("id" UUID NOT NULL,"analysisId" UUID NOT NULL,"version" INTEGER NOT NULL,"action" VARCHAR(80) NOT NULL,"changes" JSONB NOT NULL,"reason" VARCHAR(1000),"changedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,"changedById" UUID NOT NULL,"correlationId" UUID NOT NULL,CONSTRAINT "analysis_history_pkey" PRIMARY KEY("id"));
+CREATE UNIQUE INDEX "requirement_analyses_requirementId_competence_key" ON "requirement_analyses"("requirementId","competence");
+CREATE INDEX "requirement_analyses_assigneeId_status_priority_idx" ON "requirement_analyses"("assigneeId","status","priority");
+CREATE INDEX "requirement_analyses_competence_status_idx" ON "requirement_analyses"("competence","status");
+CREATE UNIQUE INDEX "analysis_history_analysisId_version_key" ON "analysis_history"("analysisId","version");
+CREATE INDEX "analysis_history_changedById_changedAt_idx" ON "analysis_history"("changedById","changedAt");
+CREATE INDEX "analysis_history_correlationId_idx" ON "analysis_history"("correlationId");
+ALTER TABLE "requirement_analyses" ADD CONSTRAINT "requirement_analyses_requirementId_fkey" FOREIGN KEY("requirementId") REFERENCES "tender_requirements"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "requirement_analyses" ADD CONSTRAINT "requirement_analyses_assigneeId_fkey" FOREIGN KEY("assigneeId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "requirement_analyses" ADD CONSTRAINT "requirement_analyses_decidedById_fkey" FOREIGN KEY("decidedById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "analysis_history" ADD CONSTRAINT "analysis_history_analysisId_fkey" FOREIGN KEY("analysisId") REFERENCES "requirement_analyses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "analysis_history" ADD CONSTRAINT "analysis_history_changedById_fkey" FOREIGN KEY("changedById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+CREATE OR REPLACE FUNCTION prevent_analysis_history_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'analysis_history is append-only'; END; $$;
+CREATE TRIGGER analysis_history_append_only BEFORE UPDATE OR DELETE ON "analysis_history" FOR EACH ROW EXECUTE FUNCTION prevent_analysis_history_mutation();

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.22",
+  "version": "1.0.0",
+  "id": "4c3df36b-4cc0-4e17-b457-3794dc7d9d86",
+  "developer": {
+    "name": "AAHBRANT",
+    "websiteUrl": "https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io",
+    "privacyUrl": "https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io/privacy",
+    "termsOfUseUrl": "https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io/terms"
+  },
+  "name": {
+    "short": "G-SIPRO",
+    "full": "G-SIPRO — Gestão Inteligente de Propostas"
+  },
+  "description": {
+    "short": "Gestão inteligente de oportunidades, propostas e acervo técnico.",
+    "full": "Aplicação corporativa da AAHBRANT para gestão de oportunidades, propostas, documentos, acervo técnico, inteligência e indicadores, com acesso controlado por usuário."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#2563EB",
+  "staticTabs": [
+    {
+      "entityId": "gsipro-home",
+      "name": "G-SIPRO",
+      "contentUrl": "https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io/teams",
+      "websiteUrl": "https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": ["identity"],
+  "validDomains": [
+    "ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io"
+  ],
+  "webApplicationInfo": {
+    "id": "e9db2cdd-b997-4e45-8d2e-8b3a64147367",
+    "resource": "api://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io/e9db2cdd-b997-4e45-8d2e-8b3a64147367"
+  }
+}

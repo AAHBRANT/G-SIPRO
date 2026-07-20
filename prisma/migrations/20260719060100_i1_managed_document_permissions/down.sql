@@ -1,0 +1,1 @@
+DELETE FROM "profile_permissions" WHERE "permissionId" IN (SELECT "id" FROM "permissions" WHERE "code" IN ('documents.read','documents.create','documents.version','documents.link'));DELETE FROM "permissions" WHERE "code" IN ('documents.read','documents.create','documents.version','documents.link');

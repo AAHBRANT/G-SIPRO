@@ -1,0 +1,3 @@
+INSERT INTO "permissions"("id","code","module","action","description","createdAt","createdBy") VALUES
+('b2000000-0000-4000-8000-000000000017','proposals.technical-sections.manage','proposals','technical-sections.manage','Estruturar seções técnicas e controlar responsáveis e status',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000') ON CONFLICT("code") DO NOTHING;
+INSERT INTO "profile_permissions"("profileId","permissionId","grantedAt","grantedBy") SELECT 'a2100000-0000-4000-8000-000000000001',"id",CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000' FROM "permissions" WHERE "code"='proposals.technical-sections.manage' ON CONFLICT("profileId","permissionId") DO NOTHING;

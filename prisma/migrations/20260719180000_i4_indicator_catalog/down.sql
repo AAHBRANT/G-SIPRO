@@ -1,0 +1,10 @@
+DELETE FROM profile_permissions WHERE "permissionId" IN(SELECT id FROM permissions WHERE code IN('indicators.read','indicators.manage','indicators.approve'));
+DELETE FROM permissions WHERE code IN('indicators.read','indicators.manage','indicators.approve');
+DROP TRIGGER IF EXISTS trg_indicator_approvals_append_only ON indicator_approvals;
+DROP TRIGGER IF EXISTS trg_indicator_definitions_append_only ON indicator_definitions;
+DROP TRIGGER IF EXISTS trg_validate_indicator_approval ON indicator_approvals;
+DROP FUNCTION IF EXISTS gsipro_validate_indicator_approval();
+DROP TRIGGER IF EXISTS trg_validate_indicator_definition ON indicator_definitions;
+DROP FUNCTION IF EXISTS gsipro_validate_indicator_definition();
+DROP TABLE IF EXISTS indicator_approvals;
+DROP TABLE IF EXISTS indicator_definitions;

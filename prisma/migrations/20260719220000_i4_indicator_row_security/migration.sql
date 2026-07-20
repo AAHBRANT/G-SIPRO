@@ -1,0 +1,2 @@
+INSERT INTO permissions(id,code,module,action,description,"createdAt","createdBy") VALUES('e4700000-0000-4000-8000-000000000001','indicators.read-all','indicators','read-all','Consultar todas as linhas de indicadores independentemente de propriedade ou responsabilidade.',now(),'00000000-0000-0000-0000-000000000000');
+INSERT INTO profile_permissions("profileId","permissionId","grantedAt","grantedBy") VALUES('a2100000-0000-4000-8000-000000000001','e4700000-0000-4000-8000-000000000001',now(),'00000000-0000-0000-0000-000000000000');

@@ -1,0 +1,39 @@
+import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
+import { NextResponse } from "next/server";
+
+import { requireMaster } from "@/core/authorization/authorization-context";
+import { getDatabase } from "@/core/database/prisma";
+import { ConflictError, ValidationError } from "@/core/errors/application-error";
+import { toApiError } from "@/core/errors/api-error";
+import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { userAccessSchema } from "@/modules/admin/user-access-schema";
+
+export async function POST(request: Request): Promise<NextResponse> {
+  const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
+  return runWithRequestContext(context, async () => {
+    try {
+      const authorization = await requireMaster();
+      const input = userAccessSchema.parse(await request.json());
+      const database = getDatabase();
+      if (await database.user.findUnique({ where: { email: input.email }, select: { id: true } })) throw new ConflictError("Já existe um usuário com este e-mail.");
+      if (input.departmentId && !await database.department.findFirst({ where: { id: input.departmentId, active: true }, select: { id: true } })) throw new ValidationError("O departamento selecionado não está disponível.");
+      const permissionCount = await database.permission.count({ where: { id: { in: input.permissionIds } } });
+      if (permissionCount !== new Set(input.permissionIds).size) throw new ValidationError("Uma ou mais permissões selecionadas são inválidas.");
+
+      const userId = randomUUID();
+      const profileId = randomUUID();
+      await database.$transaction(async (transaction) => {
+        await transaction.user.create({ data: { id: userId, entraObjectId: randomUUID(), displayName: input.displayName, email: input.email, status: input.status, isMaster: input.isMaster, departmentId: input.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
+        await transaction.profile.create({ data: { id: profileId, code: `USER_ACCESS_${userId.replaceAll("-", "")}`, name: `Acesso individual — ${input.displayName}`, description: "Perfil individual administrado pelo painel de usuários.", createdBy: authorization.actorId, updatedBy: authorization.actorId } });
+        if (input.permissionIds.length) await transaction.profilePermission.createMany({ data: [...new Set(input.permissionIds)].map((permissionId) => ({ profileId, permissionId, grantedBy: authorization.actorId })) });
+        await transaction.userProfile.create({ data: { userId, profileId, grantedBy: authorization.actorId, reason: "Provisionamento pelo painel administrativo" } });
+        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_PROVISIONED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, isMaster: input.isMaster, permissionCount: input.permissionIds.length } } });
+      });
+      revalidatePath("/admin");
+      return NextResponse.json({ data: { id: userId }, correlationId: context.correlationId }, { status: 201 });
+    } catch (error) {
+      return toApiError(error);
+    }
+  });
+}

@@ -1,0 +1,4 @@
+INSERT INTO "permissions"("id","code","module","action","description","createdAt","createdBy") VALUES
+('b2000000-0000-4000-8000-000000000018','proposals.technical-content.edit','proposals','technical-content.edit','Elaborar conteúdo e vincular evidências técnicas',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'),
+('b2000000-0000-4000-8000-000000000019','proposals.technical-review','proposals','technical-review','Comentar, resolver pendências e revisar conteúdo técnico',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000') ON CONFLICT("code") DO NOTHING;
+INSERT INTO "profile_permissions"("profileId","permissionId","grantedAt","grantedBy") SELECT 'a2100000-0000-4000-8000-000000000001',"id",CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000' FROM "permissions" WHERE "code" IN ('proposals.technical-content.edit','proposals.technical-review') ON CONFLICT("profileId","permissionId") DO NOTHING;

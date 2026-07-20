@@ -1,0 +1,3 @@
+import{describe,expect,it}from"vitest";import{AiExtractionProviderError}from"../domain/ai-extraction";import{OpenAiResponsesProvider}from"./openai-responses-provider";
+const input={model:"gpt-test",prompt:"extraia",documentTitle:"Edital",documentType:"EDITAL",fileHash:"a".repeat(64),mimeType:"application/pdf",bytes:Buffer.from("test"),requestedFields:["Objeto"],correlationId:"11111111-1111-4111-8111-111111111111"};
+describe("OpenAI Responses provider",()=>{it("fails safely when the server secret is absent",async()=>{await expect(new OpenAiResponsesProvider("").execute(input)).rejects.toMatchObject({code:"OPENAI_NOT_CONFIGURED"} satisfies Partial<AiExtractionProviderError>)})});

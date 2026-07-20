@@ -1,0 +1,2 @@
+# Gerado e controlado pelo Prisma Migrate.
+provider = "postgresql"

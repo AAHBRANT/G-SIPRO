@@ -1,0 +1,1 @@
+DELETE FROM "profile_permissions" WHERE "permissionId" IN(SELECT "id" FROM "permissions" WHERE "code" IN('technical-archive.read','technical-archive.create'));DELETE FROM "permissions" WHERE "code" IN('technical-archive.read','technical-archive.create');

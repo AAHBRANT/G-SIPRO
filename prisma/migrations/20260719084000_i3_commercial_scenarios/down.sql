@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS "commercial_scenario_append_only" ON "commercial_scenarios";DROP FUNCTION IF EXISTS "reject_commercial_scenario_mutation"();DROP TRIGGER IF EXISTS "commercial_scenario_chain_guard" ON "commercial_scenarios";DROP FUNCTION IF EXISTS "validate_commercial_scenario_chain"();DROP TABLE IF EXISTS "commercial_scenarios";

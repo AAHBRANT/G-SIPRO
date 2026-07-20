@@ -1,0 +1,6 @@
+INSERT INTO "permissions"("id","code","module","action","description","createdAt","createdBy")VALUES
+('a5000000-0000-4000-8000-000000000001','analyses.read','analyses','read','Consultar análises distribuídas por competência',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'),
+('a5000000-0000-4000-8000-000000000002','analyses.create','analyses','create','Distribuir requisito para análise por competência',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'),
+('a5000000-0000-4000-8000-000000000003','analyses.decide','analyses','decide','Validar ou rejeitar análise com justificativa humana',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'),
+('a5000000-0000-4000-8000-000000000004','analyses.reassign','analyses','reassign','Reatribuir análise pendente com motivo auditável',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000') ON CONFLICT("code")DO NOTHING;
+INSERT INTO "profile_permissions"("profileId","permissionId","grantedAt","grantedBy")SELECT'a2100000-0000-4000-8000-000000000001',"id",CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000'FROM"permissions"WHERE"code"IN('analyses.read','analyses.create','analyses.decide','analyses.reassign')ON CONFLICT("profileId","permissionId")DO NOTHING;

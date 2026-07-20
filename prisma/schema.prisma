@@ -1,0 +1,2193 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum AuditActorType {
+  USER
+  APPLICATION
+  SYSTEM
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+enum SupportTicketType {
+  BUG
+  QUESTION
+  IMPROVEMENT
+  NEW_FEATURE
+}
+
+enum SupportTicketPriority {
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum SupportTicketStatus {
+  OPEN
+  TRIAGED
+  WAITING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+  CANCELLED
+}
+
+enum SupportDecision {
+  APPROVED
+  REJECTED
+}
+
+enum OpportunityOrigin {
+  CHANNEL
+  REFERRAL
+  PORTAL
+  CUSTOMER
+  PROSPECTING
+}
+
+enum OpportunityStatus {
+  DRAFT
+  QUALIFICATION
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum TenderVersionStatus {
+  RECEIVED
+  IN_ANALYSIS
+  VALIDATED
+  SUBSTITUTED
+}
+
+enum RequirementCriticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RequirementStatus {
+  DRAFT
+  PENDING_VALIDATION
+  VALIDATED
+  REJECTED
+}
+
+enum DeadlineStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum DeadlineAlertStatus {
+  SCHEDULED
+  ACKNOWLEDGED
+  CANCELLED
+}
+
+enum AnalysisCompetence {
+  TECHNICAL
+  LEGAL
+  COMMERCIAL
+  FINANCIAL
+  ACCOUNTING
+}
+
+enum AnalysisPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum AnalysisStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+}
+
+enum TechnicalExperienceStatus {
+  DRAFT
+  VALIDATED
+  RESTRICTED
+  EXPIRED
+}
+
+enum TechnicalEvidenceType {
+  ATTESTATION
+  CAT
+  ART
+}
+
+enum TechnicalEvidenceStatus {
+  CURRENT
+  RESTRICTED
+  EXPIRED
+}
+
+enum ProfessionalStatus {
+  ACTIVE
+  INACTIVE
+  RESTRICTED
+}
+
+enum ProfessionalLinkTargetType {
+  CONTRACT
+  WORK
+  TECHNICAL_EVIDENCE
+}
+
+enum ComplianceMatrixStatus {
+  IN_ANALYSIS
+  VALIDATED
+  SUPERSEDED
+}
+
+enum ComplianceItemDecision {
+  MEETS
+  PARTIAL
+  DOES_NOT_MEET
+  NOT_APPLICABLE
+}
+
+enum ProposalStatus {
+  PREPARATION
+  REVIEW
+  APPROVAL
+  SENT
+  JUDGED
+  CLOSED
+  FINALIZED
+  CANCELLED
+}
+
+enum ProposalOriginType {
+  PUBLIC_TENDER
+  PRIVATE_COMPETITION
+  DIRECT
+}
+
+enum ProposalComponentType {
+  TECHNICAL
+  COMMERCIAL
+}
+
+enum ProposalComponentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+}
+
+enum ProposalTechnicalSectionStatus {
+  DRAFT
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+}
+
+enum ProposalTechnicalCommentSeverity {
+  NORMAL
+  CRITICAL
+}
+
+enum ProposalTechnicalCommentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ProposalTechnicalReviewDecision {
+  APPROVED
+  CHANGES_REQUIRED
+}
+
+enum CommercialApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+enum ProposalWorkflowStage {
+  PREPARATION
+  TECHNICAL
+  COMMERCIAL
+  APPROVAL
+  SENT
+}
+
+model Department {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(160)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdBy String   @db.Uuid
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  updatedBy String   @db.Uuid
+  users     User[]
+
+  @@index([active])
+  @@map("departments")
+}
+
+model User {
+  id                          String                            @id @default(uuid()) @db.Uuid
+  entraObjectId               String                            @unique @db.Uuid
+  displayName                 String                            @db.VarChar(160)
+  email                       String                            @unique @db.VarChar(254)
+  status                      UserStatus                        @default(ACTIVE)
+  isMaster                    Boolean                           @default(false)
+  departmentId                String?                           @db.Uuid
+  department                  Department?                       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  profileMemberships          UserProfile[]
+  ownedOpportunities          Opportunity[]                     @relation("OpportunityOwner")
+  opportunityChanges          OpportunityHistory[]              @relation("OpportunityChangedBy")
+  requirementResponsibilities TenderRequirement[]               @relation("RequirementResponsible")
+  requirementChanges          RequirementHistory[]              @relation("RequirementChangedBy")
+  deadlineResponsibilities    TenderDeadline[]                  @relation("DeadlineResponsible")
+  deadlineConfirmations       TenderDeadline[]                  @relation("DeadlineConfirmedBy")
+  deadlineChanges             DeadlineHistory[]                 @relation("DeadlineChangedBy")
+  analysisAssignments         RequirementAnalysis[]             @relation("AnalysisAssignee")
+  analysisDecisions           RequirementAnalysis[]             @relation("AnalysisDecidedBy")
+  analysisChanges             AnalysisHistory[]                 @relation("AnalysisChangedBy")
+  ownedDocuments              ManagedDocument[]                 @relation("DocumentOwner")
+  technicalExperiences        ExecutedContract[]                @relation("TechnicalExperienceOwner")
+  technicalExperienceChanges  TechnicalExperienceHistory[]      @relation("TechnicalExperienceChangedBy")
+  technicalEvidenceRecords    TechnicalEvidence[]               @relation("TechnicalEvidenceCreatedBy")
+  professionalRecords         Professional[]                    @relation("ProfessionalCreatedBy")
+  professionalChanges         ProfessionalHistory[]             @relation("ProfessionalChangedBy")
+  professionalLinks           ProfessionalLink[]                @relation("ProfessionalLinkCreatedBy")
+  complianceMatrixChanges     ComplianceMatrixHistory[]         @relation("ComplianceMatrixChangedBy")
+  complianceResponsibilities  ComplianceItemAssessment[]        @relation("ComplianceAssessmentResponsible")
+  complianceValidations       ComplianceItemAssessment[]        @relation("ComplianceAssessmentValidatedBy")
+  complianceExports           ComplianceMatrixExport[]          @relation("ComplianceExportedBy")
+  proposalChanges             ProposalHistory[]                 @relation("ProposalChangedBy")
+  proposalSectionAssignments  ProposalTechnicalSection[]        @relation("ProposalSectionResponsible")
+  proposalSectionChanges      ProposalTechnicalSectionHistory[] @relation("ProposalSectionChangedBy")
+  supportTicketsReported      SupportTicket[]                   @relation("SupportReportedBy")
+  supportTicketsAssigned      SupportTicket[]                   @relation("SupportAssignedTo")
+  supportTicketsResolved      SupportTicket[]                   @relation("SupportResolvedBy")
+  supportDecisions            SupportTicketDecision[]           @relation("SupportDecidedBy")
+  supportUpdates              SupportTicketUpdate[]             @relation("SupportUpdatedBy")
+  createdAt                   DateTime                          @default(now()) @db.Timestamptz(6)
+  createdBy                   String                            @db.Uuid
+  updatedAt                   DateTime                          @updatedAt @db.Timestamptz(6)
+  updatedBy                   String                            @db.Uuid
+
+  @@index([departmentId, status])
+  @@index([displayName])
+  @@map("users")
+}
+
+model Customer {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String        @db.VarChar(200)
+  identifiers   Json?
+  active        Boolean       @default(true)
+  opportunities Opportunity[]
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  createdBy     String        @db.Uuid
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+  updatedBy     String        @db.Uuid
+
+  @@index([name])
+  @@index([active])
+  @@map("customers")
+}
+
+model ContractingAuthority {
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String        @db.VarChar(200)
+  sphere        String?       @db.VarChar(80)
+  locality      String?       @db.VarChar(160)
+  identifiers   Json?
+  active        Boolean       @default(true)
+  opportunities Opportunity[]
+  tenders       Tender[]
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  createdBy     String        @db.Uuid
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+  updatedBy     String        @db.Uuid
+
+  @@index([name])
+  @@index([active])
+  @@map("contracting_authorities")
+}
+
+model Opportunity {
+  id                     String                @id @default(uuid()) @db.Uuid
+  code                   String                @unique @db.VarChar(50)
+  origin                 OpportunityOrigin
+  subject                String?               @db.Text
+  customerId             String?               @db.Uuid
+  customer               Customer?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  contractingAuthorityId String?               @db.Uuid
+  contractingAuthority   ContractingAuthority? @relation(fields: [contractingAuthorityId], references: [id], onDelete: Restrict)
+  estimatedValue         Decimal?              @db.Decimal(19, 4)
+  currency               String?               @db.Char(3)
+  valueSource            String?               @db.VarChar(300)
+  publishedAt            DateTime?             @db.Timestamptz(6)
+  deliveryAt             DateTime?             @db.Timestamptz(6)
+  datesSource            String?               @db.VarChar(300)
+  datesTimeZone          String?               @db.VarChar(80)
+  ownerId                String?               @db.Uuid
+  owner                  User?                 @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  status                 OpportunityStatus     @default(DRAFT)
+  closureReasonCode      String?               @db.VarChar(80)
+  closureJustification   String?               @db.VarChar(1000)
+  closedAt               DateTime?             @db.Timestamptz(6)
+  version                Int                   @default(1)
+  history                OpportunityHistory[]
+  tenders                Tender[]
+  proposals              Proposal[]
+  createdAt              DateTime              @default(now()) @db.Timestamptz(6)
+  createdBy              String                @db.Uuid
+  updatedAt              DateTime              @updatedAt @db.Timestamptz(6)
+  updatedBy              String                @db.Uuid
+
+  @@index([status, deliveryAt])
+  @@index([ownerId, status])
+  @@index([customerId, status])
+  @@index([contractingAuthorityId, status])
+  @@map("opportunities")
+}
+
+model Tender {
+  id                     String                @id @default(uuid()) @db.Uuid
+  code                   String                @unique @db.VarChar(50)
+  number                 String                @db.VarChar(100)
+  modality               String                @db.VarChar(100)
+  subject                String                @db.Text
+  origin                 String                @db.VarChar(500)
+  opportunityId          String?               @db.Uuid
+  opportunity            Opportunity?          @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  contractingAuthorityId String?               @db.Uuid
+  contractingAuthority   ContractingAuthority? @relation(fields: [contractingAuthorityId], references: [id], onDelete: Restrict)
+  lots                   TenderLot[]
+  versions               TenderVersion[]
+  deadlines              TenderDeadline[]
+  rectifications         TenderRectification[]
+  competitions           Competition[]
+  createdAt              DateTime              @default(now()) @db.Timestamptz(6)
+  createdBy              String                @db.Uuid
+  updatedAt              DateTime              @updatedAt @db.Timestamptz(6)
+  updatedBy              String                @db.Uuid
+
+  @@index([number, modality])
+  @@index([opportunityId])
+  @@index([contractingAuthorityId])
+  @@map("tenders")
+}
+
+model TenderLot {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenderId    String       @db.Uuid
+  tender      Tender       @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  code        String       @db.VarChar(80)
+  subject     String       @db.Text
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+  createdBy   String       @db.Uuid
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(6)
+  updatedBy   String       @db.Uuid
+  proposals   Proposal[]
+  competition Competition?
+
+  @@unique([tenderId, code])
+  @@map("tender_lots")
+}
+
+enum CompetitionStatus {
+  DRAFT
+  ACTIVE
+  VALIDATED
+}
+
+enum CompetitionFactStatus {
+  ESTIMATED
+  CONFIRMED
+}
+
+enum CompetitionParticipantStatus {
+  EXPECTED
+  PARTICIPATING
+  WITHDRAWN
+}
+
+enum CompetitionActType {
+  JUDGMENT
+  DILIGENCE
+  APPEAL
+  COUNTERARGUMENT
+  DECISION
+}
+
+enum CompetitionOutcome {
+  WIN
+  LOSS
+  DISQUALIFICATION
+  CANCELLATION
+}
+
+enum CompetitionMotiveStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum IndicatorCalculationMethod {
+  PIPELINE_COUNT
+  PIPELINE_VALUE
+  RESULT_CONVERSION_RATE
+  FINANCIAL_CONVERSION_RATE
+  AVERAGE_DISCOUNT_PERCENT
+  AVERAGE_MARGIN_PERCENT
+}
+
+enum IndicatorReconciliationStatus {
+  MATCH
+  DIVERGENT
+}
+
+enum AiModelStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AiExtractionStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model Competitor {
+  id             String                   @id @default(uuid()) @db.Uuid
+  legalName      String                   @db.VarChar(300)
+  tradeName      String?                  @db.VarChar(300)
+  normalizedName String                   @unique @db.VarChar(300)
+  knownNames     Json
+  participants   CompetitionParticipant[]
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy      String                   @db.Uuid
+  updatedAt      DateTime                 @updatedAt @db.Timestamptz(6)
+  updatedBy      String                   @db.Uuid
+
+  @@map("competitors")
+}
+
+model Competition {
+  id              String                   @id @default(uuid()) @db.Uuid
+  tenderId        String                   @db.Uuid
+  tender          Tender                   @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  tenderLotId     String                   @unique @db.Uuid
+  tenderLot       TenderLot                @relation(fields: [tenderLotId], references: [id], onDelete: Restrict)
+  competitionDate DateTime                 @db.Date
+  status          CompetitionStatus        @default(DRAFT)
+  sourceReference String                   @db.VarChar(500)
+  sourceDate      DateTime                 @db.Date
+  participants    CompetitionParticipant[]
+  acts            CompetitionAct[]
+  results         CompetitionResult[]
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy       String                   @db.Uuid
+  updatedAt       DateTime                 @updatedAt @db.Timestamptz(6)
+  updatedBy       String                   @db.Uuid
+
+  @@index([tenderId, status])
+  @@map("competitions")
+}
+
+model CompetitionParticipant {
+  id              String                       @id @default(uuid()) @db.Uuid
+  competitionId   String                       @db.Uuid
+  competition     Competition                  @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  competitorId    String                       @db.Uuid
+  competitor      Competitor                   @relation(fields: [competitorId], references: [id], onDelete: Restrict)
+  status          CompetitionParticipantStatus
+  factStatus      CompetitionFactStatus
+  sourceReference String                       @db.VarChar(500)
+  sourceDate      DateTime                     @db.Date
+  offers          CompetitionOffer[]
+  acts            CompetitionAct[]
+  winningResults  CompetitionResult[]
+  createdAt       DateTime                     @default(now()) @db.Timestamptz(6)
+  createdBy       String                       @db.Uuid
+
+  @@unique([competitionId, competitorId])
+  @@index([competitorId])
+  @@map("competition_participants")
+}
+
+model CompetitionOffer {
+  id                String                 @id @default(uuid()) @db.Uuid
+  participantId     String                 @db.Uuid
+  participant       CompetitionParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  offerKey          String                 @db.Uuid
+  version           Int
+  previousVersionId String?                @db.Uuid
+  previousVersion   CompetitionOffer?      @relation("CompetitionOfferChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions      CompetitionOffer[]     @relation("CompetitionOfferChain")
+  amount            Decimal                @db.Decimal(19, 4)
+  currency          String                 @db.Char(3)
+  offerDate         DateTime               @db.Date
+  factStatus        CompetitionFactStatus
+  sourceReference   String                 @db.VarChar(500)
+  sourceDate        DateTime               @db.Date
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  createdBy         String                 @db.Uuid
+  correlationId     String                 @db.Uuid
+
+  @@unique([offerKey, version])
+  @@index([participantId, offerDate])
+  @@index([previousVersionId])
+  @@map("competition_offers")
+}
+
+model CompetitionAct {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  competitionId          String                  @db.Uuid
+  competition            Competition             @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  participantId          String?                 @db.Uuid
+  participant            CompetitionParticipant? @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  actKey                 String                  @db.Uuid
+  version                Int
+  previousVersionId      String?                 @db.Uuid
+  previousVersion        CompetitionAct?         @relation("CompetitionActChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions           CompetitionAct[]        @relation("CompetitionActChain")
+  type                   CompetitionActType
+  summary                String                  @db.Text
+  judgmentClassification String?                 @db.VarChar(200)
+  qualification          String?                 @db.VarChar(200)
+  criterion              String?                 @db.VarChar(1000)
+  actDate                DateTime                @db.Date
+  deadlineAt             DateTime?               @db.Timestamptz(6)
+  documentVersionId      String                  @db.Uuid
+  documentVersion        ManagedDocumentVersion  @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash       String                  @db.Char(64)
+  sourceReference        String                  @db.VarChar(500)
+  sourceDate             DateTime                @db.Date
+  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
+  createdBy              String                  @db.Uuid
+  correlationId          String                  @db.Uuid
+
+  @@unique([actKey, version])
+  @@index([competitionId, type, actDate])
+  @@index([participantId])
+  @@index([previousVersionId])
+  @@index([documentVersionId])
+  @@map("competition_acts")
+}
+
+model CompetitionMotiveCategory {
+  id                String                      @id @default(uuid()) @db.Uuid
+  categoryKey       String                      @db.Uuid
+  version           Int
+  previousVersionId String?                     @db.Uuid
+  previousVersion   CompetitionMotiveCategory?  @relation("CompetitionMotiveChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions      CompetitionMotiveCategory[] @relation("CompetitionMotiveChain")
+  code              String                      @db.VarChar(80)
+  name              String                      @db.VarChar(200)
+  definition        String                      @db.VarChar(1000)
+  applicableOutcome CompetitionOutcome?
+  status            CompetitionMotiveStatus
+  changeReason      String                      @db.VarChar(1000)
+  sourceReference   String                      @db.VarChar(500)
+  sourceDate        DateTime                    @db.Date
+  results           CompetitionResult[]
+  createdAt         DateTime                    @default(now()) @db.Timestamptz(6)
+  createdBy         String                      @db.Uuid
+  correlationId     String                      @db.Uuid
+
+  @@unique([categoryKey, version])
+  @@index([code, status])
+  @@index([previousVersionId])
+  @@map("competition_motive_categories")
+}
+
+model CompetitionResult {
+  id                   String                       @id @default(uuid()) @db.Uuid
+  competitionId        String                       @db.Uuid
+  competition          Competition                  @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  version              Int
+  previousVersionId    String?                      @db.Uuid
+  previousVersion      CompetitionResult?           @relation("CompetitionResultChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions         CompetitionResult[]          @relation("CompetitionResultChain")
+  outcome              CompetitionOutcome
+  winningParticipantId String?                      @db.Uuid
+  winningParticipant   CompetitionParticipant?      @relation(fields: [winningParticipantId], references: [id], onDelete: Restrict)
+  motiveCategoryId     String                       @db.Uuid
+  motiveCategory       CompetitionMotiveCategory    @relation(fields: [motiveCategoryId], references: [id], onDelete: Restrict)
+  justification        String                       @db.Text
+  resultDate           DateTime                     @db.Date
+  documentVersionId    String                       @db.Uuid
+  documentVersion      ManagedDocumentVersion       @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash     String                       @db.Char(64)
+  sourceReference      String                       @db.VarChar(500)
+  sourceDate           DateTime                     @db.Date
+  validation           CompetitionResultValidation?
+  award                CompetitionAward?
+  createdAt            DateTime                     @default(now()) @db.Timestamptz(6)
+  createdBy            String                       @db.Uuid
+  correlationId        String                       @db.Uuid
+
+  @@unique([competitionId, version])
+  @@index([outcome, resultDate])
+  @@index([previousVersionId])
+  @@index([motiveCategoryId])
+  @@index([documentVersionId])
+  @@map("competition_results")
+}
+
+model CompetitionAward {
+  id                String                 @id @default(uuid()) @db.Uuid
+  resultId          String                 @unique @db.Uuid
+  result            CompetitionResult      @relation(fields: [resultId], references: [id], onDelete: Restrict)
+  contractValue     Decimal                @db.Decimal(19, 4)
+  currency          String                 @db.Char(3)
+  documentVersionId String                 @db.Uuid
+  documentVersion   ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash  String                 @db.Char(64)
+  sourceReference   String                 @db.VarChar(500)
+  sourceDate        DateTime               @db.Date
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  createdBy         String                 @db.Uuid
+  correlationId     String                 @db.Uuid
+
+  @@index([currency, sourceDate])
+  @@index([documentVersionId])
+  @@map("competition_awards")
+}
+
+model CompetitionResultValidation {
+  id            String            @id @default(uuid()) @db.Uuid
+  resultId      String            @unique @db.Uuid
+  result        CompetitionResult @relation(fields: [resultId], references: [id], onDelete: Restrict)
+  note          String            @db.VarChar(1000)
+  validatedAt   DateTime          @db.Timestamptz(6)
+  validatedBy   String            @db.Uuid
+  correlationId String            @db.Uuid
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+
+  @@index([validatedAt])
+  @@map("competition_result_validations")
+}
+
+model IndicatorDefinition {
+  id                    String                      @id @default(uuid()) @db.Uuid
+  indicatorKey          String                      @db.Uuid
+  version               Int
+  previousVersionId     String?                     @db.Uuid
+  previousVersion       IndicatorDefinition?        @relation("IndicatorDefinitionChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions          IndicatorDefinition[]       @relation("IndicatorDefinitionChain")
+  code                  String                      @db.VarChar(80)
+  name                  String                      @db.VarChar(200)
+  purpose               String                      @db.VarChar(1000)
+  calculationMethod     IndicatorCalculationMethod?
+  ownerId               String                      @db.Uuid
+  numeratorDefinition   String                      @db.Text
+  denominatorDefinition String                      @db.Text
+  treatmentDefinition   String                      @db.Text
+  granularity           String                      @db.VarChar(500)
+  sourceMappings        Json
+  dimensions            Json
+  refreshPeriodicity    String                      @db.VarChar(200)
+  refreshTime           String                      @db.VarChar(80)
+  accessRule            String                      @db.VarChar(1000)
+  rowSecurityRule       String                      @db.VarChar(1000)
+  qualityTest           String                      @db.VarChar(1000)
+  qualityTolerance      String                      @db.VarChar(500)
+  qualityOwnerId        String                      @db.Uuid
+  effectiveFrom         DateTime                    @db.Date
+  changeReason          String                      @db.VarChar(1000)
+  approval              IndicatorApproval?
+  snapshots             IndicatorSnapshot[]
+  createdAt             DateTime                    @default(now()) @db.Timestamptz(6)
+  createdBy             String                      @db.Uuid
+  correlationId         String                      @db.Uuid
+
+  @@unique([indicatorKey, version])
+  @@index([code, effectiveFrom])
+  @@index([previousVersionId])
+  @@index([ownerId])
+  @@index([qualityOwnerId])
+  @@map("indicator_definitions")
+}
+
+model IndicatorSnapshot {
+  id                      String                     @id @default(uuid()) @db.Uuid
+  definitionId            String                     @db.Uuid
+  definition              IndicatorDefinition        @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  calculationMethod       IndicatorCalculationMethod
+  periodStart             DateTime                   @db.Date
+  periodEnd               DateTime                   @db.Date
+  currency                String?                    @db.Char(3)
+  numerator               Decimal                    @db.Decimal(24, 8)
+  denominator             Decimal?                   @db.Decimal(24, 8)
+  value                   Decimal                    @db.Decimal(24, 8)
+  unit                    String                     @db.VarChar(40)
+  sourceRecordCount       Int
+  sourcePayload           Json
+  payloadHash             String                     @db.Char(64)
+  calculatedAt            DateTime                   @db.Timestamptz(6)
+  calculatedBy            String                     @db.Uuid
+  correlationId           String                     @db.Uuid
+  createdAt               DateTime                   @default(now()) @db.Timestamptz(6)
+  baselineReconciliations IndicatorReconciliation[]  @relation("IndicatorReconciliationBaseline")
+  observedReconciliation  IndicatorReconciliation?   @relation("IndicatorReconciliationObserved")
+  publication             IndicatorPublication?
+
+  @@unique([definitionId, periodStart, periodEnd, currency, payloadHash, calculatedAt], map: "indicator_snapshots_execution_key")
+  @@index([definitionId, calculatedAt])
+  @@index([payloadHash])
+  @@map("indicator_snapshots")
+}
+
+model IndicatorReconciliation {
+  id                    String                        @id @default(uuid()) @db.Uuid
+  baselineSnapshotId    String                        @db.Uuid
+  baselineSnapshot      IndicatorSnapshot             @relation("IndicatorReconciliationBaseline", fields: [baselineSnapshotId], references: [id], onDelete: Restrict)
+  observedSnapshotId    String                        @unique @db.Uuid
+  observedSnapshot      IndicatorSnapshot             @relation("IndicatorReconciliationObserved", fields: [observedSnapshotId], references: [id], onDelete: Restrict)
+  status                IndicatorReconciliationStatus
+  numeratorDifference   Decimal                       @db.Decimal(24, 8)
+  denominatorDifference Decimal?                      @db.Decimal(24, 8)
+  valueDifference       Decimal                       @db.Decimal(24, 8)
+  sourceCountDifference Int
+  checkedAt             DateTime                      @db.Timestamptz(6)
+  checkedBy             String                        @db.Uuid
+  note                  String                        @db.VarChar(1000)
+  correlationId         String                        @db.Uuid
+  createdAt             DateTime                      @default(now()) @db.Timestamptz(6)
+  publication           IndicatorPublication?
+
+  @@index([baselineSnapshotId, checkedAt])
+  @@index([status, checkedAt])
+  @@map("indicator_reconciliations")
+}
+
+model IndicatorPublication {
+  id               String                        @id @default(uuid()) @db.Uuid
+  reconciliationId String                        @unique @db.Uuid
+  reconciliation   IndicatorReconciliation       @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  snapshotId       String                        @unique @db.Uuid
+  snapshot         IndicatorSnapshot             @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  qualityState     IndicatorReconciliationStatus
+  dataUpdatedAt    DateTime                      @db.Timestamptz(6)
+  lineageHash      String                        @db.Char(64)
+  note             String                        @db.VarChar(1000)
+  publishedAt      DateTime                      @db.Timestamptz(6)
+  publishedBy      String                        @db.Uuid
+  correlationId    String                        @db.Uuid
+  createdAt        DateTime                      @default(now()) @db.Timestamptz(6)
+
+  @@index([publishedAt])
+  @@index([qualityState, dataUpdatedAt])
+  @@map("indicator_publications")
+}
+
+model IndicatorApproval {
+  id            String              @id @default(uuid()) @db.Uuid
+  definitionId  String              @unique @db.Uuid
+  definition    IndicatorDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  note          String              @db.VarChar(1000)
+  approvedAt    DateTime            @db.Timestamptz(6)
+  approvedBy    String              @db.Uuid
+  correlationId String              @db.Uuid
+  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
+
+  @@index([approvedAt])
+  @@map("indicator_approvals")
+}
+
+model AiModelVersion {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  modelKey             String                  @db.Uuid
+  version              Int
+  previousVersionId    String?                 @db.Uuid
+  previousVersion      AiModelVersion?         @relation("AiModelVersionChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions         AiModelVersion[]        @relation("AiModelVersionChain")
+  provider             String                  @db.VarChar(160)
+  modelName            String                  @db.VarChar(200)
+  providerModelVersion String                  @db.VarChar(160)
+  serviceType          String                  @db.VarChar(160)
+  deploymentReference  String?                 @db.VarChar(500)
+  dataProcessingRegion String                  @db.VarChar(160)
+  retentionRule        String                  @db.VarChar(500)
+  status               AiModelStatus
+  changeReason         String                  @db.VarChar(1000)
+  sourceReference      String                  @db.VarChar(500)
+  sourceDate           DateTime                @db.Date
+  useCases             AiUseCaseDefinition[]
+  extractionExecutions AiExtractionExecution[]
+  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
+  createdBy            String                  @db.Uuid
+  correlationId        String                  @db.Uuid
+
+  @@unique([modelKey, version])
+  @@index([provider, modelName, status])
+  @@index([previousVersionId])
+  @@map("ai_model_versions")
+}
+
+model AiUseCaseDefinition {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  useCaseKey           String                  @db.Uuid
+  version              Int
+  previousVersionId    String?                 @db.Uuid
+  previousVersion      AiUseCaseDefinition?    @relation("AiUseCaseChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions         AiUseCaseDefinition[]   @relation("AiUseCaseChain")
+  code                 String                  @db.VarChar(80)
+  name                 String                  @db.VarChar(200)
+  purpose              String                  @db.VarChar(1000)
+  ownerId              String                  @db.Uuid
+  inputs               Json
+  outputs              Json
+  audience             Json
+  riskAssessment       String                  @db.Text
+  limitations          Json
+  authorizedSources    Json
+  evaluationCriteria   Json
+  modelVersionId       String                  @db.Uuid
+  modelVersion         AiModelVersion          @relation(fields: [modelVersionId], references: [id], onDelete: Restrict)
+  promptTemplate       String                  @db.Text
+  promptHash           String                  @db.Char(64)
+  effectiveFrom        DateTime                @db.Date
+  changeReason         String                  @db.VarChar(1000)
+  approval             AiUseCaseApproval?
+  extractionExecutions AiExtractionExecution[]
+  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
+  createdBy            String                  @db.Uuid
+  correlationId        String                  @db.Uuid
+
+  @@unique([useCaseKey, version])
+  @@index([code, effectiveFrom])
+  @@index([modelVersionId])
+  @@index([ownerId])
+  @@map("ai_use_case_definitions")
+}
+
+model AiUseCaseApproval {
+  id            String              @id @default(uuid()) @db.Uuid
+  definitionId  String              @unique @db.Uuid
+  definition    AiUseCaseDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  note          String              @db.VarChar(1000)
+  approvedAt    DateTime            @db.Timestamptz(6)
+  approvedBy    String              @db.Uuid
+  correlationId String              @db.Uuid
+  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
+
+  @@index([approvedAt])
+  @@map("ai_use_case_approvals")
+}
+
+model AiExtractionExecution {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  idempotencyKey     String                 @unique @db.VarChar(120)
+  definitionId       String                 @db.Uuid
+  definition         AiUseCaseDefinition    @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  modelVersionId     String                 @db.Uuid
+  modelVersion       AiModelVersion         @relation(fields: [modelVersionId], references: [id], onDelete: Restrict)
+  documentVersionId  String                 @db.Uuid
+  documentVersion    ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash   String                 @db.Char(64)
+  requestedFields    Json
+  instructions       String?                @db.Text
+  inputHash          String                 @db.Char(64)
+  status             AiExtractionStatus
+  output             Json?
+  confidence         Decimal?               @db.Decimal(5, 4)
+  limitations        Json?
+  providerResponseId String?                @db.VarChar(200)
+  errorCode          String?                @db.VarChar(120)
+  errorMessage       String?                @db.VarChar(500)
+  startedAt          DateTime               @db.Timestamptz(6)
+  completedAt        DateTime?              @db.Timestamptz(6)
+  createdBy          String                 @db.Uuid
+  correlationId      String                 @db.Uuid
+  createdAt          DateTime               @default(now()) @db.Timestamptz(6)
+  evidence           AiExtractionEvidence[]
+
+  @@index([definitionId, startedAt])
+  @@index([documentVersionId, startedAt])
+  @@index([status, startedAt])
+  @@index([inputHash])
+  @@map("ai_extraction_executions")
+}
+
+model AiExtractionEvidence {
+  id                String                 @id @default(uuid()) @db.Uuid
+  executionId       String                 @db.Uuid
+  execution         AiExtractionExecution  @relation(fields: [executionId], references: [id], onDelete: Restrict)
+  documentVersionId String                 @db.Uuid
+  documentVersion   ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash  String                 @db.Char(64)
+  excerpt           String                 @db.Text
+  locator           String                 @db.VarChar(500)
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+
+  @@index([executionId])
+  @@index([documentVersionId])
+  @@map("ai_extraction_evidence")
+}
+
+model TenderVersion {
+  id                  String                @id @default(uuid()) @db.Uuid
+  tenderId            String                @db.Uuid
+  tender              Tender                @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  version             Int
+  fileName            String                @db.VarChar(255)
+  fileHash            String                @db.Char(64)
+  uri                 String?               @db.VarChar(1000)
+  mimeType            String?               @db.VarChar(160)
+  sizeBytes           BigInt?
+  source              String                @db.VarChar(500)
+  receivedAt          DateTime              @db.Timestamptz(6)
+  status              TenderVersionStatus   @default(RECEIVED)
+  attachments         TenderAttachment[]
+  requirements        TenderRequirement[]
+  complianceMatrices  ComplianceMatrix[]
+  proposals           Proposal[]
+  rectificationsFrom  TenderRectification[] @relation("RectificationPreviousVersion")
+  rectificationResult TenderRectification?  @relation("RectificationResultVersion")
+  createdAt           DateTime              @default(now()) @db.Timestamptz(6)
+  createdBy           String                @db.Uuid
+
+  @@unique([tenderId, version])
+  @@unique([tenderId, fileHash])
+  @@index([status, receivedAt])
+  @@map("tender_versions")
+}
+
+model Proposal {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  code                String                  @unique @db.VarChar(50)
+  title               String                  @db.VarChar(255)
+  opportunityId       String                  @db.Uuid
+  opportunity         Opportunity             @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  opportunityVersion  Int
+  tenderVersionId     String?                 @db.Uuid
+  tenderVersion       TenderVersion?          @relation(fields: [tenderVersionId], references: [id], onDelete: Restrict)
+  tenderVersionNumber Int?
+  tenderFileHash      String?                 @db.Char(64)
+  tenderLotId         String?                 @db.Uuid
+  tenderLot           TenderLot?              @relation(fields: [tenderLotId], references: [id], onDelete: Restrict)
+  tenderLotCode       String?                 @db.VarChar(80)
+  version             Int                     @default(1)
+  status              ProposalStatus          @default(PREPARATION)
+  statusReason        String?                 @db.VarChar(1000)
+  statusChangedAt     DateTime?               @db.Timestamptz(6)
+  deletedAt           DateTime?               @db.Timestamptz(6)
+  deletedBy           String?                 @db.Uuid
+  originType          ProposalOriginType      @default(DIRECT)
+  history             ProposalHistory[]
+  versions            ProposalVersion[]
+  workflowEvents      ProposalWorkflowEvent[]
+  submissions         ProposalSubmission[]
+  createdAt           DateTime                @default(now()) @db.Timestamptz(6)
+  createdBy           String                  @db.Uuid
+  updatedAt           DateTime                @updatedAt @db.Timestamptz(6)
+  updatedBy           String                  @db.Uuid
+
+  @@index([opportunityId, status])
+  @@index([tenderVersionId])
+  @@index([tenderLotId])
+  @@index([deletedAt])
+  @@map("proposals")
+}
+
+model ProposalHistory {
+  id            String   @id @default(uuid()) @db.Uuid
+  proposalId    String   @db.Uuid
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String   @db.VarChar(80)
+  snapshot      Json
+  changedAt     DateTime @default(now()) @db.Timestamptz(6)
+  changedById   String   @db.Uuid
+  changedBy     User     @relation("ProposalChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String   @db.Uuid
+
+  @@unique([proposalId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("proposal_history")
+}
+
+model ProposalVersion {
+  id                String               @id @default(uuid()) @db.Uuid
+  proposalId        String               @db.Uuid
+  proposal          Proposal             @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  version           Int
+  previousVersionId String?              @db.Uuid
+  previousVersion   ProposalVersion?     @relation("ProposalVersionChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions      ProposalVersion[]    @relation("ProposalVersionChain")
+  reason            String               @db.VarChar(1000)
+  components        ProposalComponent[]
+  submissions       ProposalSubmission[]
+  createdAt         DateTime             @default(now()) @db.Timestamptz(6)
+  createdBy         String               @db.Uuid
+  correlationId     String               @db.Uuid
+
+  @@unique([proposalId, version])
+  @@index([previousVersionId])
+  @@index([correlationId])
+  @@map("proposal_versions")
+}
+
+model ProposalComponent {
+  id                  String                     @id @default(uuid()) @db.Uuid
+  proposalVersionId   String                     @db.Uuid
+  proposalVersion     ProposalVersion            @relation(fields: [proposalVersionId], references: [id], onDelete: Restrict)
+  type                ProposalComponentType
+  status              ProposalComponentStatus    @default(DRAFT)
+  createdAt           DateTime                   @default(now()) @db.Timestamptz(6)
+  createdBy           String                     @db.Uuid
+  technicalSections   ProposalTechnicalSection[]
+  commercialScenarios CommercialScenario[]
+
+  @@unique([proposalVersionId, type])
+  @@index([type, status])
+  @@map("proposal_components")
+}
+
+model CommercialScenario {
+  id                String               @id @default(uuid()) @db.Uuid
+  componentId       String               @db.Uuid
+  component         ProposalComponent    @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  scenarioKey       String               @db.Uuid
+  name              String               @db.VarChar(160)
+  version           Int
+  previousVersionId String?              @db.Uuid
+  previousVersion   CommercialScenario?  @relation("CommercialScenarioChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions      CommercialScenario[] @relation("CommercialScenarioChain")
+  currency          String               @db.Char(3)
+  baseDate          DateTime             @db.Date
+  estimatedValue    Decimal              @db.Decimal(19, 4)
+  estimatedSource   String               @db.VarChar(500)
+  assumptions       Json
+  items             Json
+  totalCost         Decimal              @db.Decimal(19, 4)
+  offeredPrice      Decimal              @db.Decimal(19, 4)
+  discountPercent   Decimal              @db.Decimal(9, 6)
+  marginAmount      Decimal              @db.Decimal(19, 4)
+  marginPercent     Decimal              @db.Decimal(9, 6)
+  formulaVersion    String               @db.VarChar(40)
+  calculationHash   String               @db.Char(64)
+  approvals         CommercialApproval[]
+  submissions       ProposalSubmission[]
+  createdAt         DateTime             @default(now()) @db.Timestamptz(6)
+  createdBy         String               @db.Uuid
+  correlationId     String               @db.Uuid
+
+  @@unique([scenarioKey, version])
+  @@index([componentId, createdAt])
+  @@index([previousVersionId])
+  @@index([correlationId])
+  @@map("commercial_scenarios")
+}
+
+model CommercialAuthorityRule {
+  id                 String               @id @default(uuid()) @db.Uuid
+  code               String               @db.VarChar(80)
+  version            Int
+  decisionType       String               @db.VarChar(80)
+  currency           String?              @db.Char(3)
+  minValue           Decimal?             @db.Decimal(19, 4)
+  maxValue           Decimal?             @db.Decimal(19, 4)
+  minDiscountPercent Decimal?             @db.Decimal(9, 6)
+  maxDiscountPercent Decimal?             @db.Decimal(9, 6)
+  minMarginPercent   Decimal?             @db.Decimal(9, 6)
+  maxMarginPercent   Decimal?             @db.Decimal(9, 6)
+  requiredPermission String               @db.VarChar(120)
+  activeFrom         DateTime             @db.Timestamptz(6)
+  activeTo           DateTime?            @db.Timestamptz(6)
+  publishedAt        DateTime             @db.Timestamptz(6)
+  approvals          CommercialApproval[]
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6)
+  createdBy          String               @db.Uuid
+  correlationId      String               @db.Uuid
+
+  @@unique([code, version])
+  @@index([decisionType, activeFrom, activeTo])
+  @@index([correlationId])
+  @@map("commercial_authority_rules")
+}
+
+model CommercialApproval {
+  id              String                     @id @default(uuid()) @db.Uuid
+  scenarioId      String                     @db.Uuid
+  scenario        CommercialScenario         @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  version         Int
+  authorityRuleId String                     @db.Uuid
+  authorityRule   CommercialAuthorityRule    @relation(fields: [authorityRuleId], references: [id], onDelete: Restrict)
+  decision        CommercialApprovalDecision
+  justification   String                     @db.VarChar(2000)
+  decidedAt       DateTime                   @default(now()) @db.Timestamptz(6)
+  decidedBy       String                     @db.Uuid
+  correlationId   String                     @db.Uuid
+
+  @@unique([scenarioId, version])
+  @@index([decidedBy, decidedAt])
+  @@index([correlationId])
+  @@map("commercial_approvals")
+}
+
+model ProposalWorkflowEvent {
+  id            String                 @id @default(uuid()) @db.Uuid
+  proposalId    String                 @db.Uuid
+  proposal      Proposal               @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  version       Int
+  fromStage     ProposalWorkflowStage?
+  toStage       ProposalWorkflowStage
+  event         String                 @db.VarChar(80)
+  reason        String                 @db.VarChar(1000)
+  occurredAt    DateTime               @default(now()) @db.Timestamptz(6)
+  actorId       String                 @db.Uuid
+  correlationId String                 @db.Uuid
+
+  @@unique([proposalId, version])
+  @@index([actorId, occurredAt])
+  @@index([correlationId])
+  @@map("proposal_workflow_events")
+}
+
+model ProposalSubmission {
+  id                        String                 @id @default(uuid()) @db.Uuid
+  proposalId                String                 @db.Uuid
+  proposal                  Proposal               @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  proposalVersionId         String                 @unique @db.Uuid
+  proposalVersion           ProposalVersion        @relation(fields: [proposalVersionId], references: [id], onDelete: Restrict)
+  commercialScenarioId      String                 @db.Uuid
+  commercialScenario        CommercialScenario     @relation(fields: [commercialScenarioId], references: [id], onDelete: Restrict)
+  payload                   Json
+  payloadHash               String                 @db.Char(64)
+  channel                   String                 @db.VarChar(160)
+  submittedAt               DateTime               @db.Timestamptz(6)
+  protocol                  String                 @db.VarChar(200)
+  evidenceDocumentVersionId String                 @db.Uuid
+  evidenceDocumentVersion   ManagedDocumentVersion @relation(fields: [evidenceDocumentVersionId], references: [id], onDelete: Restrict)
+  evidenceFileHash          String                 @db.Char(64)
+  submittedBy               String                 @db.Uuid
+  correlationId             String                 @db.Uuid
+  createdAt                 DateTime               @default(now()) @db.Timestamptz(6)
+
+  @@unique([channel, protocol])
+  @@index([proposalId, submittedAt])
+  @@index([payloadHash])
+  @@index([correlationId])
+  @@map("proposal_submissions")
+}
+
+model ProposalTechnicalSection {
+  id            String                                @id @default(uuid()) @db.Uuid
+  componentId   String                                @db.Uuid
+  component     ProposalComponent                     @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  type          String                                @db.VarChar(80)
+  title         String                                @db.VarChar(200)
+  position      Int
+  responsibleId String                                @db.Uuid
+  responsible   User                                  @relation("ProposalSectionResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  status        ProposalTechnicalSectionStatus        @default(DRAFT)
+  version       Int                                   @default(1)
+  requirements  ProposalTechnicalSectionRequirement[]
+  history       ProposalTechnicalSectionHistory[]
+  contents      ProposalTechnicalContentVersion[]
+  evidences     ProposalTechnicalEvidenceLink[]
+  comments      ProposalTechnicalReviewComment[]
+  reviews       ProposalTechnicalReview[]
+  createdAt     DateTime                              @default(now()) @db.Timestamptz(6)
+  createdBy     String                                @db.Uuid
+  updatedAt     DateTime                              @updatedAt @db.Timestamptz(6)
+  updatedBy     String                                @db.Uuid
+
+  @@unique([componentId, position])
+  @@index([responsibleId, status])
+  @@index([componentId, status])
+  @@map("proposal_technical_sections")
+}
+
+model ProposalTechnicalContentVersion {
+  id                String                            @id @default(uuid()) @db.Uuid
+  sectionId         String                            @db.Uuid
+  section           ProposalTechnicalSection          @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  version           Int
+  previousVersionId String?                           @db.Uuid
+  previousVersion   ProposalTechnicalContentVersion?  @relation("ProposalTechnicalContentChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions      ProposalTechnicalContentVersion[] @relation("ProposalTechnicalContentChain")
+  content           String                            @db.Text
+  reason            String                            @db.VarChar(1000)
+  contentHash       String                            @db.Char(64)
+  createdAt         DateTime                          @default(now()) @db.Timestamptz(6)
+  createdBy         String                            @db.Uuid
+  correlationId     String                            @db.Uuid
+
+  @@unique([sectionId, version])
+  @@index([previousVersionId])
+  @@index([correlationId])
+  @@map("proposal_technical_content_versions")
+}
+
+model ProposalTechnicalEvidenceLink {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  sectionId           String                   @db.Uuid
+  section             ProposalTechnicalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  technicalEvidenceId String                   @db.Uuid
+  technicalEvidence   TechnicalEvidence        @relation(fields: [technicalEvidenceId], references: [id], onDelete: Restrict)
+  evidenceVersion     Int
+  evidenceType        TechnicalEvidenceType
+  evidenceNumber      String                   @db.VarChar(100)
+  documentVersionId   String                   @db.Uuid
+  documentVersion     ManagedDocumentVersion   @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash    String                   @db.Char(64)
+  locator             String                   @db.VarChar(500)
+  justification       String                   @db.VarChar(1000)
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy           String                   @db.Uuid
+  correlationId       String                   @db.Uuid
+
+  @@unique([sectionId, technicalEvidenceId])
+  @@index([technicalEvidenceId])
+  @@index([documentVersionId])
+  @@index([correlationId])
+  @@map("proposal_technical_evidence_links")
+}
+
+model ProposalTechnicalReviewComment {
+  id            String                           @id @default(uuid()) @db.Uuid
+  sectionId     String                           @db.Uuid
+  section       ProposalTechnicalSection         @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  severity      ProposalTechnicalCommentSeverity
+  comment       String                           @db.VarChar(2000)
+  status        ProposalTechnicalCommentStatus   @default(OPEN)
+  createdAt     DateTime                         @default(now()) @db.Timestamptz(6)
+  createdBy     String                           @db.Uuid
+  resolvedAt    DateTime?                        @db.Timestamptz(6)
+  resolvedBy    String?                          @db.Uuid
+  resolution    String?                          @db.VarChar(2000)
+  correlationId String                           @db.Uuid
+
+  @@index([sectionId, status, severity])
+  @@index([correlationId])
+  @@map("proposal_technical_review_comments")
+}
+
+model ProposalTechnicalReview {
+  id             String                          @id @default(uuid()) @db.Uuid
+  sectionId      String                          @db.Uuid
+  section        ProposalTechnicalSection        @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  version        Int
+  contentVersion Int
+  decision       ProposalTechnicalReviewDecision
+  justification  String                          @db.VarChar(2000)
+  reviewedAt     DateTime                        @default(now()) @db.Timestamptz(6)
+  reviewedBy     String                          @db.Uuid
+  correlationId  String                          @db.Uuid
+
+  @@unique([sectionId, version])
+  @@index([reviewedBy, reviewedAt])
+  @@index([correlationId])
+  @@map("proposal_technical_reviews")
+}
+
+model ProposalTechnicalSectionRequirement {
+  sectionId          String                   @db.Uuid
+  section            ProposalTechnicalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  requirementId      String                   @db.Uuid
+  requirement        TenderRequirement        @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  requirementVersion Int
+  requirementType    String                   @db.VarChar(80)
+  requirementText    String                   @db.Text
+  sourceExcerpt      String                   @db.Text
+  sourcePage         Int
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy          String                   @db.Uuid
+
+  @@id([sectionId, requirementId])
+  @@index([requirementId])
+  @@map("proposal_technical_section_requirements")
+}
+
+model ProposalTechnicalSectionHistory {
+  id            String                   @id @default(uuid()) @db.Uuid
+  sectionId     String                   @db.Uuid
+  section       ProposalTechnicalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String                   @db.VarChar(80)
+  snapshot      Json
+  changedAt     DateTime                 @default(now()) @db.Timestamptz(6)
+  changedById   String                   @db.Uuid
+  changedBy     User                     @relation("ProposalSectionChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String                   @db.Uuid
+
+  @@unique([sectionId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("proposal_technical_section_history")
+}
+
+model TenderRequirement {
+  id                    String                                @id @default(uuid()) @db.Uuid
+  tenderVersionId       String                                @db.Uuid
+  tenderVersion         TenderVersion                         @relation(fields: [tenderVersionId], references: [id], onDelete: Restrict)
+  type                  String                                @db.VarChar(80)
+  text                  String                                @db.Text
+  criticality           RequirementCriticality
+  responsibleId         String                                @db.Uuid
+  responsible           User                                  @relation("RequirementResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  sourceExcerpt         String                                @db.Text
+  sourcePage            Int
+  status                RequirementStatus                     @default(DRAFT)
+  version               Int                                   @default(1)
+  history               RequirementHistory[]
+  deadlines             TenderDeadline[]
+  analyses              RequirementAnalysis[]
+  rectificationImpacts  RectificationImpact[]
+  complianceMatrixItems ComplianceMatrixItem[]
+  proposalSectionLinks  ProposalTechnicalSectionRequirement[]
+  createdAt             DateTime                              @default(now()) @db.Timestamptz(6)
+  createdBy             String                                @db.Uuid
+  updatedAt             DateTime                              @updatedAt @db.Timestamptz(6)
+  updatedBy             String                                @db.Uuid
+
+  @@index([tenderVersionId, criticality, status])
+  @@index([responsibleId, status])
+  @@map("tender_requirements")
+}
+
+model RequirementAnalysis {
+  id            String             @id @default(uuid()) @db.Uuid
+  requirementId String             @db.Uuid
+  requirement   TenderRequirement  @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  competence    AnalysisCompetence
+  priority      AnalysisPriority   @default(NORMAL)
+  assigneeId    String             @db.Uuid
+  assignee      User               @relation("AnalysisAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  status        AnalysisStatus     @default(PENDING)
+  justification String?            @db.VarChar(1000)
+  decidedAt     DateTime?          @db.Timestamptz(6)
+  decidedById   String?            @db.Uuid
+  decidedBy     User?              @relation("AnalysisDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  version       Int                @default(1)
+  history       AnalysisHistory[]
+  createdAt     DateTime           @default(now()) @db.Timestamptz(6)
+  createdBy     String             @db.Uuid
+  updatedAt     DateTime           @updatedAt @db.Timestamptz(6)
+  updatedBy     String             @db.Uuid
+
+  @@unique([requirementId, competence])
+  @@index([assigneeId, status, priority])
+  @@index([competence, status])
+  @@map("requirement_analyses")
+}
+
+model AnalysisHistory {
+  id            String              @id @default(uuid()) @db.Uuid
+  analysisId    String              @db.Uuid
+  analysis      RequirementAnalysis @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String              @db.VarChar(80)
+  changes       Json
+  reason        String?             @db.VarChar(1000)
+  changedAt     DateTime            @default(now()) @db.Timestamptz(6)
+  changedById   String              @db.Uuid
+  changedBy     User                @relation("AnalysisChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String              @db.Uuid
+
+  @@unique([analysisId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("analysis_history")
+}
+
+model TenderRectification {
+  id                   String                @id @default(uuid()) @db.Uuid
+  tenderId             String                @db.Uuid
+  tender               Tender                @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  previousVersionId    String                @db.Uuid
+  previousVersion      TenderVersion         @relation("RectificationPreviousVersion", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  rectifiedByVersionId String                @unique @db.Uuid
+  rectifiedByVersion   TenderVersion         @relation("RectificationResultVersion", fields: [rectifiedByVersionId], references: [id], onDelete: Restrict)
+  description          String                @db.VarChar(1000)
+  source               String                @db.VarChar(500)
+  impacts              RectificationImpact[]
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  createdBy            String                @db.Uuid
+
+  @@index([tenderId, createdAt])
+  @@index([previousVersionId])
+  @@map("tender_rectifications")
+}
+
+model RectificationImpact {
+  id                   String              @id @default(uuid()) @db.Uuid
+  rectificationId      String              @db.Uuid
+  rectification        TenderRectification @relation(fields: [rectificationId], references: [id], onDelete: Restrict)
+  requirementId        String              @db.Uuid
+  requirement          TenderRequirement   @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  description          String              @db.VarChar(1000)
+  requiresRevalidation Boolean             @default(true)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(6)
+  createdBy            String              @db.Uuid
+
+  @@unique([rectificationId, requirementId])
+  @@index([requirementId])
+  @@map("rectification_impacts")
+}
+
+model ManagedDocument {
+  id             String                   @id @default(uuid()) @db.Uuid
+  type           String                   @db.VarChar(80)
+  title          String                   @db.VarChar(255)
+  classification String                   @db.VarChar(80)
+  status         String                   @default("DRAFT") @db.VarChar(40)
+  ownerId        String                   @db.Uuid
+  owner          User                     @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  versions       ManagedDocumentVersion[]
+  links          ManagedDocumentLink[]
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy      String                   @db.Uuid
+  updatedAt      DateTime                 @updatedAt @db.Timestamptz(6)
+  updatedBy      String                   @db.Uuid
+
+  @@index([type, status])
+  @@index([ownerId, status])
+  @@map("managed_documents")
+}
+
+model ManagedDocumentVersion {
+  id                       String                          @id @default(uuid()) @db.Uuid
+  documentId               String                          @db.Uuid
+  document                 ManagedDocument                 @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  version                  Int
+  uri                      String                          @db.VarChar(1000)
+  fileHash                 String                          @db.Char(64)
+  mimeType                 String                          @db.VarChar(160)
+  sizeBytes                BigInt
+  origin                   String                          @db.VarChar(500)
+  createdAt                DateTime                        @default(now()) @db.Timestamptz(6)
+  createdBy                String                          @db.Uuid
+  technicalExperiences     ExecutedContract[]
+  technicalEvidenceRecords TechnicalEvidence[]
+  professionalLinks        ProfessionalLink[]
+  complianceEvidenceLinks  ComplianceMatrixEvidence[]
+  proposalTechnicalLinks   ProposalTechnicalEvidenceLink[]
+  proposalSubmissions      ProposalSubmission[]
+  competitionActs          CompetitionAct[]
+  competitionResults       CompetitionResult[]
+  competitionAwards        CompetitionAward[]
+  aiExtractionExecutions   AiExtractionExecution[]
+  aiExtractionEvidence     AiExtractionEvidence[]
+
+  @@unique([documentId, version])
+  @@unique([documentId, fileHash])
+  @@index([fileHash])
+  @@map("managed_document_versions")
+}
+
+model ExecutedContract {
+  id                        String                       @id @default(uuid()) @db.Uuid
+  code                      String                       @unique @db.VarChar(50)
+  contractorName            String                       @db.VarChar(255)
+  contractorIdentifier      String?                      @db.VarChar(80)
+  contractorSource          String                       @db.VarChar(500)
+  subject                   String                       @db.Text
+  startedAt                 DateTime                     @db.Date
+  endedAt                   DateTime                     @db.Date
+  value                     Decimal?                     @db.Decimal(19, 4)
+  currency                  String?                      @db.Char(3)
+  status                    TechnicalExperienceStatus    @default(DRAFT)
+  ownerId                   String                       @db.Uuid
+  owner                     User                         @relation("TechnicalExperienceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  evidenceDocumentVersionId String                       @db.Uuid
+  evidenceDocumentVersion   ManagedDocumentVersion       @relation(fields: [evidenceDocumentVersionId], references: [id], onDelete: Restrict)
+  works                     ExecutedWork[]
+  services                  ExecutedService[]
+  history                   TechnicalExperienceHistory[]
+  technicalEvidence         TechnicalEvidence[]
+  professionalLinks         ProfessionalLink[]
+  version                   Int                          @default(1)
+  createdAt                 DateTime                     @default(now()) @db.Timestamptz(6)
+  createdBy                 String                       @db.Uuid
+  updatedAt                 DateTime                     @updatedAt @db.Timestamptz(6)
+  updatedBy                 String                       @db.Uuid
+
+  @@index([status, startedAt, endedAt])
+  @@index([ownerId, status])
+  @@index([evidenceDocumentVersionId])
+  @@map("executed_contracts")
+}
+
+model ExecutedWork {
+  id                String             @id @default(uuid()) @db.Uuid
+  contractId        String             @db.Uuid
+  contract          ExecutedContract   @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  name              String             @db.VarChar(255)
+  location          String             @db.VarChar(255)
+  type              String             @db.VarChar(120)
+  startedAt         DateTime           @db.Date
+  endedAt           DateTime           @db.Date
+  characteristics   String             @db.Text
+  services          ExecutedService[]
+  professionalLinks ProfessionalLink[]
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  createdBy         String             @db.Uuid
+
+  @@index([contractId, type])
+  @@map("executed_works")
+}
+
+model ExecutedService {
+  id                  String             @id @default(uuid()) @db.Uuid
+  contractId          String             @db.Uuid
+  contract            ExecutedContract   @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  workId              String?            @db.Uuid
+  work                ExecutedWork?      @relation(fields: [workId], references: [id], onDelete: Restrict)
+  discipline          String             @db.VarChar(120)
+  originalDescription String             @db.Text
+  characteristics     String             @db.Text
+  quantities          ExecutedQuantity[]
+  createdAt           DateTime           @default(now()) @db.Timestamptz(6)
+  createdBy           String             @db.Uuid
+
+  @@index([contractId, discipline])
+  @@index([workId])
+  @@map("executed_services")
+}
+
+model ExecutedQuantity {
+  id                    String                         @id @default(uuid()) @db.Uuid
+  serviceId             String                         @db.Uuid
+  service               ExecutedService                @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  value                 Decimal                        @db.Decimal(19, 6)
+  unit                  String                         @db.VarChar(40)
+  source                String                         @db.VarChar(500)
+  createdAt             DateTime                       @default(now()) @db.Timestamptz(6)
+  createdBy             String                         @db.Uuid
+  complianceComparisons ComplianceQuantityComparison[]
+
+  @@index([serviceId, unit])
+  @@map("executed_quantities")
+}
+
+model TechnicalExperienceHistory {
+  id            String           @id @default(uuid()) @db.Uuid
+  contractId    String           @db.Uuid
+  contract      ExecutedContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String           @db.VarChar(80)
+  snapshot      Json
+  reason        String?          @db.VarChar(1000)
+  changedAt     DateTime         @default(now()) @db.Timestamptz(6)
+  changedById   String           @db.Uuid
+  changedBy     User             @relation("TechnicalExperienceChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String           @db.Uuid
+
+  @@unique([contractId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("technical_experience_history")
+}
+
+model TechnicalEvidence {
+  id                      String                          @id @default(uuid()) @db.Uuid
+  experienceId            String                          @db.Uuid
+  experience              ExecutedContract                @relation(fields: [experienceId], references: [id], onDelete: Restrict)
+  type                    TechnicalEvidenceType
+  number                  String                          @db.VarChar(100)
+  version                 Int                             @default(1)
+  issuingBody             String                          @db.VarChar(255)
+  issuedAt                DateTime                        @db.Date
+  validUntil              DateTime?                       @db.Date
+  status                  TechnicalEvidenceStatus         @default(CURRENT)
+  subjectActivity         String                          @db.Text
+  professionalName        String?                         @db.VarChar(255)
+  professionalIdentifier  String?                         @db.VarChar(100)
+  startedAt               DateTime?                       @db.Date
+  endedAt                 DateTime?                       @db.Date
+  restrictions            String?                         @db.Text
+  documentVersionId       String                          @db.Uuid
+  documentVersion         ManagedDocumentVersion          @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  previousVersionId       String?                         @unique @db.Uuid
+  previousVersion         TechnicalEvidence?              @relation("TechnicalEvidenceVersions", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions            TechnicalEvidence[]             @relation("TechnicalEvidenceVersions")
+  relatedCatId            String?                         @db.Uuid
+  relatedCat              TechnicalEvidence?              @relation("CatArts", fields: [relatedCatId], references: [id], onDelete: Restrict)
+  arts                    TechnicalEvidence[]             @relation("CatArts")
+  professionalLinks       ProfessionalLink[]
+  complianceEvidenceLinks ComplianceMatrixEvidence[]
+  proposalTechnicalLinks  ProposalTechnicalEvidenceLink[]
+  createdAt               DateTime                        @default(now()) @db.Timestamptz(6)
+  createdById             String                          @db.Uuid
+  createdBy               User                            @relation("TechnicalEvidenceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  correlationId           String                          @db.Uuid
+
+  @@unique([type, number, version])
+  @@index([experienceId, type, status])
+  @@index([documentVersionId])
+  @@index([relatedCatId])
+  @@index([createdById, createdAt])
+  @@map("technical_evidence")
+}
+
+model Professional {
+  id                   String                @id @default(uuid()) @db.Uuid
+  fullName             String                @db.VarChar(255)
+  council              String                @db.VarChar(40)
+  registrationNumber   String                @db.VarChar(100)
+  nationalRegistration String?               @db.VarChar(100)
+  professionalTitle    String                @db.VarChar(160)
+  status               ProfessionalStatus    @default(ACTIVE)
+  processingPurpose    String                @db.VarChar(500)
+  legalBasis           String                @db.VarChar(255)
+  classification       String                @default("PERSONAL_DATA") @db.VarChar(80)
+  version              Int                   @default(1)
+  links                ProfessionalLink[]
+  history              ProfessionalHistory[]
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  createdById          String                @db.Uuid
+  createdBy            User                  @relation("ProfessionalCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([council, registrationNumber])
+  @@index([fullName])
+  @@index([status, council])
+  @@map("professionals")
+}
+
+model ProfessionalLink {
+  id                        String                     @id @default(uuid()) @db.Uuid
+  professionalId            String                     @db.Uuid
+  professional              Professional               @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  targetType                ProfessionalLinkTargetType
+  contractId                String?                    @db.Uuid
+  contract                  ExecutedContract?          @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  workId                    String?                    @db.Uuid
+  work                      ExecutedWork?              @relation(fields: [workId], references: [id], onDelete: Restrict)
+  technicalEvidenceId       String?                    @db.Uuid
+  technicalEvidence         TechnicalEvidence?         @relation(fields: [technicalEvidenceId], references: [id], onDelete: Restrict)
+  role                      String                     @db.VarChar(160)
+  responsibility            String                     @db.Text
+  startedAt                 DateTime                   @db.Date
+  endedAt                   DateTime                   @db.Date
+  source                    String                     @db.VarChar(500)
+  evidenceDocumentVersionId String                     @db.Uuid
+  evidenceDocumentVersion   ManagedDocumentVersion     @relation(fields: [evidenceDocumentVersionId], references: [id], onDelete: Restrict)
+  createdAt                 DateTime                   @default(now()) @db.Timestamptz(6)
+  createdById               String                     @db.Uuid
+  createdBy                 User                       @relation("ProfessionalLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  correlationId             String                     @db.Uuid
+
+  @@unique([professionalId, contractId, role, startedAt])
+  @@unique([professionalId, workId, role, startedAt])
+  @@unique([professionalId, technicalEvidenceId, role, startedAt])
+  @@index([contractId])
+  @@index([workId])
+  @@index([technicalEvidenceId])
+  @@index([evidenceDocumentVersionId])
+  @@index([createdById, createdAt])
+  @@map("professional_links")
+}
+
+model ProfessionalHistory {
+  id             String       @id @default(uuid()) @db.Uuid
+  professionalId String       @db.Uuid
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  version        Int
+  action         String       @db.VarChar(80)
+  snapshot       Json
+  changedAt      DateTime     @default(now()) @db.Timestamptz(6)
+  changedById    String       @db.Uuid
+  changedBy      User         @relation("ProfessionalChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId  String       @db.Uuid
+
+  @@unique([professionalId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("professional_history")
+}
+
+model ComplianceMatrix {
+  id                String                    @id @default(uuid()) @db.Uuid
+  tenderVersionId   String                    @db.Uuid
+  tenderVersion     TenderVersion             @relation(fields: [tenderVersionId], references: [id], onDelete: Restrict)
+  analysisReference String                    @db.VarChar(160)
+  version           Int                       @default(1)
+  status            ComplianceMatrixStatus    @default(IN_ANALYSIS)
+  sourceFileHash    String                    @db.Char(64)
+  itemCount         Int
+  items             ComplianceMatrixItem[]
+  history           ComplianceMatrixHistory[]
+  exports           ComplianceMatrixExport[]
+  createdAt         DateTime                  @default(now()) @db.Timestamptz(6)
+  createdBy         String                    @db.Uuid
+  updatedAt         DateTime                  @updatedAt @db.Timestamptz(6)
+  updatedBy         String                    @db.Uuid
+
+  @@unique([tenderVersionId, analysisReference, version])
+  @@index([tenderVersionId, status])
+  @@map("compliance_matrices")
+}
+
+model ComplianceMatrixItem {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  matrixId           String                     @db.Uuid
+  matrix             ComplianceMatrix           @relation(fields: [matrixId], references: [id], onDelete: Restrict)
+  requirementId      String                     @db.Uuid
+  requirement        TenderRequirement          @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  requirementVersion Int
+  requirementType    String                     @db.VarChar(80)
+  requirementText    String                     @db.Text
+  criticality        RequirementCriticality
+  sourceExcerpt      String                     @db.Text
+  sourcePage         Int
+  createdAt          DateTime                   @default(now()) @db.Timestamptz(6)
+  createdBy          String                     @db.Uuid
+  evidenceLinks      ComplianceMatrixEvidence[]
+  assessments        ComplianceItemAssessment[]
+
+  @@unique([matrixId, requirementId])
+  @@index([requirementId])
+  @@index([matrixId, criticality])
+  @@map("compliance_matrix_items")
+}
+
+model ComplianceMatrixHistory {
+  id            String           @id @default(uuid()) @db.Uuid
+  matrixId      String           @db.Uuid
+  matrix        ComplianceMatrix @relation(fields: [matrixId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String           @db.VarChar(80)
+  snapshot      Json
+  changedAt     DateTime         @default(now()) @db.Timestamptz(6)
+  changedById   String           @db.Uuid
+  changedBy     User             @relation("ComplianceMatrixChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String           @db.Uuid
+
+  @@unique([matrixId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("compliance_matrix_history")
+}
+
+model ComplianceMatrixEvidence {
+  id                        String                         @id @default(uuid()) @db.Uuid
+  matrixItemId              String                         @db.Uuid
+  matrixItem                ComplianceMatrixItem           @relation(fields: [matrixItemId], references: [id], onDelete: Restrict)
+  technicalEvidenceId       String                         @db.Uuid
+  technicalEvidence         TechnicalEvidence              @relation(fields: [technicalEvidenceId], references: [id], onDelete: Restrict)
+  evidenceDocumentVersionId String                         @db.Uuid
+  evidenceDocumentVersion   ManagedDocumentVersion         @relation(fields: [evidenceDocumentVersionId], references: [id], onDelete: Restrict)
+  evidenceFileHash          String                         @db.Char(64)
+  locator                   String                         @db.VarChar(500)
+  justification             String                         @db.VarChar(1000)
+  comparisons               ComplianceQuantityComparison[]
+  createdAt                 DateTime                       @default(now()) @db.Timestamptz(6)
+  createdBy                 String                         @db.Uuid
+  correlationId             String                         @db.Uuid
+
+  @@unique([matrixItemId, technicalEvidenceId])
+  @@index([technicalEvidenceId])
+  @@index([evidenceDocumentVersionId])
+  @@index([correlationId])
+  @@map("compliance_matrix_evidence")
+}
+
+model ComplianceItemAssessment {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  matrixItemId         String                     @db.Uuid
+  matrixItem           ComplianceMatrixItem       @relation(fields: [matrixItemId], references: [id], onDelete: Restrict)
+  version              Int
+  previousAssessmentId String?                    @db.Uuid
+  previousAssessment   ComplianceItemAssessment?  @relation("ComplianceAssessmentVersions", fields: [previousAssessmentId], references: [id], onDelete: Restrict)
+  nextAssessments      ComplianceItemAssessment[] @relation("ComplianceAssessmentVersions")
+  decision             ComplianceItemDecision
+  justification        String                     @db.Text
+  gapDescription       String?                    @db.Text
+  riskDescription      String?                    @db.Text
+  impact               String?                    @db.Text
+  treatment            String?                    @db.Text
+  responsibleId        String?                    @db.Uuid
+  responsible          User?                      @relation("ComplianceAssessmentResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  dueAt                DateTime?                  @db.Timestamptz(6)
+  evidenceCount        Int
+  evidenceSnapshot     Json
+  validatedAt          DateTime                   @default(now()) @db.Timestamptz(6)
+  validatedById        String                     @db.Uuid
+  validatedBy          User                       @relation("ComplianceAssessmentValidatedBy", fields: [validatedById], references: [id], onDelete: Restrict)
+  correlationId        String                     @db.Uuid
+
+  @@unique([matrixItemId, version])
+  @@index([previousAssessmentId])
+  @@index([responsibleId, dueAt])
+  @@index([validatedById, validatedAt])
+  @@index([correlationId])
+  @@map("compliance_item_assessments")
+}
+
+model ComplianceMatrixExport {
+  id            String           @id @default(uuid()) @db.Uuid
+  matrixId      String           @db.Uuid
+  matrix        ComplianceMatrix @relation(fields: [matrixId], references: [id], onDelete: Restrict)
+  matrixVersion Int
+  format        String           @db.VarChar(20)
+  fileName      String           @db.VarChar(255)
+  fileHash      String           @db.Char(64)
+  payload       Json
+  exportedAt    DateTime         @default(now()) @db.Timestamptz(6)
+  exportedById  String           @db.Uuid
+  exportedBy    User             @relation("ComplianceExportedBy", fields: [exportedById], references: [id], onDelete: Restrict)
+  correlationId String           @db.Uuid
+
+  @@unique([matrixId, matrixVersion, format])
+  @@index([fileHash])
+  @@index([exportedById, exportedAt])
+  @@index([correlationId])
+  @@map("compliance_matrix_exports")
+}
+
+model ComplianceQuantityComparison {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  evidenceAssociationId String                   @db.Uuid
+  evidenceAssociation   ComplianceMatrixEvidence @relation(fields: [evidenceAssociationId], references: [id], onDelete: Restrict)
+  executedQuantityId    String                   @db.Uuid
+  executedQuantity      ExecutedQuantity         @relation(fields: [executedQuantityId], references: [id], onDelete: Restrict)
+  requiredValue         Decimal                  @db.Decimal(19, 6)
+  requiredUnit          String                   @db.VarChar(40)
+  provenValue           Decimal                  @db.Decimal(19, 6)
+  provenUnit            String                   @db.VarChar(40)
+  normalizedProvenValue Decimal                  @db.Decimal(19, 6)
+  difference            Decimal                  @db.Decimal(19, 6)
+  conversionFactor      Decimal?                 @db.Decimal(19, 9)
+  conversionRule        String?                  @db.Text
+  conversionSource      String?                  @db.VarChar(500)
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy             String                   @db.Uuid
+  correlationId         String                   @db.Uuid
+
+  @@unique([evidenceAssociationId, executedQuantityId, requiredValue, requiredUnit])
+  @@index([executedQuantityId])
+  @@index([correlationId])
+  @@map("compliance_quantity_comparisons")
+}
+
+model ManagedDocumentLink {
+  id         String          @id @default(uuid()) @db.Uuid
+  documentId String          @db.Uuid
+  document   ManagedDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  entityType String          @db.VarChar(80)
+  entityId   String          @db.VarChar(160)
+  role       String          @db.VarChar(80)
+  createdAt  DateTime        @default(now()) @db.Timestamptz(6)
+  createdBy  String          @db.Uuid
+
+  @@unique([documentId, entityType, entityId, role])
+  @@index([entityType, entityId])
+  @@map("managed_document_links")
+}
+
+model RequirementHistory {
+  id            String            @id @default(uuid()) @db.Uuid
+  requirementId String            @db.Uuid
+  requirement   TenderRequirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String            @db.VarChar(80)
+  changes       Json
+  changedAt     DateTime          @default(now()) @db.Timestamptz(6)
+  changedById   String            @db.Uuid
+  changedBy     User              @relation("RequirementChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String            @db.Uuid
+
+  @@unique([requirementId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("requirement_history")
+}
+
+model TenderDeadline {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenderId      String             @db.Uuid
+  tender        Tender             @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  requirementId String?            @db.Uuid
+  requirement   TenderRequirement? @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  event         String             @db.VarChar(200)
+  dueAt         DateTime           @db.Timestamptz(6)
+  timeZone      String             @db.VarChar(80)
+  source        String             @db.VarChar(500)
+  critical      Boolean            @default(false)
+  responsibleId String             @db.Uuid
+  responsible   User               @relation("DeadlineResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  status        DeadlineStatus     @default(PENDING_CONFIRMATION)
+  confirmedAt   DateTime?          @db.Timestamptz(6)
+  confirmedById String?            @db.Uuid
+  confirmedBy   User?              @relation("DeadlineConfirmedBy", fields: [confirmedById], references: [id], onDelete: Restrict)
+  version       Int                @default(1)
+  alerts        DeadlineAlert[]
+  history       DeadlineHistory[]
+  createdAt     DateTime           @default(now()) @db.Timestamptz(6)
+  createdBy     String             @db.Uuid
+  updatedAt     DateTime           @updatedAt @db.Timestamptz(6)
+  updatedBy     String             @db.Uuid
+
+  @@index([tenderId, status, dueAt])
+  @@index([responsibleId, status, dueAt])
+  @@index([requirementId])
+  @@map("tender_deadlines")
+}
+
+model DeadlineAlert {
+  id          String              @id @default(uuid()) @db.Uuid
+  deadlineId  String              @db.Uuid
+  deadline    TenderDeadline      @relation(fields: [deadlineId], references: [id], onDelete: Restrict)
+  scheduledAt DateTime            @db.Timestamptz(6)
+  status      DeadlineAlertStatus @default(SCHEDULED)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
+  createdBy   String              @db.Uuid
+
+  @@unique([deadlineId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@map("deadline_alerts")
+}
+
+model DeadlineHistory {
+  id            String         @id @default(uuid()) @db.Uuid
+  deadlineId    String         @db.Uuid
+  deadline      TenderDeadline @relation(fields: [deadlineId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String         @db.VarChar(80)
+  changes       Json
+  reason        String?        @db.VarChar(1000)
+  changedAt     DateTime       @default(now()) @db.Timestamptz(6)
+  changedById   String         @db.Uuid
+  changedBy     User           @relation("DeadlineChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String         @db.Uuid
+
+  @@unique([deadlineId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("deadline_history")
+}
+
+model TenderAttachment {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenderVersionId String        @db.Uuid
+  tenderVersion   TenderVersion @relation(fields: [tenderVersionId], references: [id], onDelete: Restrict)
+  fileName        String        @db.VarChar(255)
+  fileHash        String        @db.Char(64)
+  source          String        @db.VarChar(500)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(6)
+  createdBy       String        @db.Uuid
+
+  @@unique([tenderVersionId, fileHash])
+  @@map("tender_attachments")
+}
+
+model OpportunityHistory {
+  id            String             @id @default(uuid()) @db.Uuid
+  opportunityId String             @db.Uuid
+  opportunity   Opportunity        @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  version       Int
+  action        String             @db.VarChar(80)
+  fromStatus    OpportunityStatus?
+  toStatus      OpportunityStatus
+  changes       Json
+  reason        String?            @db.VarChar(1000)
+  changedAt     DateTime           @default(now()) @db.Timestamptz(6)
+  changedById   String             @db.Uuid
+  changedBy     User               @relation("OpportunityChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  correlationId String             @db.Uuid
+
+  @@unique([opportunityId, version])
+  @@index([changedById, changedAt])
+  @@index([correlationId])
+  @@map("opportunity_history")
+}
+
+model Profile {
+  id          String              @id @default(uuid()) @db.Uuid
+  code        String              @unique @db.VarChar(80)
+  name        String              @db.VarChar(160)
+  description String?             @db.VarChar(500)
+  active      Boolean             @default(true)
+  memberships UserProfile[]
+  permissions ProfilePermission[]
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
+  createdBy   String              @db.Uuid
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(6)
+  updatedBy   String              @db.Uuid
+
+  @@index([active])
+  @@map("profiles")
+}
+
+model Permission {
+  id          String              @id @default(uuid()) @db.Uuid
+  code        String              @unique @db.VarChar(120)
+  module      String              @db.VarChar(80)
+  action      String              @db.VarChar(80)
+  description String?             @db.VarChar(500)
+  profiles    ProfilePermission[]
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
+  createdBy   String              @db.Uuid
+
+  @@unique([module, action])
+  @@index([module])
+  @@map("permissions")
+}
+
+model UserProfile {
+  userId    String    @db.Uuid
+  profileId String    @db.Uuid
+  validFrom DateTime  @default(now()) @db.Timestamptz(6)
+  validTo   DateTime? @db.Timestamptz(6)
+  grantedAt DateTime  @default(now()) @db.Timestamptz(6)
+  grantedBy String    @db.Uuid
+  reason    String    @db.VarChar(500)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@id([userId, profileId])
+  @@index([profileId, validTo])
+  @@map("user_profiles")
+}
+
+model ProfilePermission {
+  profileId    String     @db.Uuid
+  permissionId String     @db.Uuid
+  grantedAt    DateTime   @default(now()) @db.Timestamptz(6)
+  grantedBy    String     @db.Uuid
+  profile      Profile    @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([profileId, permissionId])
+  @@index([permissionId])
+  @@map("profile_permissions")
+}
+
+model AuditEvent {
+  id            String         @id @default(uuid()) @db.Uuid
+  occurredAt    DateTime       @default(now()) @db.Timestamptz(6)
+  actorType     AuditActorType
+  actorId       String         @db.VarChar(160)
+  action        String         @db.VarChar(120)
+  entityType    String         @db.VarChar(120)
+  entityId      String?        @db.VarChar(160)
+  correlationId String         @db.Uuid
+  outcome       AuditOutcome
+  origin        String         @db.VarChar(160)
+  metadata      Json?
+
+  @@index([occurredAt])
+  @@index([actorId, occurredAt])
+  @@index([entityType, entityId, occurredAt])
+  @@index([correlationId])
+  @@map("audit_events")
+}
+
+model SupportTicket {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  number               Int                       @unique @default(autoincrement())
+  type                 SupportTicketType
+  priority             SupportTicketPriority     @default(NORMAL)
+  status               SupportTicketStatus       @default(OPEN)
+  title                String                    @db.VarChar(200)
+  description          String                    @db.Text
+  pagePath             String?                   @db.VarChar(500)
+  errorMessage         String?                   @db.Text
+  stepsToReproduce     String?                   @db.Text
+  clientContext        Json?
+  aiDiagnosis          Json?
+  aiProviderModel      String?                   @db.VarChar(160)
+  aiDiagnosedAt        DateTime?                 @db.Timestamptz(6)
+  approvalRequired     Boolean                   @default(false)
+  approvalReason       String?                   @db.VarChar(1000)
+  reporterId           String                    @db.Uuid
+  reporter             User                      @relation("SupportReportedBy", fields: [reporterId], references: [id], onDelete: Restrict)
+  assignedToId         String?                   @db.Uuid
+  assignedTo           User?                     @relation("SupportAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  resolution           String?                   @db.Text
+  resolvedAt           DateTime?                 @db.Timestamptz(6)
+  resolvedById         String?                   @db.Uuid
+  resolvedBy           User?                     @relation("SupportResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  executionLeaseId     String?                   @unique @db.Uuid
+  executorId           String?                   @db.VarChar(160)
+  executionClaimedAt   DateTime?                 @db.Timestamptz(6)
+  executionHeartbeatAt DateTime?                 @db.Timestamptz(6)
+  executionAttempts    Int                       @default(0)
+  correlationId        String                    @db.Uuid
+  attachments          SupportTicketAttachment[]
+  decisions            SupportTicketDecision[]
+  updates              SupportTicketUpdate[]
+  createdAt            DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                  @updatedAt @db.Timestamptz(6)
+
+  @@index([status, priority, createdAt])
+  @@index([reporterId, createdAt])
+  @@index([approvalRequired, status])
+  @@index([correlationId])
+  @@map("support_tickets")
+}
+
+model SupportTicketAttachment {
+  id        String        @id @default(uuid()) @db.Uuid
+  ticketId  String        @db.Uuid
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  fileName  String        @db.VarChar(255)
+  fileHash  String        @db.Char(64)
+  mimeType  String        @db.VarChar(160)
+  sizeBytes BigInt
+  uri       String        @db.VarChar(1000)
+  createdAt DateTime      @default(now()) @db.Timestamptz(6)
+  createdBy String        @db.Uuid
+
+  @@unique([ticketId, fileHash])
+  @@index([fileHash])
+  @@map("support_ticket_attachments")
+}
+
+model SupportTicketDecision {
+  id          String          @id @default(uuid()) @db.Uuid
+  ticketId    String          @db.Uuid
+  ticket      SupportTicket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  decision    SupportDecision
+  note        String          @db.VarChar(1000)
+  decidedAt   DateTime        @default(now()) @db.Timestamptz(6)
+  decidedById String          @db.Uuid
+  decidedBy   User            @relation("SupportDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, decidedAt])
+  @@index([decidedById, decidedAt])
+  @@map("support_ticket_decisions")
+}
+
+model SupportTicketUpdate {
+  id          String               @id @default(uuid()) @db.Uuid
+  ticketId    String               @db.Uuid
+  ticket      SupportTicket        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  fromStatus  SupportTicketStatus?
+  toStatus    SupportTicketStatus
+  note        String               @db.VarChar(2000)
+  createdAt   DateTime             @default(now()) @db.Timestamptz(6)
+  createdById String?              @db.Uuid
+  createdBy   User?                @relation("SupportUpdatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  actorLabel  String               @default("Usuário") @db.VarChar(160)
+
+  @@index([ticketId, createdAt])
+  @@index([createdById, createdAt])
+  @@map("support_ticket_updates")
+}

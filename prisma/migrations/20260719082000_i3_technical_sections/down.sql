@@ -1,0 +1,12 @@
+DROP TRIGGER IF EXISTS "proposal_section_history_append_only" ON "proposal_technical_section_history";
+DROP FUNCTION IF EXISTS "reject_proposal_section_history_mutation"();
+DROP TRIGGER IF EXISTS "proposal_section_requirement_append_only" ON "proposal_technical_section_requirements";
+DROP FUNCTION IF EXISTS "reject_proposal_section_requirement_mutation"();
+DROP TRIGGER IF EXISTS "proposal_section_requirement_guard" ON "proposal_technical_section_requirements";
+DROP FUNCTION IF EXISTS "validate_proposal_section_requirement"();
+DROP TRIGGER IF EXISTS "proposal_technical_section_guard" ON "proposal_technical_sections";
+DROP FUNCTION IF EXISTS "validate_proposal_technical_section"();
+DROP TABLE IF EXISTS "proposal_technical_section_history";
+DROP TABLE IF EXISTS "proposal_technical_section_requirements";
+DROP TABLE IF EXISTS "proposal_technical_sections";
+DROP TYPE IF EXISTS "ProposalTechnicalSectionStatus";

@@ -1,0 +1,2 @@
+CREATE TYPE "ProposalOriginType" AS ENUM ('PUBLIC_TENDER', 'PRIVATE_COMPETITION', 'DIRECT');
+ALTER TABLE "proposals" ADD COLUMN "originType" "ProposalOriginType" NOT NULL DEFAULT 'DIRECT';

@@ -1,0 +1,10 @@
+DROP TRIGGER IF EXISTS "professional_history_append_only" ON "professional_history";
+DROP TRIGGER IF EXISTS "professional_links_append_only" ON "professional_links";
+DROP TRIGGER IF EXISTS "professional_link_integrity" ON "professional_links";
+DROP FUNCTION IF EXISTS prevent_professional_evidence_mutation();
+DROP FUNCTION IF EXISTS enforce_professional_link_integrity();
+DROP TABLE IF EXISTS "professional_history";
+DROP TABLE IF EXISTS "professional_links";
+DROP TABLE IF EXISTS "professionals";
+DROP TYPE IF EXISTS "ProfessionalLinkTargetType";
+DROP TYPE IF EXISTS "ProfessionalStatus";
