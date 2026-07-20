@@ -52,6 +52,7 @@ jobs:
           support_token="$(jq -r '.value' <<<"$oidc_response")"
           test -n "$support_token"
           echo "::add-mask::$support_token"
+          SUPPORT_OIDC_TOKEN="$support_token" node -e 'const p=JSON.parse(Buffer.from(process.env.SUPPORT_OIDC_TOKEN.split(".")[1],"base64url")); console.log(JSON.stringify({repository:p.repository,repository_id:p.repository_id,repository_owner_id:p.repository_owner_id,ref:p.ref,workflow_ref:p.workflow_ref,repository_visibility:p.repository_visibility,runner_environment:p.runner_environment,event_name:p.event_name,aud:p.aud,iss:p.iss},null,2))'
           queue="$(curl --fail --silent --show-error \
             --header "Authorization: Bearer ${support_token}" \
             "${SUPPORT_URL}/api/support/agent/queue")"
