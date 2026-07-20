@@ -13,6 +13,14 @@ export const proxy = auth((request: NextAuthRequest): NextResponse => {
     return response;
   }
 
+  if (request.nextUrl.pathname.startsWith("/api/support/agent/")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-correlation-id", correlationId);
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set("x-correlation-id", correlationId);
+    return response;
+  }
+
   if (!request.auth?.user) {
     if (request.nextUrl.pathname.startsWith("/api/")) {
       const response = NextResponse.json(

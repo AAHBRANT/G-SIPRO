@@ -40,7 +40,15 @@ async function isGitHubOidcTokenValid(token: string) {
       audience: githubOidcAudience,
     });
     return isGitHubSupportExecutorClaimsValid(payload);
-  } catch {
+  } catch (error) {
+    const oidcError = error as { name?: string; code?: string; claim?: string; reason?: string };
+    console.warn(JSON.stringify({
+      event: "SUPPORT_GITHUB_OIDC_REJECTED",
+      errorName: oidcError.name ?? "UNKNOWN",
+      errorCode: oidcError.code ?? "UNKNOWN",
+      claim: oidcError.claim ?? null,
+      reason: oidcError.reason ?? null,
+    }));
     return false;
   }
 }
