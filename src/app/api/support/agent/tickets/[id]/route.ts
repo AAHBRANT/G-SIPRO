@@ -14,6 +14,7 @@ const include = {
   reporter: { select: { displayName: true, email: true } },
   attachments: { select: { id: true, fileName: true, fileHash: true, mimeType: true, sizeBytes: true } },
   decisions: { include: { decidedBy: { select: { displayName: true } } }, orderBy: { decidedAt: "desc" as const } },
+  updates: { select: { note: true, toStatus: true, actorLabel: true, createdAt: true, createdBy: { select: { displayName: true } } }, orderBy: { createdAt: "asc" as const } },
 };
 
 export async function POST(request: Request, route: { params: Promise<{ id: string }> }) {
@@ -79,7 +80,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       }
 
       const completed = input.action === "COMPLETE";
-      const retryStatus = ticket.approvalRequired ? "APPROVED" : "TRIAGED";
+      const retryStatus = "TRIAGED";
       const note = completed
         ? supportExecutionResolution(input)
         : `Falha informada pelo executor ${input.executorId}: ${input.summary}`;
@@ -88,6 +89,8 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
           where: { id, status: "IN_PROGRESS", executionLeaseId: input.leaseId, executorId: input.executorId },
           data: {
             status: completed ? "WAITING_USER_VALIDATION" : retryStatus,
+            approvalRequired: false,
+            approvalReason: null,
             resolution: completed ? note : ticket.resolution,
             resolvedAt: null,
             resolvedById: null,

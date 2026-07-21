@@ -1,0 +1,1 @@
+-- A autonomia já registrada no histórico dos chamados não é revertida automaticamente.

@@ -31,6 +31,8 @@ describe("support execution package", () => {
       reporter: { displayName: "Usuário", email: "usuario@example.com" },
       attachments: [{ id: "attachment-1", fileName: "evidencia.png", fileHash: "hash", mimeType: "image/png", sizeBytes: 2048n }],
       decisions: [],
+      resolutionAttempts: 1,
+      updates: [{ note: "O problema continua no Teams.", toStatus: "TRIAGED", actorLabel: "Solicitante", createdAt: new Date("2026-07-20T13:00:00.000Z"), createdBy: null }],
     });
 
     expect(result.ticket.code).toBe("SUP-00009");
@@ -40,5 +42,7 @@ describe("support execution package", () => {
       contentPath: "/api/support/attachments/attachment-1/content",
     });
     expect(result.attachments[0]).not.toHaveProperty("uri");
+    expect(result.execution.currentAttempt).toBe(2);
+    expect(result.history[0]).toMatchObject({ note: "O problema continua no Teams.", actor: "Solicitante" });
   });
 });

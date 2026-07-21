@@ -3,7 +3,7 @@ name: G-SIPRO Support Codex
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
 
 concurrency:
   group: gsipro-support-codex
@@ -136,10 +136,24 @@ jobs:
       id-token: write
     env:
       SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+    outputs:
+      merge_revision: ${{ steps.merge.outputs.merge_revision }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies for validation
+        run: pnpm install --frozen-lockfile
 
       - uses: actions/download-artifact@v4
         with:
@@ -160,6 +174,12 @@ jobs:
             git switch --create "$branch" --track "origin/$branch"
           else
             git apply --index codex.patch
+            protected_paths="$(git diff --cached --name-only | grep -E '^(\.github/|\.codex/|Dockerfile$|docker-compose|scripts/deploy)' || true)"
+            if [ -n "$protected_paths" ]; then
+              echo "A correção tentou modificar arquivos protegidos da automação:" >&2
+              echo "$protected_paths" >&2
+              exit 1
+            fi
             git switch -c "$branch"
             git commit -m "corrige ${TICKET_CODE} via Codex"
             git push origin "$branch"
@@ -167,7 +187,7 @@ jobs:
 
           pr_url="$(gh pr list --head "$branch" --state all --json url --jq '.[0].url // empty')"
           if [ -z "$pr_url" ]; then
-            printf 'Correção automatizada para `%s`.\n\nRevise as alterações e aguarde o CI antes de incorporar.\n' "$TICKET_CODE" > pr-body.md
+            printf 'Correção automatizada para `%s`.\n\nA alteração será validada pelo CI, incorporada e implantada automaticamente.\n' "$TICKET_CODE" > pr-body.md
             pr_url="$(gh pr create --base main --head "$branch" --title "Correção automática ${TICKET_CODE}" --body-file pr-body.md)"
           fi
           echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
@@ -184,8 +204,124 @@ jobs:
           oidc_response="$(curl --fail --silent --show-error --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
           support_token="$(jq -r '.value' <<<"$oidc_response")"
           echo "::add-mask::$support_token"
-          body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" --arg pullRequestUrl "$PR_URL" --arg revision "$REVISION" '{action:"REPORT_PROGRESS",executorId:$executorId,leaseId:$leaseId,summary:"Correção proposta pelo Codex e enviada para revisão humana.",pullRequestUrl:$pullRequestUrl,revision:$revision}')"
+          body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" --arg pullRequestUrl "$PR_URL" --arg revision "$REVISION" '{action:"REPORT_PROGRESS",executorId:$executorId,leaseId:$leaseId,summary:"Correção preparada pela IA. O CI, a incorporação e a implantação seguirão automaticamente.",pullRequestUrl:$pullRequestUrl,revision:$revision}')"
           curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${support_token}" \
             --header "Content-Type: application/json" --data "$body" \
             "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"
+
+      - name: Validate the AI correction before incorporation
+        run: |
+          pnpm check
+          pnpm build
+
+      - name: Incorporate validated correction automatically
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR_URL" --squash --delete-branch
+          revision="$(gh pr view "$PR_URL" --json mergeCommit --jq '.mergeCommit.oid')"
+          test -n "$revision"
+          echo "merge_revision=$revision" >> "$GITHUB_OUTPUT"
+
+  deploy_fix:
+    needs: [generate_fix, open_pr]
+    if: needs.generate_fix.outputs.has_patch == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+      RESOURCE_GROUP: rg-gsipro-hml-brazilsouth
+      CONTAINER_APP: ca-gsipro-hml-aahbrant
+      REGISTRY: acrgsiprohml27207f
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.open_pr.outputs.merge_revision }}
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and deploy validated image
+        id: deployment
+        env:
+          TICKET_CODE: ${{ needs.generate_fix.outputs.ticket_code }}
+          MERGE_REVISION: ${{ needs.open_pr.outputs.merge_revision }}
+        run: |
+          set -euo pipefail
+          short_revision="${MERGE_REVISION:0:7}"
+          normalized_ticket="$(tr '[:upper:]' '[:lower:]' <<<"$TICKET_CODE")"
+          image_tag="support-${normalized_ticket}-${short_revision}-${GITHUB_RUN_ID}"
+          revision_suffix="sup-${short_revision}-${GITHUB_RUN_ID}"
+          az acr build --registry "$REGISTRY" --image "gsipro:${image_tag}" . --no-logs
+          az containerapp update --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" \
+            --image "${REGISTRY}.azurecr.io/gsipro:${image_tag}" --revision-suffix "$revision_suffix" --output none
+          deployment_url="${SUPPORT_URL}"
+          revision_name="${CONTAINER_APP}--${revision_suffix}"
+          for attempt in $(seq 1 30); do
+            health="$(az containerapp revision show --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" \
+              --revision "$revision_name" --query properties.healthState --output tsv 2>/dev/null || true)"
+            ready="$(curl --silent --show-error --fail "${deployment_url}/api/readiness" | jq -r '.status // empty' || true)"
+            if [ "$health" = "Healthy" ] && [ "$ready" = "ready" ]; then
+              echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+              echo "revision_name=$revision_name" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "A nova revisão não ficou pronta dentro do prazo." >&2
+          exit 1
+
+      - name: Return deployed solution for requester validation
+        env:
+          TICKET_ID: ${{ needs.generate_fix.outputs.ticket_id }}
+          LEASE_ID: ${{ needs.generate_fix.outputs.lease_id }}
+          EXECUTOR_ID: ${{ needs.generate_fix.outputs.executor_id }}
+          MERGE_REVISION: ${{ needs.open_pr.outputs.merge_revision }}
+          DEPLOYMENT_URL: ${{ steps.deployment.outputs.deployment_url }}
+        run: |
+          set -euo pipefail
+          oidc_response="$(curl --fail --silent --show-error --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
+          support_token="$(jq -r '.value' <<<"$oidc_response")"
+          echo "::add-mask::$support_token"
+          body="$(jq -n \
+            --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" \
+            --arg revision "$MERGE_REVISION" --arg deploymentUrl "$DEPLOYMENT_URL" \
+            '{action:"COMPLETE",executorId:$executorId,leaseId:$leaseId,summary:"Correção produzida, validada, incorporada e implantada automaticamente pela IA do G-SIPRO.",tests:["CI da correção aprovado","Imagem criada no Azure Container Registry","Nova revisão implantada no Azure Container Apps","Health e readiness aprovados"],revision:$revision,deploymentUrl:$deploymentUrl}')"
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${support_token}" \
+            --header "Content-Type: application/json" --data "$body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"
+
+  return_pipeline_failure:
+    needs: [generate_fix, open_pr, deploy_fix]
+    if: always() && needs.generate_fix.outputs.has_patch == 'true' && (needs.open_pr.result != 'success' || needs.deploy_fix.result != 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    env:
+      SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+    steps:
+      - name: Return pipeline failure to autonomous queue
+        env:
+          TICKET_ID: ${{ needs.generate_fix.outputs.ticket_id }}
+          LEASE_ID: ${{ needs.generate_fix.outputs.lease_id }}
+          EXECUTOR_ID: ${{ needs.generate_fix.outputs.executor_id }}
+        run: |
+          oidc_response="$(curl --fail --silent --show-error --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
+          support_token="$(jq -r '.value' <<<"$oidc_response")"
+          echo "::add-mask::$support_token"
+          body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" '{action:"REPORT_FAILURE",executorId:$executorId,leaseId:$leaseId,summary:"A correção não concluiu a validação, incorporação ou implantação automática e retornou à fila para nova execução."}')"
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${support_token}" \
+            --header "Content-Type: application/json" --data "$body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}" || true

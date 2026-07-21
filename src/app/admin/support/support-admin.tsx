@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SupportTicketView } from "@/app/support/support-center";
 import { SupportChat } from "@/app/support/support-chat";
+import { SupportProgressCard } from "@/app/support/support-progress-card";
 
 const typeLabel: Record<string, string> = { BUG: "Erro", QUESTION: "Dúvida", IMPROVEMENT: "Melhoria", NEW_FEATURE: "Nova ferramenta" };
 const statusLabel: Record<string, string> = { OPEN: "Recebido", TRIAGED: "Na fila técnica", WAITING_APPROVAL: "Aguardando aprovação", APPROVED: "Autorizado", IN_PROGRESS: "Em execução", WAITING_USER_VALIDATION: "Validação do solicitante", ESCALATED: "Escalado ao proprietário", RESOLVED: "Resolvido", REJECTED: "Rejeitado", CANCELLED: "Cancelado" };
@@ -59,6 +60,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">{statusLabel[ticket.status]}</span>
           </div>
         </div>
+        <div className="mt-4"><SupportProgressCard resolutionAttempts={ticket.resolutionAttempts ?? 0} status={ticket.status} updatedAt={ticket.updatedAt}/></div>
         <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">{ticket.description}</p>
         {ticket.errorMessage && <p className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-800"><b>Erro:</b> {ticket.errorMessage}</p>}
         {diagnosis && <div className="mt-4 grid gap-3 rounded-xl border border-violet-200 bg-violet-50/40 p-4 md:grid-cols-2">
@@ -68,7 +70,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
         {ticket.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{ticket.attachments.map((file) => <a className="rounded-lg border px-3 py-2 text-xs font-bold text-brand" href={`/api/support/attachments/${file.id}/content`} key={file.id} target="_blank" rel="noreferrer">{file.fileName}</a>)}</div>}
         {executionAuthorized && <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/50 p-4">
           <p className="text-xs font-black uppercase tracking-wider text-cyan-800">Ponte de execução</p>
-          <p className="mt-1 text-xs text-cyan-900">Diagnóstico, autorização, evidências e testes estão reunidos em um pacote técnico rastreável.</p>
+          <p className="mt-1 text-xs text-cyan-900">Diagnóstico, evidências e testes estão reunidos em um pacote técnico rastreável. As três tentativas seguem sem aprovação manual.</p>
           {ticket.executorId && <p className="mt-2 text-xs font-semibold text-cyan-950">Executor: {ticket.executorId} · tentativa {ticket.executionAttempts ?? 1}{ticket.executionHeartbeatAt ? ` · último sinal ${new Date(ticket.executionHeartbeatAt).toLocaleString("pt-BR")}` : ""}</p>}
           <a className="mt-3 inline-flex rounded-lg border border-cyan-300 bg-white px-3 py-2 text-xs font-bold text-cyan-800" href={`/api/support/tickets/${ticket.id}/execution`} target="_blank" rel="noreferrer">Abrir pacote técnico</a>
         </div>}
@@ -77,12 +79,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
         <textarea className="mt-4 min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm" onChange={(event) => setNotes((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder={ticket.status === "IN_PROGRESS" ? "Descreva a solução realmente implantada" : "Registre a decisão ou orientação"} value={note}/>
         {ticket.status === "IN_PROGRESS" && <div className="mt-3 grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 md:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-emerald-950">Revisão ou commit implantado<input className="rounded-lg border border-emerald-200 bg-white px-3 py-2 font-mono text-xs font-normal" minLength={7} onChange={(event) => setRevisions((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder="Ex.: 65508f5" value={revision}/></label><label className="grid gap-1 text-xs font-bold text-emerald-950">URL do ambiente publicado<input className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-normal" onChange={(event) => setDeploymentUrls((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder="https://..." type="url" value={deploymentUrl}/></label><label className="grid gap-1 text-xs font-bold text-emerald-950 md:col-span-2">Testes realmente executados — um por linha<textarea className="min-h-20 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-normal" onChange={(event) => setExecutedTests((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder="Teste realizado e resultado observado" value={executedTests[ticket.id] ?? ""}/></label></div>}
         <div className="mt-3 flex flex-wrap gap-2">
-          {ticket.status === "WAITING_APPROVAL" && canApprove && <>
-            <button className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "decision", { decision: "APPROVED", note })}>Aprovar execução</button>
-            <button className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "decision", { decision: "REJECTED", note })}>Rejeitar</button>
-          </>}
-          {ticket.status === "WAITING_APPROVAL" && !canApprove && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">Aguardando decisão de um proprietário.</p>}
-          {((ticket.status === "TRIAGED" && !ticket.approvalRequired) || ticket.status === "APPROVED") && <button className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id} onClick={() => send(ticket.id, "execution", { action: "CLAIM" })}>Iniciar execução técnica</button>}
+          {["TRIAGED", "APPROVED", "WAITING_APPROVAL"].includes(ticket.status) && <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-800">Execução automática ativa. Nenhuma aprovação ou início manual é necessário.</p>}
           {ticket.status === "IN_PROGRESS" && <button className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3 || revision.trim().length < 7 || !deploymentUrl.startsWith("https://") || testLines.length === 0} onClick={() => send(ticket.id, "execution", { action: "COMPLETE", summary: note, tests: testLines, revision, deploymentUrl })}>Concluir após implantação</button>}
           {ticket.status === "ESCALATED" && canApprove && <button className="rounded-lg bg-rose-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id} onClick={() => send(ticket.id, "escalation", {})}>Assumir chamado escalado</button>}
           {ticket.status === "RESOLVED" && canApprove && <button className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "reopen", { note })}>Reabrir chamado</button>}

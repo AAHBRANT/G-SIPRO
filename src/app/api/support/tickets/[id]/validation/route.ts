@@ -66,13 +66,13 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       const missing = clarification.data.questions.filter(question => !answers.has(question.id));
       if (missing.length) throw new ValidationError("Responda todas as perguntas antes de continuar.");
       const escalated = ticket.resolutionAttempts >= 3;
-      const nextStatus = escalated ? "ESCALATED" : ticket.approvalRequired ? "APPROVED" : "TRIAGED";
+      const nextStatus = escalated ? "ESCALATED" : "TRIAGED";
       const details = clarification.data.questions.map(question => `${question.question}\nResposta: ${answers.get(question.id)}`).join("\n\n");
       const note = escalated
         ? `Terceira tentativa não solucionou o problema. Chamado escalado automaticamente ao proprietário.\n\n${details}`
-        : `Esclarecimentos do solicitante para a próxima tentativa:\n\n${details}`;
+        : `Reabertura aceita. Os esclarecimentos foram registrados e a IA iniciará automaticamente a tentativa ${Math.min(3, ticket.resolutionAttempts + 1)} de 3, sem nova aprovação.\n\n${details}`;
       await database.$transaction(async transaction => {
-        await transaction.supportTicket.update({ where: { id }, data: { status: nextStatus, validationQuestions: Prisma.JsonNull, validationRequestedAt: null, escalatedAt: escalated ? new Date() : null, executionLeaseId: null, executorId: null, executionClaimedAt: null, executionHeartbeatAt: null } });
+        await transaction.supportTicket.update({ where: { id }, data: { status: nextStatus, approvalRequired: false, approvalReason: null, validationQuestions: Prisma.JsonNull, validationRequestedAt: null, escalatedAt: escalated ? new Date() : null, executionLeaseId: null, executorId: null, executionClaimedAt: null, executionHeartbeatAt: null } });
         await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId: id, fromStatus: "WAITING_USER_VALIDATION", toStatus: nextStatus, note, createdById: authorization.actorId, actorLabel: "Solicitante" } });
         await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: escalated ? "SUPPORT_ESCALATED_TO_OWNER" : "SUPPORT_CLARIFICATION_COMPLETED", entityType: "SUPPORT_TICKET", entityId: id, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-validation", metadata: { resolutionAttempts: ticket.resolutionAttempts, answers: input.answers } } });
       });

@@ -9,6 +9,7 @@ const include = {
   reporter: { select: { displayName: true, email: true } },
   attachments: { select: { id: true, fileName: true, fileHash: true, mimeType: true, sizeBytes: true } },
   decisions: { include: { decidedBy: { select: { displayName: true } } }, orderBy: { decidedAt: "desc" as const } },
+  updates: { select: { note: true, toStatus: true, actorLabel: true, createdAt: true, createdBy: { select: { displayName: true } } }, orderBy: { createdAt: "asc" as const } },
 };
 
 export async function GET(request: Request) {

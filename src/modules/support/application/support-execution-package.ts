@@ -17,6 +17,7 @@ type TicketForExecution = {
   approvalReason: string | null;
   executorId?: string | null;
   executionAttempts?: number;
+  resolutionAttempts?: number;
   executionClaimedAt?: Date | null;
   executionHeartbeatAt?: Date | null;
   correlationId: string;
@@ -24,6 +25,7 @@ type TicketForExecution = {
   reporter: { displayName: string; email: string };
   attachments: Array<{ id: string; fileName: string; fileHash: string; mimeType: string; sizeBytes: bigint }>;
   decisions: Array<{ decision: string; note: string; decidedAt: Date; decidedBy: { displayName: string } }>;
+  updates: Array<{ note: string; toStatus: string; actorLabel: string | null; createdAt: Date; createdBy: { displayName: string } | null }>;
 };
 
 export function buildSupportExecutionPackage(ticket: TicketForExecution) {
@@ -62,7 +64,15 @@ export function buildSupportExecutionPackage(ticket: TicketForExecution) {
       attempts: ticket.executionAttempts ?? 0,
       claimedAt: ticket.executionClaimedAt?.toISOString() ?? null,
       heartbeatAt: ticket.executionHeartbeatAt?.toISOString() ?? null,
+      deliveredAttempts: ticket.resolutionAttempts ?? 0,
+      currentAttempt: Math.min(3, (ticket.resolutionAttempts ?? 0) + 1),
     },
+    history: ticket.updates.map((update) => ({
+      status: update.toStatus,
+      note: update.note,
+      actor: update.createdBy?.displayName ?? update.actorLabel ?? "Sistema",
+      at: update.createdAt.toISOString(),
+    })),
     acceptanceCriteria: diagnosis?.suggestedTests ?? [],
     attachments: ticket.attachments.map((attachment) => ({
       id: attachment.id,
