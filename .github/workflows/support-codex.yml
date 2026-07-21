@@ -152,15 +152,24 @@ jobs:
           TICKET_CODE: ${{ needs.generate_fix.outputs.ticket_code }}
         run: |
           set -euo pipefail
-          git apply --index codex.patch
           branch="codex/support-${TICKET_CODE,,}-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git commit -m "corrige ${TICKET_CODE} via Codex"
-          git push origin "$branch"
-          printf 'Correção automatizada para `%s`.\n\nRevise as alterações e aguarde o CI antes de incorporar.\n' "$TICKET_CODE" > pr-body.md
-          pr_url="$(gh pr create --base main --head "$branch" --title "Correção automática ${TICKET_CODE}" --body-file pr-body.md)"
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git switch --create "$branch" --track "origin/$branch"
+          else
+            git apply --index codex.patch
+            git switch -c "$branch"
+            git commit -m "corrige ${TICKET_CODE} via Codex"
+            git push origin "$branch"
+          fi
+
+          pr_url="$(gh pr list --head "$branch" --state all --json url --jq '.[0].url // empty')"
+          if [ -z "$pr_url" ]; then
+            printf 'Correção automatizada para `%s`.\n\nRevise as alterações e aguarde o CI antes de incorporar.\n' "$TICKET_CODE" > pr-body.md
+            pr_url="$(gh pr create --base main --head "$branch" --title "Correção automática ${TICKET_CODE}" --body-file pr-body.md)"
+          fi
           echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
