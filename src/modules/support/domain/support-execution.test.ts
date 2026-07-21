@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { supportExecutionAuthorization, supportExecutionResolution } from "./support-execution";
+import { supportExecutionAuthorization, supportExecutionCommandSchema, supportExecutionResolution } from "./support-execution";
 
 describe("support execution bridge", () => {
   it("queues a diagnosed correction without extra approval", () => {
@@ -15,7 +15,11 @@ describe("support execution bridge", () => {
   });
 
   it("builds a human-readable resolution with validation evidence", () => {
-    expect(supportExecutionResolution({ action: "COMPLETE", summary: "Correção implantada.", tests: ["Teste de regressão aprovado"], revision: "rev-1" }))
+    expect(supportExecutionResolution({ action: "COMPLETE", summary: "Correção implantada.", tests: ["Teste de regressão aprovado"], revision: "abcdef1", deploymentUrl: "https://app.example.com" }))
       .toContain("Teste de regressão aprovado");
+  });
+
+  it("recusa conclusão sem revisão e ambiente publicado", () => {
+    expect(supportExecutionCommandSchema.safeParse({ action: "COMPLETE", summary: "Concluído", tests: ["Teste aprovado"] }).success).toBe(false);
   });
 });

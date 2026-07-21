@@ -25,6 +25,10 @@ export const supportMessageSchema = z.object({
   message: z.string().trim().min(1).max(2_000),
 });
 
+export const supportReopenSchema = z.object({
+  note: z.string().trim().min(3).max(2_000),
+});
+
 export const supportDiagnosisSchema = z.object({
   summary: z.string().trim().min(1).max(1_500),
   probableCause: z.string().trim().min(1).max(2_500),

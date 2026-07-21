@@ -7,7 +7,7 @@ describe("support agent protocol", () => {
   });
 
   it("accepts a complete result with validation evidence", () => {
-    expect(supportAgentCommandSchema.safeParse({ action: "COMPLETE", executorId: "codex-runner", leaseId: crypto.randomUUID(), summary: "Corrigido", tests: ["Regressão aprovada"] }).success).toBe(true);
+    expect(supportAgentCommandSchema.safeParse({ action: "COMPLETE", executorId: "codex-runner", leaseId: crypto.randomUUID(), summary: "Corrigido", tests: ["Regressão aprovada"], revision: "abcdef1", deploymentUrl: "https://app.example.com" }).success).toBe(true);
   });
 
   it("accepts progress linked to a pull request", () => {

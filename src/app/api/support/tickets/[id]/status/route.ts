@@ -7,7 +7,7 @@ import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { supportStatusSchema } from "@/modules/support/domain/support-ticket";
 
-const transitions: Record<string, string[]> = { OPEN: ["IN_PROGRESS", "CANCELLED"], TRIAGED: ["IN_PROGRESS", "RESOLVED", "CANCELLED"], APPROVED: ["IN_PROGRESS", "CANCELLED"], IN_PROGRESS: ["RESOLVED", "CANCELLED"] };
+const transitions: Record<string, string[]> = { OPEN: ["IN_PROGRESS", "CANCELLED"], TRIAGED: ["IN_PROGRESS", "CANCELLED"], APPROVED: ["IN_PROGRESS", "CANCELLED"], IN_PROGRESS: ["CANCELLED"] };
 
 export async function POST(request: Request, route: { params: Promise<{ id: string }> }) {
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
