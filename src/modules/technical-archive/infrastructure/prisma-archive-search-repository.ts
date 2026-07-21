@@ -13,6 +13,7 @@ export class PrismaArchiveSearchRepository implements ArchiveSearchRepository {
       }),
     };
     const where: Prisma.ExecutedServiceWhereInput = {
+      contract: { evidenceDocumentVersion: { document: { status: { not: "DELETED" } } } },
       ...(criteria.discipline && { discipline: { contains: criteria.discipline, mode: "insensitive" } }),
       ...(criteria.service && { originalDescription: { contains: criteria.service, mode: "insensitive" } }),
       ...(criteria.characteristic && { characteristics: { contains: criteria.characteristic, mode: "insensitive" } }),

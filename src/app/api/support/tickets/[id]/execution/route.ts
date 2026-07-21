@@ -64,6 +64,10 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             validationRequestedAt: input.action === "COMPLETE" ? new Date() : ticket.validationRequestedAt,
             validationQuestions: input.action === "COMPLETE" ? Prisma.JsonNull : undefined,
             resolutionAttempts: input.action === "COMPLETE" && ticket.resolutionAttempts < 3 ? { increment: 1 } : undefined,
+            executionLeaseId: input.action === "COMPLETE" ? null : undefined,
+            executorId: input.action === "COMPLETE" ? null : undefined,
+            executionClaimedAt: input.action === "COMPLETE" ? null : undefined,
+            executionHeartbeatAt: input.action === "COMPLETE" ? null : undefined,
           },
         });
         await transaction.supportTicketUpdate.create({
