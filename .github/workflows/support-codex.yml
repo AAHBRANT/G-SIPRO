@@ -305,9 +305,28 @@ jobs:
             --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" \
             --arg revision "$MERGE_REVISION" --arg deploymentUrl "$DEPLOYMENT_URL" \
             '{action:"COMPLETE",executorId:$executorId,leaseId:$leaseId,summary:"Correção produzida, validada, incorporada e implantada automaticamente pela IA do G-SIPRO.",tests:["CI da correção aprovado","Imagem criada no Azure Container Registry","Nova revisão implantada no Azure Container Apps","Health e readiness aprovados"],revision:$revision,deploymentUrl:$deploymentUrl}')"
-          curl --fail --silent --show-error --request POST \
+          if curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${support_token}" \
             --header "Content-Type: application/json" --data "$body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"; then
+            exit 0
+          fi
+
+          echo "A implantação foi concluída, mas a reserva expirou. Obtendo nova reserva para registrar a entrega."
+          claim_body="$(jq -n --arg executorId "$EXECUTOR_ID" '{action:"CLAIM",executorId:$executorId}')"
+          claimed="$(curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${support_token}" \
+            --header "Content-Type: application/json" --data "$claim_body" \
+            "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}")"
+          recovered_lease="$(jq -r '.data.leaseId // empty' <<<"$claimed")"
+          test -n "$recovered_lease"
+          recovered_body="$(jq -n \
+            --arg executorId "$EXECUTOR_ID" --arg leaseId "$recovered_lease" \
+            --arg revision "$MERGE_REVISION" --arg deploymentUrl "$DEPLOYMENT_URL" \
+            '{action:"COMPLETE",executorId:$executorId,leaseId:$leaseId,summary:"Correção produzida, validada, incorporada e implantada automaticamente pela IA do G-SIPRO após recuperação da reserva técnica.",tests:["CI da correção aprovado","Imagem criada no Azure Container Registry","Nova revisão implantada no Azure Container Apps","Health e readiness aprovados"],revision:$revision,deploymentUrl:$deploymentUrl}')"
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${support_token}" \
+            --header "Content-Type: application/json" --data "$recovered_body" \
             "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"
 
   return_pipeline_failure:
