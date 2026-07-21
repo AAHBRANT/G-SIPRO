@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 type NavigationItem = Readonly<{ href: string; label: string; icon: ReactNode; permission?: string; badge?: number; exact?: boolean }>;
-type NavigationGroup = Readonly<{ label: string; items: ReadonlyArray<NavigationItem> }>;
 
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -30,35 +29,31 @@ const icons = {
   support: <Icon><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M9 9h6M9 13h4"/></Icon>,
 };
 
-const navigation: ReadonlyArray<NavigationGroup> = [
-  { label: "Visão geral", items: [{ href: "/", label: "Dashboard", icon: icons.dashboard }] },
-  { label: "Comercial", items: [
-    { href: "/opportunities", label: "Oportunidades", icon: icons.opportunity, permission: "opportunities.read" },
-    { href: "/proposals", label: "Propostas", icon: icons.proposal, permission: "proposals.read" },
-  ]},
-  { label: "Acervo técnico", items: [
-    { href: "/technical-archive", label: "Acervo técnico", icon: icons.archive, permission: "technical-archive.read" },
-  ]},
-  { label: "Inteligência", items: [
-    { href: "/indicators", label: "Inteligência e KPIs", icon: icons.indicators, permission: "indicators.read" },
-  ]},
-  { label: "Atendimento", items: [
-    { href: "/support", label: "Suporte", icon: icons.support },
-  ]},
+const navigation: ReadonlyArray<NavigationItem> = [
+  { href: "/", label: "Visão geral", icon: icons.dashboard },
+  { href: "/opportunities", label: "Oportunidades", icon: icons.opportunity, permission: "opportunities.read" },
+  { href: "/proposals", label: "Propostas", icon: icons.proposal, permission: "proposals.read" },
+  { href: "/technical-archive", label: "Acervo técnico", icon: icons.archive, permission: "technical-archive.read" },
+  { href: "/indicators", label: "Inteligência e KPIs", icon: icons.indicators, permission: "indicators.read" },
 ];
 
 function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals = 0, permissions }: { close?: () => void; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; permissions: ReadonlyArray<string> }) {
   const pathname = usePathname();
   const granted = new Set(permissions);
-  const groups = navigation.map((group) => ({ ...group, items: group.items.filter((item) => isMaster || !item.permission || granted.has(item.permission)) })).filter((group) => group.items.length > 0);
-  if (isMaster) groups.push({ label: "Sistema", items: [{ href: "/admin", label: "Administrador", icon: icons.admin, exact: true }, ...(isOwner ? [{ href: "/admin/support#approvals", label: "Aprovações", icon: icons.support, badge: pendingApprovals }] : [])] });
-  return <nav className="flex-1 overflow-y-auto px-3 pb-6 pt-4">{groups.map(group => <section className="mb-5" key={group.label}>
-    <p className="px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
-    <ul className="mt-2 space-y-1">{group.items.map(item => {
+  const mainItems = navigation.filter((item) => isMaster || !item.permission || granted.has(item.permission));
+  if (isMaster) mainItems.push({ href: "/admin", label: "Administrador", icon: icons.admin, exact: true });
+  const bottomItems: ReadonlyArray<NavigationItem> = [
+    { href: "/support", label: "Suporte", icon: icons.support },
+    ...(isOwner ? [{ href: "/admin/support#approvals", label: "Aprovações", icon: icons.support, badge: pendingApprovals }] : []),
+  ];
+  const renderItems = (items: ReadonlyArray<NavigationItem>) => <ul className="space-y-1">{items.map(item => {
       const active = item.exact || item.href === "/" ? pathname === item.href : pathname.startsWith(item.href.split("#")[0]);
       return <li key={item.href}><Link aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${active ? "bg-blue-50 text-brand shadow-sm ring-1 ring-blue-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`} href={item.href} onClick={close}>{item.icon}<span>{item.label}</span>{Boolean(item.badge) && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white">{item.badge}</span>}</Link></li>;
-    })}</ul>
-  </section>)}</nav>;
+    })}</ul>;
+  return <nav className="flex min-h-0 flex-1 flex-col px-3 py-4">
+    <div className="flex-1 overflow-y-auto">{renderItems(mainItems)}</div>
+    <div className="mt-4 shrink-0 border-t border-slate-100 pt-4">{renderItems(bottomItems)}</div>
+  </nav>;
 }
 
 export function AppShell({ children, userLabel, isMaster = false, isOwner = false, pendingApprovals = 0, permissions = [], signOutAction }: { children: ReactNode; userLabel: string; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; permissions?: ReadonlyArray<string>; signOutAction: () => Promise<void> }) {
