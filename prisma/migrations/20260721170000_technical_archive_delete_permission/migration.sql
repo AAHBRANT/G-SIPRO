@@ -1,5 +1,5 @@
 INSERT INTO "permissions"("id","code","module","action","description","createdAt","createdBy")
-VALUES('b2000000-0000-4000-8000-000000000007','technical-archive.delete','technical-archive','delete','Excluir logicamente acervo técnico com motivo e auditoria',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000')
+VALUES('ae370d42-3d2e-4fcf-9783-fc6297f8d6de','technical-archive.delete','technical-archive','delete','Excluir logicamente acervo técnico com motivo e auditoria',CURRENT_TIMESTAMP,'00000000-0000-0000-0000-000000000000')
 ON CONFLICT("code") DO NOTHING;
 
 INSERT INTO "profile_permissions"("profileId","permissionId","grantedAt","grantedBy")
