@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
+import { snapshotSelectedFiles } from "./browser-file-selection";
 import { browserRandomUuid } from "./browser-random-uuid";
 
 export type OpportunityOption = Readonly<{
@@ -163,9 +164,10 @@ export function CreateProposalForm({
 
   function addFiles(files: FileList | null) {
     if (!files) return;
+    const selectedFiles = snapshotSelectedFiles(files);
     setDocuments((current) => [
       ...current,
-      ...Array.from(files).map((file) => ({
+      ...selectedFiles.map((file) => ({
         id: browserRandomUuid(),
         file,
         type: guessType(file.name),
