@@ -71,7 +71,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
         {executionAuthorized && <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/50 p-4">
           <p className="text-xs font-black uppercase tracking-wider text-cyan-800">Ponte de execução</p>
           <p className="mt-1 text-xs text-cyan-900">Diagnóstico, evidências e testes estão reunidos em um pacote técnico rastreável. As três tentativas seguem sem aprovação manual.</p>
-          {ticket.executorId && <p className="mt-2 text-xs font-semibold text-cyan-950">Executor: {ticket.executorId} · tentativa {ticket.executionAttempts ?? 1}{ticket.executionHeartbeatAt ? ` · último sinal ${new Date(ticket.executionHeartbeatAt).toLocaleString("pt-BR")}` : ""}</p>}
+          {ticket.executorId && <p className="mt-2 text-xs font-semibold text-cyan-950">Executor: {ticket.executorId} · execução técnica nº {ticket.executionAttempts ?? 1}{ticket.executionHeartbeatAt ? ` · último sinal ${new Date(ticket.executionHeartbeatAt).toLocaleString("pt-BR")}` : ""}</p>}
           <a className="mt-3 inline-flex rounded-lg border border-cyan-300 bg-white px-3 py-2 text-xs font-bold text-cyan-800" href={`/api/support/tickets/${ticket.id}/execution`} target="_blank" rel="noreferrer">Abrir pacote técnico</a>
         </div>}
         {ticket.status === "WAITING_USER_VALIDATION" && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">Solução entregue. Aguardando o solicitante responder “Posso encerrar este chamado?” — tentativa {ticket.resolutionAttempts ?? 1} de 3.</p>}
