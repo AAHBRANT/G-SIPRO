@@ -16,6 +16,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       const authorization = await requireMaster();
       const input = userAccessSchema.parse(await request.json());
       const database = getDatabase();
+      if (input.isOwner && !authorization.isOwner) throw new ConflictError("Somente um proprietário pode conceder o perfil de proprietário.");
       if (await database.user.findUnique({ where: { email: input.email }, select: { id: true } })) throw new ConflictError("Já existe um usuário com este e-mail.");
       if (input.departmentId && !await database.department.findFirst({ where: { id: input.departmentId, active: true }, select: { id: true } })) throw new ValidationError("O departamento selecionado não está disponível.");
       const permissionCount = await database.permission.count({ where: { id: { in: input.permissionIds } } });
@@ -24,11 +25,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       const userId = randomUUID();
       const profileId = randomUUID();
       await database.$transaction(async (transaction) => {
-        await transaction.user.create({ data: { id: userId, entraObjectId: randomUUID(), displayName: input.displayName, email: input.email, status: input.status, isMaster: input.isMaster, departmentId: input.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
+        await transaction.user.create({ data: { id: userId, entraObjectId: randomUUID(), displayName: input.displayName, email: input.email, status: input.status, isMaster: input.isMaster, isOwner: input.isOwner, departmentId: input.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
         await transaction.profile.create({ data: { id: profileId, code: `USER_ACCESS_${userId.replaceAll("-", "")}`, name: `Acesso individual — ${input.displayName}`, description: "Perfil individual administrado pelo painel de usuários.", createdBy: authorization.actorId, updatedBy: authorization.actorId } });
         if (input.permissionIds.length) await transaction.profilePermission.createMany({ data: [...new Set(input.permissionIds)].map((permissionId) => ({ profileId, permissionId, grantedBy: authorization.actorId })) });
         await transaction.userProfile.create({ data: { userId, profileId, grantedBy: authorization.actorId, reason: "Provisionamento pelo painel administrativo" } });
-        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_PROVISIONED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, isMaster: input.isMaster, permissionCount: input.permissionIds.length } } });
+        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_PROVISIONED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, isMaster: input.isMaster, isOwner: input.isOwner, permissionCount: input.permissionIds.length } } });
       });
       revalidatePath("/admin");
       return NextResponse.json({ data: { id: userId }, correlationId: context.correlationId }, { status: 201 });

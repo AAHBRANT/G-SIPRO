@@ -256,6 +256,7 @@ model User {
   email                       String                            @unique @db.VarChar(254)
   status                      UserStatus                        @default(ACTIVE)
   isMaster                    Boolean                           @default(false)
+  isOwner                     Boolean                           @default(false)
   departmentId                String?                           @db.Uuid
   department                  Department?                       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   profileMemberships          UserProfile[]
@@ -294,6 +295,7 @@ model User {
   updatedBy                   String                            @db.Uuid
 
   @@index([departmentId, status])
+  @@index([isOwner, status])
   @@index([displayName])
   @@map("users")
 }

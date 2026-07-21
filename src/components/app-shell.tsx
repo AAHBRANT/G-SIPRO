@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
-type NavigationItem = Readonly<{ href: string; label: string; icon: ReactNode; permission?: string }>;
+type NavigationItem = Readonly<{ href: string; label: string; icon: ReactNode; permission?: string; badge?: number; exact?: boolean }>;
 type NavigationGroup = Readonly<{ label: string; items: ReadonlyArray<NavigationItem> }>;
 
 function Icon({ children }: { children: ReactNode }) {
@@ -47,21 +47,21 @@ const navigation: ReadonlyArray<NavigationGroup> = [
   ]},
 ];
 
-function Navigation({ close, isMaster = false, permissions }: { close?: () => void; isMaster?: boolean; permissions: ReadonlyArray<string> }) {
+function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals = 0, permissions }: { close?: () => void; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; permissions: ReadonlyArray<string> }) {
   const pathname = usePathname();
   const granted = new Set(permissions);
   const groups = navigation.map((group) => ({ ...group, items: group.items.filter((item) => isMaster || !item.permission || granted.has(item.permission)) })).filter((group) => group.items.length > 0);
-  if (isMaster) groups.push({ label: "Sistema", items: [{ href: "/admin", label: "Administrador", icon: icons.admin }] });
+  if (isMaster) groups.push({ label: "Sistema", items: [{ href: "/admin", label: "Administrador", icon: icons.admin, exact: true }, ...(isOwner ? [{ href: "/admin/support#approvals", label: "Aprovações", icon: icons.support, badge: pendingApprovals }] : [])] });
   return <nav className="flex-1 overflow-y-auto px-3 pb-6 pt-4">{groups.map(group => <section className="mb-5" key={group.label}>
     <p className="px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{group.label}</p>
     <ul className="mt-2 space-y-1">{group.items.map(item => {
-      const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-      return <li key={item.href}><Link aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${active ? "bg-blue-50 text-brand shadow-sm ring-1 ring-blue-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`} href={item.href} onClick={close}>{item.icon}<span>{item.label}</span></Link></li>;
+      const active = item.exact || item.href === "/" ? pathname === item.href : pathname.startsWith(item.href.split("#")[0]);
+      return <li key={item.href}><Link aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${active ? "bg-blue-50 text-brand shadow-sm ring-1 ring-blue-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`} href={item.href} onClick={close}>{item.icon}<span>{item.label}</span>{Boolean(item.badge) && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white">{item.badge}</span>}</Link></li>;
     })}</ul>
   </section>)}</nav>;
 }
 
-export function AppShell({ children, userLabel, isMaster = false, permissions = [], signOutAction }: { children: ReactNode; userLabel: string; isMaster?: boolean; permissions?: ReadonlyArray<string>; signOutAction: () => Promise<void> }) {
+export function AppShell({ children, userLabel, isMaster = false, isOwner = false, pendingApprovals = 0, permissions = [], signOutAction }: { children: ReactNode; userLabel: string; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; permissions?: ReadonlyArray<string>; signOutAction: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const initials = userLabel.split(/[\s.@]+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "GS";
@@ -72,11 +72,11 @@ export function AppShell({ children, userLabel, isMaster = false, permissions = 
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white shadow-md shadow-blue-900/20">GS</div>
         <div><p className="text-lg font-black leading-none text-slate-950">G-SIPRO</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gestão de propostas</p></div>
       </div>
-      <Navigation isMaster={isMaster} permissions={permissions}/>
+      <Navigation isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/>
       <div className="border-t border-slate-100 p-3">
         <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-bold text-white">{initials}</span>
-          <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{userLabel}</p><p className="text-[10px] text-slate-500">Acesso corporativo</p></div>
+          <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{userLabel}</p><p className="text-[10px] text-slate-500">{isOwner ? "Proprietário" : isMaster ? "Usuário mestre" : "Acesso corporativo"}</p></div>
           <form action={signOutAction}><button className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-900" title="Sair" type="submit"><Icon><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></Icon></button></form>
         </div>
       </div>
@@ -86,8 +86,8 @@ export function AppShell({ children, userLabel, isMaster = false, permissions = 
       <div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-xs font-black text-white">GS</div><strong>G-SIPRO</strong></div>
       <button aria-label="Abrir menu" className="rounded-lg border border-slate-200 p-2" onClick={() => setOpen(true)}><Icon><path d="M4 7h16M4 12h16M4 17h16"/></Icon></button>
     </header>
-    {open && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Fechar menu" className="absolute inset-0 bg-slate-950/40" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[86%] max-w-80 flex-col bg-white shadow-2xl"><div className="flex h-16 items-center justify-between border-b px-5"><strong>G-SIPRO</strong><button className="p-2" onClick={() => setOpen(false)}><Icon><path d="m6 6 12 12M18 6 6 18"/></Icon></button></div><Navigation close={() => setOpen(false)} isMaster={isMaster} permissions={permissions}/></aside></div>}
-    <div className="md:pl-64"><main className="min-h-screen">{children}</main></div>
+    {open && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Fechar menu" className="absolute inset-0 bg-slate-950/40" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[86%] max-w-80 flex-col bg-white shadow-2xl"><div className="flex h-16 items-center justify-between border-b px-5"><strong>G-SIPRO</strong><button className="p-2" onClick={() => setOpen(false)}><Icon><path d="m6 6 12 12M18 6 6 18"/></Icon></button></div><Navigation close={() => setOpen(false)} isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/></aside></div>}
+    <div className="md:pl-64">{isOwner && pendingApprovals > 0 && <Link className="flex items-center justify-between gap-4 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:px-6" href="/admin/support#approvals"><span><strong>{pendingApprovals} solicitação(ões) aguardando sua aprovação.</strong> Abra a central para analisar, conversar e decidir.</span><span className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white">Ver aprovações</span></Link>}<main className="min-h-screen">{children}</main></div>
     <Link aria-label="Abrir suporte" className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-brand" href={`/support?from=${encodeURIComponent(pathname)}`}>{icons.support}<span className="hidden sm:inline">Suporte</span></Link>
   </div>;
 }

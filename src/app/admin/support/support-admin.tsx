@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SupportTicketView } from "@/app/support/support-center";
+import { SupportChat } from "@/app/support/support-chat";
 
 const typeLabel: Record<string, string> = { BUG: "Erro", QUESTION: "Dúvida", IMPROVEMENT: "Melhoria", NEW_FEATURE: "Nova ferramenta" };
 const statusLabel: Record<string, string> = { OPEN: "Recebido", TRIAGED: "Na fila técnica", WAITING_APPROVAL: "Aguardando aprovação", APPROVED: "Autorizado", IN_PROGRESS: "Em execução", RESOLVED: "Resolvido", REJECTED: "Rejeitado", CANCELLED: "Cancelado" };
 
-export function SupportAdmin({ tickets }: { tickets: Array<SupportTicketView & { reporter: string; reporterEmail: string }> }) {
+export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets: Array<SupportTicketView & { reporter: string; reporterEmail: string }>; canApprove: boolean; currentActorId: string }) {
   const router = useRouter();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,14 +68,15 @@ export function SupportAdmin({ tickets }: { tickets: Array<SupportTicketView & {
         </div>}
         <textarea className="mt-4 min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm" onChange={(event) => setNotes((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder={ticket.status === "IN_PROGRESS" ? "Informe a solução aplicada" : "Registre a decisão ou orientação"} value={note}/>
         <div className="mt-3 flex flex-wrap gap-2">
-          {ticket.status === "WAITING_APPROVAL" && <>
+          {ticket.status === "WAITING_APPROVAL" && canApprove && <>
             <button className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "decision", { decision: "APPROVED", note })}>Aprovar execução</button>
             <button className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "decision", { decision: "REJECTED", note })}>Rejeitar</button>
           </>}
+          {ticket.status === "WAITING_APPROVAL" && !canApprove && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">Aguardando decisão de um proprietário.</p>}
           {((ticket.status === "TRIAGED" && !ticket.approvalRequired) || ticket.status === "APPROVED") && <button className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id} onClick={() => send(ticket.id, "execution", { action: "CLAIM" })}>Iniciar execução técnica</button>}
           {ticket.status === "IN_PROGRESS" && <button className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "execution", { action: "COMPLETE", summary: note, tests: diagnosis?.suggestedTests?.length ? diagnosis.suggestedTests : ["Fluxo corrigido validado no ambiente de homologação"] })}>Concluir com evidências</button>}
         </div>
-        <details className="mt-4 border-t border-slate-100 pt-4"><summary className="cursor-pointer text-xs font-bold text-slate-500">Histórico do chamado</summary><div className="mt-3 grid gap-2">{ticket.updates.map((update) => <p className="text-xs text-slate-600" key={update.id}><b>{statusLabel[update.toStatus]}</b> · {update.note} · {update.createdBy} · {new Date(update.createdAt).toLocaleString("pt-BR")}</p>)}</div></details>
+        <SupportChat currentActorId={currentActorId} messages={ticket.updates} ticketId={ticket.id}/>
       </article>;
     })}
     {tickets.length === 0 && <p className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">Nenhum chamado registrado.</p>}

@@ -2,6 +2,7 @@ export type AuthorizationContext = Readonly<{
   actorId: string;
   permissions: ReadonlySet<string>;
   isMaster?: boolean;
+  isOwner?: boolean;
   scopes?: ReadonlySet<string>;
 }>;
 
@@ -20,7 +21,7 @@ export function authorize(
   requirement: AuthorizationRequirement,
 ): AuthorizationDecision {
   if (!context) return { allowed: false, reason: "NO_CONTEXT" };
-  if (context.isMaster) return { allowed: true, reason: "GRANTED" };
+  if (context.isOwner || context.isMaster) return { allowed: true, reason: "GRANTED" };
   if (!context.permissions.has(requirement.permission)) {
     return { allowed: false, reason: "MISSING_PERMISSION" };
   }

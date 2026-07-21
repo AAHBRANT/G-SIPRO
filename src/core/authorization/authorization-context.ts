@@ -33,12 +33,18 @@ export async function getCurrentAuthorizationContext(): Promise<AuthorizationCon
   const permissions = new Set(
     user.profileMemberships.flatMap(({ profile }) => profile.permissions.map(({ permission }) => permission.code)),
   );
-  return { actorId: user.id, permissions, isMaster: user.isMaster };
+  return { actorId: user.id, permissions, isMaster: user.isMaster, isOwner: user.isOwner };
 }
 
 export async function requireMaster(): Promise<AuthorizationContext> {
   const context = await getCurrentAuthorizationContext();
   if (!context?.isMaster) throw new AuthorizationError("Acesso exclusivo de usuário mestre.", { reason: "MASTER_REQUIRED" });
+  return context;
+}
+
+export async function requireOwner(): Promise<AuthorizationContext> {
+  const context = await getCurrentAuthorizationContext();
+  if (!context?.isOwner) throw new AuthorizationError("Aprovação exclusiva do proprietário do G-SIPRO.", { reason: "OWNER_REQUIRED" });
   return context;
 }
 

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { requireMaster } from "@/core/authorization/authorization-context";
+import { requireOwner } from "@/core/authorization/authorization-context";
 import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
@@ -11,7 +11,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
   return runWithRequestContext(context, async () => {
     try {
-      const authorization = await requireMaster();
+      const authorization = await requireOwner();
       const { id } = await route.params;
       const input = supportDecisionSchema.parse(await request.json());
       const database = getDatabase();
