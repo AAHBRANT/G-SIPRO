@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
-export function Panel({ title, subtitle, action, children, className = "" }: { title: string; subtitle?: string; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Panel({ title, subtitle, action, children, className = "", variant = "default" }: { title: string; subtitle?: string; action?: ReactNode; children: ReactNode; className?: string; variant?: "default" | "executive" }) {
+  if (variant === "executive") return <section className={`overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] ${className}`}><header className="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center"><div><h2 className="text-base font-black text-slate-900">{title}</h2>{subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}</div>{action}</header>{children}</section>;
   return <section className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_14px_rgba(15,23,42,0.05)] ${className}`}><header className="flex flex-col justify-between gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center"><div><h2 className="text-base font-black uppercase tracking-wide text-slate-900">{title}</h2>{subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}</div>{action}</header>{children}</section>;
 }

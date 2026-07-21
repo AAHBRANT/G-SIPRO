@@ -98,11 +98,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ y
   const data = await loadDashboard(year);
   const maxMonthly = Math.max(1, ...data.monthly.map((item) => item.proposals));
   const pipeline = [
-    ["Em preparação", data.pipeline.PREPARATION ?? 0, "bg-blue-500"],
-    ["Em revisão", data.pipeline.REVIEW ?? 0, "bg-violet-500"],
-    ["Em aprovação", data.pipeline.APPROVAL ?? 0, "bg-amber-500"],
-    ["Entregues", data.pipeline.SENT ?? 0, "bg-emerald-500"],
-    ["Finalizadas", (data.pipeline.FINALIZED ?? 0) + (data.pipeline.JUDGED ?? 0), "bg-emerald-700"],
+    ["Em preparação", data.pipeline.PREPARATION ?? 0, "bg-slate-800"],
+    ["Em revisão", data.pipeline.REVIEW ?? 0, "bg-slate-700"],
+    ["Em aprovação", data.pipeline.APPROVAL ?? 0, "bg-slate-600"],
+    ["Entregues", data.pipeline.SENT ?? 0, "bg-slate-500"],
+    ["Finalizadas", (data.pipeline.FINALIZED ?? 0) + (data.pipeline.JUDGED ?? 0), "bg-brand"],
   ] as const;
   const pipelineTotal = Math.max(1, pipeline.reduce((sum, item) => sum + item[1], 0));
   const performance = [
@@ -113,41 +113,41 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ y
     ["Acurácia orçamentária", data.accuracy === null ? "N/D" : percent(data.accuracy), "Disponível após cadastro do custo final"],
   ] as const;
 
-  const headerAction = <><form className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 shadow-sm"><label className="text-xs font-bold text-slate-500" htmlFor="year">Período</label><select className="bg-transparent text-sm font-bold outline-none" defaultValue={year} id="year" name="year">{Array.from({ length: 5 }, (_, index) => currentYear - index).map((value) => <option key={value}>{value}</option>)}</select><button className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">Aplicar</button></form><Link className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-bold text-white shadow-md shadow-blue-900/15 transition hover:-translate-y-0.5 hover:bg-blue-700" href="/proposals?new=1"><span className="text-lg font-normal">＋</span> Nova proposta</Link></>;
+  const headerAction = <><form className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"><label className="text-xs font-bold text-slate-500" htmlFor="year">Período</label><select className="bg-transparent text-sm font-bold outline-none" defaultValue={year} id="year" name="year">{Array.from({ length: 5 }, (_, index) => currentYear - index).map((value) => <option key={value}>{value}</option>)}</select><button className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">Aplicar</button></form><Link className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--brand-strong)]" href="/proposals?new=1"><span className="text-lg font-normal">＋</span> Nova proposta</Link></>;
 
-  return <div className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-    <PageHeader action={headerAction} eyebrow="Visão geral" icon="dashboard" subtitle="Acompanhamento comercial e operacional com dados consolidados do G-SIPRO." title="Dashboard" />
+  return <div className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+    <PageHeader action={headerAction} eyebrow="Visão geral" icon="dashboard" subtitle="Acompanhamento comercial e operacional com dados consolidados do G-SIPRO." title="Painel executivo" variant="executive" />
 
-    <section aria-label="Indicadores principais" className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-      <MetricCard description={`Propostas cadastradas em ${year}`} icon="file" title="Total de propostas" tone="blue" value={data.volume}/>
-      <MetricCard description="Propostas em elaboração, revisão ou análise" icon="clock" title="Em andamento" tone="amber" value={data.inProgress}/>
-      <MetricCard description="Propostas enviadas ou entregues ao cliente" icon="send" title="Propostas entregues" tone="green" value={data.delivered}/>
-      <MetricCard description="Vitórias sobre resultados validados" icon="target" title="Conversão por quantidade" tone="violet" value={percent(data.conversionQuantity)}/>
-      <MetricCard description="Contratos ganhos e validados em BRL" icon="money" title="Receita contratada" tone="green" value={currency(data.revenue)}/>
+    <section aria-label="Indicadores principais" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <MetricCard description={`Propostas cadastradas em ${year}`} icon="file" title="Total de propostas" value={data.volume} variant="executive"/>
+      <MetricCard description="Propostas em elaboração, revisão ou análise" icon="clock" title="Em andamento" value={data.inProgress} variant="executive"/>
+      <MetricCard description="Propostas enviadas ou entregues ao cliente" icon="send" title="Propostas entregues" value={data.delivered} variant="executive"/>
+      <MetricCard description="Vitórias sobre resultados validados" icon="target" title="Conversão por quantidade" value={percent(data.conversionQuantity)} variant="executive"/>
+      <MetricCard description="Contratos ganhos e validados em BRL" icon="money" title="Receita contratada" value={currency(data.revenue)} variant="executive"/>
     </section>
 
     <section className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-      <Panel action={<span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-brand">Mensal · {year}</span>} subtitle="Volume de propostas abertas e vitórias registradas" title="Evolução das propostas">
-        <div className="px-5 pb-5 pt-7 sm:px-6"><div className="flex h-72 items-end gap-2 border-b border-slate-200 sm:gap-4">{data.monthly.map((item) => <div className="flex h-full min-w-0 flex-1 flex-col justify-end text-center" key={item.label}><span className="mb-2 text-xs font-bold text-slate-700">{item.proposals || ""}</span><div className="group relative mx-auto flex w-full max-w-11 items-end justify-center rounded-t-lg bg-blue-100" style={{ height: `${Math.max(item.proposals ? 10 : 2, item.proposals / maxMonthly * 82)}%` }}><div className="h-full w-full rounded-t-lg bg-gradient-to-t from-blue-700 to-blue-400"/>{item.wins > 0 && <span className="absolute -right-1 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-emerald-500 px-1 text-[9px] font-black text-white" title={`${item.wins} vitória(s)`}>{item.wins}</span>}</div><span className="mt-3 pb-3 text-[10px] font-semibold text-slate-500">{item.label}</span></div>)}</div><div className="mt-4 flex flex-wrap gap-5 text-xs text-slate-500"><span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-blue-600"/> Propostas abertas</span><span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500"/> Vitórias</span></div></div>
+      <Panel action={<span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">Mensal · {year}</span>} subtitle="Volume de propostas abertas e vitórias registradas" title="Evolução das propostas" variant="executive">
+        <div className="px-5 pb-5 pt-7 sm:px-6"><div className="flex h-72 items-end gap-2 border-b border-slate-200 sm:gap-4">{data.monthly.map((item) => <div className="flex h-full min-w-0 flex-1 flex-col justify-end text-center" key={item.label}><span className="mb-2 text-xs font-bold text-slate-700">{item.proposals || ""}</span><div className="group relative mx-auto flex w-full max-w-11 items-end justify-center rounded-t-md bg-slate-100" style={{ height: `${Math.max(item.proposals ? 10 : 2, item.proposals / maxMonthly * 82)}%` }}><div className="h-full w-full rounded-t-md bg-slate-800"/>{item.wins > 0 && <span className="absolute -right-1 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-emerald-100 px-1 text-[9px] font-black text-emerald-800" title={`${item.wins} vitória(s)`}>{item.wins}</span>}</div><span className="mt-3 pb-3 text-[10px] font-semibold text-slate-500">{item.label}</span></div>)}</div><div className="mt-4 flex flex-wrap gap-5 text-xs text-slate-500"><span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-slate-800"/> Propostas abertas</span><span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-emerald-200"/> Vitórias</span></div></div>
       </Panel>
 
-      <Panel subtitle="Distribuição das propostas do período por etapa" title="Pipeline de propostas">
+      <Panel subtitle="Distribuição das propostas do período por etapa" title="Pipeline de propostas" variant="executive">
         <div className="space-y-5 p-6">{pipeline.map(([label, count, color]) => <div key={label}><div className="mb-2 flex justify-between text-sm"><span className="font-semibold text-slate-600">{label}</span><strong className="text-slate-900">{count}</strong></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${color}`} style={{ width: `${count / pipelineTotal * 100}%` }}/></div></div>)}</div>
       </Panel>
     </section>
 
     <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.25fr]">
-      <Panel subtitle="Indicadores complementares do período selecionado" title="Desempenho operacional">
-        <div className="divide-y divide-slate-100">{performance.map(([label, value, hint]) => <div className="flex items-center gap-4 px-6 py-4" key={label}><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-brand"><GsIcon className="h-4 w-4" name="chart"/></span><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-800">{label}</p><p className="mt-0.5 text-xs text-slate-500">{hint}</p></div><strong className="whitespace-nowrap text-base text-slate-950">{value}</strong></div>)}</div>
+      <Panel subtitle="Indicadores complementares do período selecionado" title="Desempenho operacional" variant="executive">
+        <div className="divide-y divide-slate-100">{performance.map(([label, value, hint]) => <div className="flex items-center gap-4 px-5 py-3.5" key={label}><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700"><GsIcon className="h-4 w-4" name="chart"/></span><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-800">{label}</p><p className="mt-0.5 text-xs text-slate-500">{hint}</p></div><strong className="whitespace-nowrap text-base text-slate-950">{value}</strong></div>)}</div>
       </Panel>
 
-      <Panel action={<Link className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline" href="/tenders">Ver editais <GsIcon className="h-3 w-3" name="arrow"/></Link>} subtitle="Vencimentos confirmados para os próximos 30 dias" title="Próximos prazos">
+      <Panel action={<Link className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline" href="/tenders">Ver editais <GsIcon className="h-3 w-3" name="arrow"/></Link>} subtitle="Vencimentos confirmados para os próximos 30 dias" title="Próximos prazos" variant="executive">
         <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-6 py-3">Data</th><th className="px-6 py-3">Evento</th><th className="px-6 py-3">Situação</th></tr></thead><tbody className="divide-y divide-slate-100">{data.upcomingDeadlines.map((item) => <tr className="transition hover:bg-blue-50/30" key={item.id}><td className="whitespace-nowrap px-6 py-4 font-bold text-slate-800">{item.dueAt.toLocaleDateString("pt-BR")}</td><td className="px-6 py-4 text-slate-700">{item.label}</td><td className="px-6 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${item.daysRemaining <= 7 ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{item.daysRemaining === 0 ? "Hoje" : `${item.daysRemaining} dias`}</span></td></tr>)}{!data.upcomingDeadlines.length && <tr><td className="px-6 py-10 text-center text-slate-400" colSpan={3}>Nenhum prazo registrado para os próximos 30 dias.</td></tr>}</tbody></table></div>
       </Panel>
     </section>
 
-    <Panel className="mt-6" subtitle="Acesse rapidamente os módulos mais utilizados" title="Operação comercial">
-      <div className="grid gap-3 p-6 sm:grid-cols-2 xl:grid-cols-4">{[["Oportunidades", "Registre e acompanhe novas oportunidades", "/opportunities", "target"], ["Propostas", "Cadastre e analise documentos", "/proposals", "file"], ["Acervo técnico", "Consulte atestados e quantitativos", "/technical-archive", "pipeline"], ["Inteligência e KPIs", "Acompanhe indicadores consolidados", "/indicators", "chart"]].map(([label, hint, href, icon]) => <Link className="group rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40" href={href} key={label}><span className="grid h-10 w-10 place-items-center rounded-full bg-blue-50 text-brand group-hover:bg-brand group-hover:text-white"><GsIcon className="h-4 w-4" name={icon as "target"}/></span><p className="mt-3 font-bold text-slate-900">{label}</p><p className="mt-1 text-xs leading-5 text-slate-500">{hint}</p></Link>)}</div>
+    <Panel className="mt-6" subtitle="Acesse rapidamente os módulos mais utilizados" title="Operação comercial" variant="executive">
+      <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">{[["Oportunidades", "Registre e acompanhe novas oportunidades", "/opportunities", "target"], ["Propostas", "Cadastre e analise documentos", "/proposals", "file"], ["Acervo técnico", "Consulte atestados e quantitativos", "/technical-archive", "pipeline"], ["Inteligência e KPIs", "Acompanhe indicadores consolidados", "/indicators", "chart"]].map(([label, hint, href, icon]) => <Link className="group rounded-xl border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50" href={href} key={label}><span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700 transition group-hover:bg-brand group-hover:text-white"><GsIcon className="h-4 w-4" name={icon as "target"}/></span><p className="mt-3 font-bold text-slate-900">{label}</p><p className="mt-1 text-xs leading-5 text-slate-500">{hint}</p></Link>)}</div>
     </Panel>
   </div>;
 }

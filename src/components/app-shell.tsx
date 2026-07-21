@@ -48,11 +48,11 @@ function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals
   ];
   const renderItems = (items: ReadonlyArray<NavigationItem>) => <ul className="space-y-1">{items.map(item => {
       const active = item.exact || item.href === "/" ? pathname === item.href : pathname.startsWith(item.href.split("#")[0]);
-      return <li key={item.href}><Link aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${active ? "bg-blue-50 text-brand shadow-sm ring-1 ring-blue-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`} href={item.href} onClick={close}>{item.icon}<span>{item.label}</span>{Boolean(item.badge) && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white">{item.badge}</span>}</Link></li>;
+      return <li key={item.href}><Link aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${active ? "bg-white/10 text-white shadow-[inset_3px_0_0_var(--brand)]" : "text-slate-300 hover:bg-white/[0.06] hover:text-white"}`} href={item.href} onClick={close}>{item.icon}<span>{item.label}</span>{Boolean(item.badge) && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-black text-white">{item.badge}</span>}</Link></li>;
     })}</ul>;
   return <nav className="flex min-h-0 flex-1 flex-col px-3 py-4">
     <div className="flex-1 overflow-y-auto">{renderItems(mainItems)}</div>
-    <div className="mt-4 shrink-0 border-t border-slate-100 pt-4">{renderItems(bottomItems)}</div>
+    <div className="mt-4 shrink-0 border-t border-white/10 pt-4">{renderItems(bottomItems)}</div>
   </nav>;
 }
 
@@ -62,27 +62,27 @@ export function AppShell({ children, userLabel, isMaster = false, isOwner = fals
   const initials = userLabel.split(/[\s.@]+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "GS";
 
   return <div className="min-h-screen bg-background">
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white md:flex">
-      <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-5">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white shadow-md shadow-blue-900/20">GS</div>
-        <div><p className="text-lg font-black leading-none text-slate-950">G-SIPRO</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gestão de propostas</p></div>
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-800 bg-[#1d1e21] md:flex">
+      <div className="flex h-20 items-center gap-3 border-b border-white/10 px-5">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white shadow-md shadow-black/20">GS</div>
+        <div><p className="text-lg font-black leading-none text-white">G-SIPRO</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gestão de propostas</p></div>
       </div>
       <Navigation isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/>
-      <div className="border-t border-slate-100 p-3">
-        <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-bold text-white">{initials}</span>
-          <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{userLabel}</p><p className="text-[10px] text-slate-500">{isOwner ? "Proprietário" : isMaster ? "Usuário mestre" : "Acesso corporativo"}</p></div>
-          <form action={signOutAction}><button className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-900" title="Sair" type="submit"><Icon><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></Icon></button></form>
+      <div className="border-t border-white/10 p-3">
+        <div className="flex items-center gap-3 rounded-xl bg-white/[0.06] p-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-xs font-bold text-white">{initials}</span>
+          <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-white">{userLabel}</p><p className="text-[10px] text-slate-400">{isOwner ? "Proprietário" : isMaster ? "Usuário mestre" : "Acesso corporativo"}</p></div>
+          <form action={signOutAction}><button className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white" title="Sair" type="submit"><Icon><path d="M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></Icon></button></form>
         </div>
       </div>
     </aside>
 
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800 bg-[#1d1e21] px-4 text-white md:hidden">
       <div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-xs font-black text-white">GS</div><strong>G-SIPRO</strong></div>
-      <button aria-label="Abrir menu" className="rounded-lg border border-slate-200 p-2" onClick={() => setOpen(true)}><Icon><path d="M4 7h16M4 12h16M4 17h16"/></Icon></button>
+      <button aria-label="Abrir menu" className="rounded-lg border border-white/15 p-2 text-slate-200" onClick={() => setOpen(true)}><Icon><path d="M4 7h16M4 12h16M4 17h16"/></Icon></button>
     </header>
-    {open && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Fechar menu" className="absolute inset-0 bg-slate-950/40" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[86%] max-w-80 flex-col bg-white shadow-2xl"><div className="flex h-16 items-center justify-between border-b px-5"><strong>G-SIPRO</strong><button className="p-2" onClick={() => setOpen(false)}><Icon><path d="m6 6 12 12M18 6 6 18"/></Icon></button></div><Navigation close={() => setOpen(false)} isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/></aside></div>}
+    {open && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Fechar menu" className="absolute inset-0 bg-slate-950/50" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[86%] max-w-80 flex-col bg-[#1d1e21] text-white shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-white/10 px-5"><strong>G-SIPRO</strong><button className="p-2 text-slate-300" onClick={() => setOpen(false)}><Icon><path d="m6 6 12 12M18 6 6 18"/></Icon></button></div><Navigation close={() => setOpen(false)} isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/></aside></div>}
     <div className="md:pl-64">{isOwner && pendingApprovals > 0 && <Link className="flex items-center justify-between gap-4 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:px-6" href="/admin/support#approvals"><span><strong>{pendingApprovals} solicitação(ões) requerem sua atenção.</strong> Abra a central para aprovar mudanças ou assumir chamados escalados.</span><span className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white">Ver solicitações</span></Link>}<main className="min-h-screen">{children}</main></div>
-    <Link aria-label="Abrir suporte" className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-brand" href={`/support?from=${encodeURIComponent(pathname)}`}>{icons.support}<span className="hidden sm:inline">Suporte</span></Link>
+    <Link aria-label="Abrir suporte" className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-3 text-sm font-bold text-white shadow-lg shadow-red-950/15 transition hover:-translate-y-0.5 hover:bg-[var(--brand-strong)]" href={`/support?from=${encodeURIComponent(pathname)}`}>{icons.support}<span className="hidden sm:inline">Suporte</span></Link>
   </div>;
 }
