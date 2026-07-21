@@ -135,6 +135,7 @@ jobs:
       pull-requests: write
       id-token: write
     env:
+      DATABASE_URL: postgresql://gsipro:validation-only@localhost:5433/gsipro?schema=public
       SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
     outputs:
       merge_revision: ${{ steps.merge.outputs.merge_revision }}
@@ -211,6 +212,12 @@ jobs:
             "${SUPPORT_URL}/api/support/agent/tickets/${TICKET_ID}"
 
       - name: Validate the AI correction before incorporation
+        env:
+          ENTRA_TENANT_ID: 00000000-0000-4000-8000-000000000000
+          ENTRA_CLIENT_ID: 00000000-0000-4000-8000-000000000000
+          ENTRA_CLIENT_SECRET: build-only-not-a-client-secret
+          AUTH_SECRET: build-only-auth-secret-0000000000000000
+          AUTH_URL: http://localhost:3001
         run: |
           pnpm check
           pnpm build
