@@ -6,7 +6,7 @@ import type { SupportTicketView } from "@/app/support/support-center";
 import { SupportChat } from "@/app/support/support-chat";
 
 const typeLabel: Record<string, string> = { BUG: "Erro", QUESTION: "Dúvida", IMPROVEMENT: "Melhoria", NEW_FEATURE: "Nova ferramenta" };
-const statusLabel: Record<string, string> = { OPEN: "Recebido", TRIAGED: "Na fila técnica", WAITING_APPROVAL: "Aguardando aprovação", APPROVED: "Autorizado", IN_PROGRESS: "Em execução", RESOLVED: "Resolvido", REJECTED: "Rejeitado", CANCELLED: "Cancelado" };
+const statusLabel: Record<string, string> = { OPEN: "Recebido", TRIAGED: "Na fila técnica", WAITING_APPROVAL: "Aguardando aprovação", APPROVED: "Autorizado", IN_PROGRESS: "Em execução", WAITING_USER_VALIDATION: "Validação do solicitante", ESCALATED: "Escalado ao proprietário", RESOLVED: "Resolvido", REJECTED: "Rejeitado", CANCELLED: "Cancelado" };
 
 export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets: Array<SupportTicketView & { reporter: string; reporterEmail: string }>; canApprove: boolean; currentActorId: string }) {
   const router = useRouter();
@@ -46,7 +46,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
       const revision = revisions[ticket.id] ?? "";
       const deploymentUrl = deploymentUrls[ticket.id] ?? "";
       const testLines = (executedTests[ticket.id] ?? "").split("\n").map((item) => item.trim()).filter(Boolean);
-      const executionAuthorized = (ticket.status === "TRIAGED" && !ticket.approvalRequired) || ["APPROVED", "IN_PROGRESS", "RESOLVED"].includes(ticket.status);
+      const executionAuthorized = (ticket.status === "TRIAGED" && !ticket.approvalRequired) || ["APPROVED", "IN_PROGRESS", "WAITING_USER_VALIDATION", "ESCALATED", "RESOLVED"].includes(ticket.status);
       return <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" key={ticket.id}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -72,6 +72,8 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
           {ticket.executorId && <p className="mt-2 text-xs font-semibold text-cyan-950">Executor: {ticket.executorId} · tentativa {ticket.executionAttempts ?? 1}{ticket.executionHeartbeatAt ? ` · último sinal ${new Date(ticket.executionHeartbeatAt).toLocaleString("pt-BR")}` : ""}</p>}
           <a className="mt-3 inline-flex rounded-lg border border-cyan-300 bg-white px-3 py-2 text-xs font-bold text-cyan-800" href={`/api/support/tickets/${ticket.id}/execution`} target="_blank" rel="noreferrer">Abrir pacote técnico</a>
         </div>}
+        {ticket.status === "WAITING_USER_VALIDATION" && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">Solução entregue. Aguardando o solicitante responder “Posso encerrar este chamado?” — tentativa {ticket.resolutionAttempts ?? 1} de 3.</p>}
+        {ticket.status === "ESCALATED" && <p className="mt-4 rounded-xl border-2 border-rose-300 bg-rose-50 p-4 text-sm font-bold text-rose-900">Três tentativas completas não solucionaram o problema. Este chamado requer atuação direta do proprietário.</p>}
         <textarea className="mt-4 min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm" onChange={(event) => setNotes((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder={ticket.status === "IN_PROGRESS" ? "Descreva a solução realmente implantada" : "Registre a decisão ou orientação"} value={note}/>
         {ticket.status === "IN_PROGRESS" && <div className="mt-3 grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 md:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-emerald-950">Revisão ou commit implantado<input className="rounded-lg border border-emerald-200 bg-white px-3 py-2 font-mono text-xs font-normal" minLength={7} onChange={(event) => setRevisions((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder="Ex.: 65508f5" value={revision}/></label><label className="grid gap-1 text-xs font-bold text-emerald-950">URL do ambiente publicado<input className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-normal" onChange={(event) => setDeploymentUrls((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder="https://..." type="url" value={deploymentUrl}/></label><label className="grid gap-1 text-xs font-bold text-emerald-950 md:col-span-2">Testes realmente executados — um por linha<textarea className="min-h-20 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-normal" onChange={(event) => setExecutedTests((current) => ({ ...current, [ticket.id]: event.target.value }))} placeholder="Teste realizado e resultado observado" value={executedTests[ticket.id] ?? ""}/></label></div>}
         <div className="mt-3 flex flex-wrap gap-2">
@@ -82,6 +84,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
           {ticket.status === "WAITING_APPROVAL" && !canApprove && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">Aguardando decisão de um proprietário.</p>}
           {((ticket.status === "TRIAGED" && !ticket.approvalRequired) || ticket.status === "APPROVED") && <button className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id} onClick={() => send(ticket.id, "execution", { action: "CLAIM" })}>Iniciar execução técnica</button>}
           {ticket.status === "IN_PROGRESS" && <button className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3 || revision.trim().length < 7 || !deploymentUrl.startsWith("https://") || testLines.length === 0} onClick={() => send(ticket.id, "execution", { action: "COMPLETE", summary: note, tests: testLines, revision, deploymentUrl })}>Concluir após implantação</button>}
+          {ticket.status === "ESCALATED" && canApprove && <button className="rounded-lg bg-rose-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={busy === ticket.id} onClick={() => send(ticket.id, "escalation", {})}>Assumir chamado escalado</button>}
           {ticket.status === "RESOLVED" && canApprove && <button className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 disabled:opacity-50" disabled={busy === ticket.id || note.trim().length < 3} onClick={() => send(ticket.id, "reopen", { note })}>Reabrir chamado</button>}
         </div>
         <SupportChat currentActorId={currentActorId} messages={ticket.updates} ticketId={ticket.id}/>

@@ -29,6 +29,29 @@ export const supportReopenSchema = z.object({
   note: z.string().trim().min(3).max(2_000),
 });
 
+export const supportClarificationQuestionSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  question: z.string().trim().min(5).max(500),
+  options: z.array(z.string().trim().min(1).max(200)).min(2).max(4),
+});
+
+export const supportClarificationSchema = z.object({
+  introduction: z.string().trim().min(5).max(500),
+  questions: z.array(supportClarificationQuestionSchema).min(1).max(5),
+});
+
+export const supportValidationSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("CONFIRM_RESOLVED") }),
+  z.object({ action: z.literal("REPORT_UNRESOLVED"), reason: z.string().trim().min(5).max(2_000) }),
+  z.object({
+    action: z.literal("SUBMIT_CLARIFICATION"),
+    answers: z.array(z.object({
+      questionId: z.string().trim().min(1).max(80),
+      answer: z.string().trim().min(1).max(1_000),
+    })).min(1).max(5),
+  }),
+]);
+
 export const supportDiagnosisSchema = z.object({
   summary: z.string().trim().min(1).max(1_500),
   probableCause: z.string().trim().min(1).max(2_500),
@@ -42,3 +65,4 @@ export const supportDiagnosisSchema = z.object({
 
 export type SupportTicketInput = z.infer<typeof supportTicketInputSchema>;
 export type SupportDiagnosis = z.infer<typeof supportDiagnosisSchema>;
+export type SupportClarification = z.infer<typeof supportClarificationSchema>;

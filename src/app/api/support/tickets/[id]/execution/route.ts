@@ -5,6 +5,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { Prisma } from "@/generated/prisma/client";
 import { buildSupportExecutionPackage } from "@/modules/support/application/support-execution-package";
 import { supportExecutionAuthorization, supportExecutionCommandSchema, supportExecutionResolution } from "@/modules/support/domain/support-execution";
 
@@ -44,11 +45,11 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       if (input.action === "CLAIM" && !execution.ready) throw new ConflictError("O chamado não está disponível para início da execução.");
       if (input.action !== "CLAIM" && !execution.claimed) throw new ConflictError("O chamado não está em execução.");
 
-      const nextStatus = input.action === "COMPLETE" ? "RESOLVED" : "IN_PROGRESS";
+      const nextStatus = input.action === "COMPLETE" ? "WAITING_USER_VALIDATION" : "IN_PROGRESS";
       const note = input.action === "CLAIM"
         ? "Chamado assumido pela fila técnica para correção e validação."
         : input.action === "COMPLETE"
-          ? supportExecutionResolution(input)
+          ? `${supportExecutionResolution(input)}\n\nPosso encerrar este chamado? Aguardando validação do solicitante.`
           : `Falha informada pela execução técnica: ${input.summary}`;
 
       await database.$transaction(async (transaction) => {
@@ -58,8 +59,11 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             status: nextStatus,
             assignedToId: authorization.actorId,
             resolution: input.action === "COMPLETE" ? note : ticket.resolution,
-            resolvedAt: input.action === "COMPLETE" ? new Date() : null,
-            resolvedById: input.action === "COMPLETE" ? authorization.actorId : null,
+            resolvedAt: null,
+            resolvedById: null,
+            validationRequestedAt: input.action === "COMPLETE" ? new Date() : ticket.validationRequestedAt,
+            validationQuestions: input.action === "COMPLETE" ? Prisma.JsonNull : undefined,
+            resolutionAttempts: input.action === "COMPLETE" && ticket.resolutionAttempts < 3 ? { increment: 1 } : undefined,
           },
         });
         await transaction.supportTicketUpdate.create({
@@ -68,7 +72,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         await transaction.auditEvent.create({
           data: {
             id: randomUUID(), actorType: "USER", actorId: authorization.actorId,
-            action: input.action === "CLAIM" ? "SUPPORT_EXECUTION_CLAIMED" : input.action === "COMPLETE" ? "SUPPORT_EXECUTION_COMPLETED" : "SUPPORT_EXECUTION_FAILED",
+            action: input.action === "CLAIM" ? "SUPPORT_EXECUTION_CLAIMED" : input.action === "COMPLETE" ? "SUPPORT_VALIDATION_REQUESTED" : "SUPPORT_EXECUTION_FAILED",
             entityType: "SUPPORT_TICKET", entityId: id, correlationId: context.correlationId,
             outcome: input.action === "REPORT_FAILURE" ? "FAILURE" : "SUCCESS", origin: "support-execution-bridge",
             metadata: input.action === "COMPLETE" ? { revision: input.revision ?? null, deploymentUrl: input.deploymentUrl ?? null, tests: input.tests } : { note },

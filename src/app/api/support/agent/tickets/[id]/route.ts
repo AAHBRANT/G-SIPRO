@@ -4,6 +4,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { Prisma } from "@/generated/prisma/client";
 import { buildSupportExecutionPackage } from "@/modules/support/application/support-execution-package";
 import { supportAgentCommandSchema } from "@/modules/support/domain/support-agent";
 import { supportExecutionResolution } from "@/modules/support/domain/support-execution";
@@ -31,7 +32,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             where: {
               id,
               executionLeaseId: null,
-              executionAttempts: { lt: 2 },
+              resolutionAttempts: { lt: 3 },
               OR: [{ status: "TRIAGED", approvalRequired: false }, { status: "APPROVED" }],
             },
             data: {
@@ -86,29 +87,32 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         const changed = await transaction.supportTicket.updateMany({
           where: { id, status: "IN_PROGRESS", executionLeaseId: input.leaseId, executorId: input.executorId },
           data: {
-            status: completed ? "RESOLVED" : retryStatus,
+            status: completed ? "WAITING_USER_VALIDATION" : retryStatus,
             resolution: completed ? note : ticket.resolution,
-            resolvedAt: completed ? new Date() : null,
+            resolvedAt: null,
             resolvedById: null,
             executionHeartbeatAt: new Date(),
-            executionLeaseId: completed ? input.leaseId : null,
+            executionLeaseId: null,
+            validationRequestedAt: completed ? new Date() : ticket.validationRequestedAt,
+            validationQuestions: completed ? Prisma.JsonNull : undefined,
+            resolutionAttempts: completed ? { increment: 1 } : undefined,
           },
         });
         if (changed.count !== 1) throw new ConflictError("A reserva expirou ou foi alterada.");
         await transaction.supportTicketUpdate.create({
-          data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: completed ? "RESOLVED" : retryStatus, note, actorLabel: input.executorId },
+          data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: completed ? "WAITING_USER_VALIDATION" : retryStatus, note: completed ? `${note}\n\nPosso encerrar este chamado? Aguardando validação do solicitante.` : note, actorLabel: input.executorId },
         });
         await transaction.auditEvent.create({
           data: {
             id: randomUUID(), actorType: actor.actorType, actorId: input.executorId,
-            action: completed ? "SUPPORT_AGENT_COMPLETED" : "SUPPORT_AGENT_FAILED",
+            action: completed ? "SUPPORT_VALIDATION_REQUESTED" : "SUPPORT_AGENT_FAILED",
             entityType: "SUPPORT_TICKET", entityId: id, correlationId: context.correlationId,
             outcome: completed ? "SUCCESS" : "FAILURE", origin: "support-agent",
             metadata: completed ? { leaseId: input.leaseId, revision: input.revision ?? null, deploymentUrl: input.deploymentUrl ?? null, tests: input.tests } : { leaseId: input.leaseId, summary: input.summary },
           },
         });
       });
-      return NextResponse.json({ data: { id, status: completed ? "RESOLVED" : retryStatus }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { id, status: completed ? "WAITING_USER_VALIDATION" : retryStatus }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }

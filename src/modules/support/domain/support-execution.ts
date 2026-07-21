@@ -20,8 +20,9 @@ export type SupportExecutionCommand = z.infer<typeof supportExecutionCommandSche
 export function supportExecutionAuthorization(ticket: { status: string; approvalRequired: boolean }) {
   const ready = (ticket.status === "TRIAGED" && !ticket.approvalRequired) || ticket.status === "APPROVED";
   const claimed = ticket.status === "IN_PROGRESS";
+  const awaitingValidation = ticket.status === "WAITING_USER_VALIDATION";
   const completed = ticket.status === "RESOLVED";
-  return { ready, claimed, completed, allowed: ready || claimed || completed };
+  return { ready, claimed, awaitingValidation, completed, allowed: ready || claimed || awaitingValidation || completed };
 }
 
 export function supportExecutionResolution(input: Extract<SupportExecutionCommand, { action: "COMPLETE" }>) {

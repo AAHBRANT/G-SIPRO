@@ -19,7 +19,7 @@ export default async function RootLayout({
   const authorization = await getCurrentAuthorizationContext();
   const userLabel = session?.user?.name ?? session?.user?.email ?? "Usuário corporativo";
   const permissions = [...(authorization?.permissions ?? [])];
-  const pendingApprovals = authorization?.isOwner ? await getDatabase().supportTicket.count({ where: { status: "WAITING_APPROVAL" } }) : 0;
+  const pendingApprovals = authorization?.isOwner ? await getDatabase().supportTicket.count({ where: { status: { in: ["WAITING_APPROVAL", "ESCALATED"] } } }) : 0;
   async function signOutAction() {
     "use server";
     await signOut({ redirectTo: "/" });

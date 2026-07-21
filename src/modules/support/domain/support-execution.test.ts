@@ -14,6 +14,10 @@ describe("support execution bridge", () => {
     expect(supportExecutionAuthorization({ status: "APPROVED", approvalRequired: true })).toMatchObject({ ready: true, allowed: true });
   });
 
+  it("keeps an implemented solution open while requester validation is pending", () => {
+    expect(supportExecutionAuthorization({ status: "WAITING_USER_VALIDATION", approvalRequired: false })).toMatchObject({ awaitingValidation: true, completed: false, allowed: true });
+  });
+
   it("builds a human-readable resolution with validation evidence", () => {
     expect(supportExecutionResolution({ action: "COMPLETE", summary: "Correção implantada.", tests: ["Teste de regressão aprovado"], revision: "abcdef1", deploymentUrl: "https://app.example.com" }))
       .toContain("Teste de regressão aprovado");

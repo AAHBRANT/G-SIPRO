@@ -23,7 +23,7 @@ export default async function AdminPage() {
     database.department.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     database.auditEvent.findMany({ orderBy: { occurredAt: "desc" }, take: 30 }),
     database.auditEvent.count({ where: { occurredAt: { gte: since }, outcome: "FAILURE" } }),
-    database.supportTicket.count({ where: { status: "WAITING_APPROVAL" } }),
+    database.supportTicket.count({ where: { status: { in: ["WAITING_APPROVAL", "ESCALATED"] } } }),
   ]);
   const activeUsers = users.filter((user) => user.status === "ACTIVE").length;
   const activeProfiles = profiles.filter((profile) => profile.active).length;

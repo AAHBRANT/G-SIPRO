@@ -46,6 +46,8 @@ enum SupportTicketStatus {
   WAITING_APPROVAL
   APPROVED
   IN_PROGRESS
+  WAITING_USER_VALIDATION
+  ESCALATED
   RESOLVED
   REJECTED
   CANCELLED
@@ -2102,41 +2104,45 @@ model AuditEvent {
 }
 
 model SupportTicket {
-  id                   String                    @id @default(uuid()) @db.Uuid
-  number               Int                       @unique @default(autoincrement())
-  type                 SupportTicketType
-  priority             SupportTicketPriority     @default(NORMAL)
-  status               SupportTicketStatus       @default(OPEN)
-  title                String                    @db.VarChar(200)
-  description          String                    @db.Text
-  pagePath             String?                   @db.VarChar(500)
-  errorMessage         String?                   @db.Text
-  stepsToReproduce     String?                   @db.Text
-  clientContext        Json?
-  aiDiagnosis          Json?
-  aiProviderModel      String?                   @db.VarChar(160)
-  aiDiagnosedAt        DateTime?                 @db.Timestamptz(6)
-  approvalRequired     Boolean                   @default(false)
-  approvalReason       String?                   @db.VarChar(1000)
-  reporterId           String                    @db.Uuid
-  reporter             User                      @relation("SupportReportedBy", fields: [reporterId], references: [id], onDelete: Restrict)
-  assignedToId         String?                   @db.Uuid
-  assignedTo           User?                     @relation("SupportAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
-  resolution           String?                   @db.Text
-  resolvedAt           DateTime?                 @db.Timestamptz(6)
-  resolvedById         String?                   @db.Uuid
-  resolvedBy           User?                     @relation("SupportResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
-  executionLeaseId     String?                   @unique @db.Uuid
-  executorId           String?                   @db.VarChar(160)
-  executionClaimedAt   DateTime?                 @db.Timestamptz(6)
-  executionHeartbeatAt DateTime?                 @db.Timestamptz(6)
-  executionAttempts    Int                       @default(0)
-  correlationId        String                    @db.Uuid
-  attachments          SupportTicketAttachment[]
-  decisions            SupportTicketDecision[]
-  updates              SupportTicketUpdate[]
-  createdAt            DateTime                  @default(now()) @db.Timestamptz(6)
-  updatedAt            DateTime                  @updatedAt @db.Timestamptz(6)
+  id                    String                    @id @default(uuid()) @db.Uuid
+  number                Int                       @unique @default(autoincrement())
+  type                  SupportTicketType
+  priority              SupportTicketPriority     @default(NORMAL)
+  status                SupportTicketStatus       @default(OPEN)
+  title                 String                    @db.VarChar(200)
+  description           String                    @db.Text
+  pagePath              String?                   @db.VarChar(500)
+  errorMessage          String?                   @db.Text
+  stepsToReproduce      String?                   @db.Text
+  clientContext         Json?
+  aiDiagnosis           Json?
+  aiProviderModel       String?                   @db.VarChar(160)
+  aiDiagnosedAt         DateTime?                 @db.Timestamptz(6)
+  approvalRequired      Boolean                   @default(false)
+  approvalReason        String?                   @db.VarChar(1000)
+  reporterId            String                    @db.Uuid
+  reporter              User                      @relation("SupportReportedBy", fields: [reporterId], references: [id], onDelete: Restrict)
+  assignedToId          String?                   @db.Uuid
+  assignedTo            User?                     @relation("SupportAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  resolution            String?                   @db.Text
+  resolvedAt            DateTime?                 @db.Timestamptz(6)
+  resolvedById          String?                   @db.Uuid
+  resolvedBy            User?                     @relation("SupportResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+  executionLeaseId      String?                   @unique @db.Uuid
+  executorId            String?                   @db.VarChar(160)
+  executionClaimedAt    DateTime?                 @db.Timestamptz(6)
+  executionHeartbeatAt  DateTime?                 @db.Timestamptz(6)
+  executionAttempts     Int                       @default(0)
+  resolutionAttempts    Int                       @default(0)
+  validationRequestedAt DateTime?                 @db.Timestamptz(6)
+  validationQuestions   Json?
+  escalatedAt           DateTime?                 @db.Timestamptz(6)
+  correlationId         String                    @db.Uuid
+  attachments           SupportTicketAttachment[]
+  decisions             SupportTicketDecision[]
+  updates               SupportTicketUpdate[]
+  createdAt             DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                  @updatedAt @db.Timestamptz(6)
 
   @@index([status, priority, createdAt])
   @@index([reporterId, createdAt])

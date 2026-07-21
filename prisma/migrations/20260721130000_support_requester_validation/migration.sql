@@ -1,0 +1,8 @@
+ALTER TYPE "SupportTicketStatus" ADD VALUE IF NOT EXISTS 'WAITING_USER_VALIDATION';
+ALTER TYPE "SupportTicketStatus" ADD VALUE IF NOT EXISTS 'ESCALATED';
+
+ALTER TABLE "support_tickets"
+  ADD COLUMN "resolutionAttempts" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "validationRequestedAt" TIMESTAMPTZ(6),
+  ADD COLUMN "validationQuestions" JSONB,
+  ADD COLUMN "escalatedAt" TIMESTAMPTZ(6);
