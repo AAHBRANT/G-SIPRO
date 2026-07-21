@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
+import { browserRandomUuid } from "./browser-random-uuid";
 
 export type OpportunityOption = Readonly<{
   id: string;
@@ -165,7 +166,7 @@ export function CreateProposalForm({
     setDocuments((current) => [
       ...current,
       ...Array.from(files).map((file) => ({
-        id: crypto.randomUUID(),
+        id: browserRandomUuid(),
         file,
         type: guessType(file.name),
         title: cleanTitle(file.name),
@@ -216,7 +217,7 @@ export function CreateProposalForm({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: browserRandomUuid(),
           definitionId,
           documentVersionId: result.data.version.id,
           requestedFields,
