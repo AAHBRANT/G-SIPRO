@@ -34,10 +34,11 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
               id,
               executionLeaseId: null,
               resolutionAttempts: { lt: 3 },
-              OR: [{ status: "TRIAGED", approvalRequired: false }, { status: "APPROVED" }],
+              OR: [{ status: "TRIAGED", approvalRequired: false }, { status: "APPROVED" }, { status: "IN_PROGRESS", executorId: null }],
             },
             data: {
               status: "IN_PROGRESS",
+              assignedToId: null,
               executionLeaseId: leaseId,
               executorId: input.executorId,
               executionClaimedAt: new Date(),

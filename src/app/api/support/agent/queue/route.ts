@@ -24,6 +24,7 @@ export async function GET(request: Request) {
           OR: [
             { status: "TRIAGED", approvalRequired: false },
             { status: "APPROVED" },
+            { status: "IN_PROGRESS", executorId: null },
           ],
         },
         include,
