@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type GsIconName = "dashboard" | "file" | "target" | "send" | "clock" | "money" | "calendar" | "chart" | "refresh" | "pipeline" | "arrow" | "eye" | "ban";
+export type GsIconName = "dashboard" | "file" | "target" | "send" | "clock" | "money" | "calendar" | "chart" | "refresh" | "pipeline" | "arrow" | "eye" | "ban" | "search" | "table";
 
 const paths: Record<GsIconName, ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
@@ -16,6 +16,8 @@ const paths: Record<GsIconName, ReactNode> = {
   arrow: <path d="m9 18 6-6-6-6"/>,
   eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></>,
   ban: <><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+  table: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 9v11"/></>,
 };
 
 export function GsIcon({ name, className = "h-5 w-5" }: { name: GsIconName; className?: string }) {
