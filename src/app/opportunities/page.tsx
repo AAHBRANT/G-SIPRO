@@ -45,18 +45,18 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize)); const safePage = Math.min(page, totalPages);
   const firstRecord = totalFiltered ? (safePage - 1) * pageSize + 1 : 0; const lastRecord = Math.min(safePage * pageSize, totalFiltered);
 
-  return <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-    <PageHeader action={canCreate ? <CreateOpportunityForm/> : undefined} eyebrow="Comercial" icon="target" subtitle="Registre sinais de mercado e acompanhe sua evolução até a decisão comercial." title="Oportunidades"/>
+  return <main className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+    <PageHeader action={canCreate ? <CreateOpportunityForm/> : undefined} eyebrow="Comercial" icon="target" subtitle="Registre sinais de mercado e acompanhe sua evolução até a decisão comercial." title="Oportunidades" variant="executive"/>
 
-    <section aria-label="Indicadores de oportunidades" className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-      <MetricCard description="Todas as oportunidades registradas" icon="target" title="Total de oportunidades" tone="blue" value={total}/>
-      <MetricCard description="Oportunidades atualmente em acompanhamento" icon="chart" title="Oportunidades ativas" tone="green" value={active}/>
-      <MetricCard description="Registros aguardando análise comercial" icon="clock" title="Em qualificação" tone="violet" value={qualification}/>
-      <MetricCard description="Prazos previstos para os próximos 30 dias" icon="calendar" title="Prazos próximos" tone="amber" value={upcoming}/>
-      <MetricCard description="Oportunidades encerradas com histórico preservado" icon="file" title="Encerradas" tone="slate" value={closed}/>
+    <section aria-label="Indicadores de oportunidades" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <MetricCard description="Todas as oportunidades registradas" icon="target" title="Total de oportunidades" value={total} variant="executive"/>
+      <MetricCard description="Oportunidades atualmente em acompanhamento" icon="chart" title="Oportunidades ativas" value={active} variant="executive"/>
+      <MetricCard description="Registros aguardando análise comercial" icon="clock" title="Em qualificação" value={qualification} variant="executive"/>
+      <MetricCard description="Prazos previstos para os próximos 30 dias" icon="calendar" title="Prazos próximos" value={upcoming} variant="executive"/>
+      <MetricCard description="Oportunidades encerradas com histórico preservado" icon="file" title="Encerradas" value={closed} variant="executive"/>
     </section>
 
-    <Panel className="mt-6" subtitle="Busque e consulte todas as oportunidades cadastradas" title="Relação de oportunidades">
+    <Panel className="mt-6" subtitle="Busque e consulte todas as oportunidades cadastradas" title="Relação de oportunidades" variant="executive">
       <form className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-end sm:justify-end" method="get">
         <label className="grid w-full max-w-md gap-1 text-xs font-bold text-slate-600">Buscar oportunidade<input className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal" name="query" placeholder="Código, objeto, cliente ou órgão" defaultValue={query}/></label>
         <input name="pageSize" type="hidden" value={pageSize}/><button className="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-5 text-xs font-bold text-white">Buscar</button>{query && <Link className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600" href={`/opportunities?pageSize=${pageSize}`}>Limpar</Link>}
