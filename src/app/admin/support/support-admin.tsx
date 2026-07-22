@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SupportTicketView } from "@/app/support/support-center";
 import { SupportChat } from "@/app/support/support-chat";
 import { SupportProgressCard } from "@/app/support/support-progress-card";
+import { GsIcon } from "@/components/ui/gs-icon";
 
 const typeLabel: Record<string, string> = { BUG: "Erro", QUESTION: "Dúvida", IMPROVEMENT: "Melhoria", NEW_FEATURE: "Nova ferramenta" };
 const statusLabel: Record<string, string> = { OPEN: "Recebido", TRIAGED: "Na fila técnica", WAITING_APPROVAL: "Aguardando aprovação", APPROVED: "Autorizado", IN_PROGRESS: "Em execução", WAITING_USER_VALIDATION: "Validação do solicitante", ESCALATED: "Escalado ao proprietário", RESOLVED: "Resolvido", REJECTED: "Rejeitado", CANCELLED: "Cancelado" };
@@ -20,6 +21,12 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   async function send(ticketId: string, endpoint: string, payload: unknown) {
     setBusy(ticketId);
@@ -49,21 +56,33 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
   const deploymentUrl = selectedTicket ? deploymentUrls[selectedTicket.id] ?? "" : "";
   const testLines = selectedTicket ? (executedTests[selectedTicket.id] ?? "").split("\n").map((item) => item.trim()).filter(Boolean) : [];
   const executionAuthorized = selectedTicket ? (selectedTicket.status === "TRIAGED" && !selectedTicket.approvalRequired) || ["APPROVED", "IN_PROGRESS", "WAITING_USER_VALIDATION", "ESCALATED", "RESOLVED"].includes(selectedTicket.status) : false;
+  const filteredTickets = useMemo(() => tickets.filter((ticket) => {
+    const haystack = `SUP-${String(ticket.number).padStart(5, "0")} ${ticket.title} ${ticket.description} ${ticket.reporter} ${typeLabel[ticket.type] ?? ticket.type} ${statusLabel[ticket.status] ?? ticket.status}`.toLocaleLowerCase("pt-BR");
+    return (!query || haystack.includes(query.toLocaleLowerCase("pt-BR"))) && (!statusFilter || ticket.status === statusFilter) && (!typeFilter || ticket.type === typeFilter);
+  }), [tickets, query, statusFilter, typeFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleTickets = filteredTickets.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const firstRecord = filteredTickets.length ? (safePage - 1) * pageSize + 1 : 0;
+  const lastRecord = Math.min(safePage * pageSize, filteredTickets.length);
+  const controlClass = "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
 
   return <div className="mt-6">
     {message && <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">{message}</p>}
-    <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]" aria-label="Relação de chamados">
-      <header className="flex flex-col justify-between gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center"><div><h2 className="font-black text-slate-950">Chamados registrados</h2><p className="mt-1 text-xs text-slate-500">Selecione um chamado para visualizar informações, histórico e ações.</p></div><span className="text-xs font-bold text-slate-500">{tickets.length} registro(s)</span></header>
-      <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-sm"><thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Nº do chamado</th><th className="px-5 py-3">Descrição</th><th className="px-5 py-3">Abertura / conclusão</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">
-        {tickets.map((ticket) => <tr className="transition hover:bg-slate-50/80" key={ticket.id}>
-          <td className="whitespace-nowrap px-5 py-4 align-top"><button className="font-black text-brand hover:underline" onClick={() => setSelectedTicketId(ticket.id)} type="button">SUP-{String(ticket.number).padStart(5, "0")}</button><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{typeLabel[ticket.type]}</p></td>
-          <td className="max-w-md px-5 py-4 align-top"><p className="font-bold text-slate-900">{ticket.title}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{ticket.description}</p></td>
-          <td className="whitespace-nowrap px-5 py-4 align-top text-xs text-slate-600"><p><b>Abertura:</b> {new Date(ticket.createdAt).toLocaleDateString("pt-BR")}</p><p className="mt-1"><b>Conclusão:</b> {concludedStatuses.has(ticket.status) ? new Date(ticket.updatedAt).toLocaleDateString("pt-BR") : "Em aberto"}</p></td>
-          <td className="px-5 py-4 align-top"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${statusTone[ticket.status] ?? statusTone.OPEN}`}>{statusLabel[ticket.status] ?? ticket.status}</span></td>
-          <td className="px-5 py-4 text-right align-top"><button className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50" onClick={() => setSelectedTicketId(ticket.id)} type="button">Visualizar</button></td>
+    <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]" aria-label="Relação de chamados">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center"><h2 className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-800"><GsIcon className="h-4 w-4 text-brand" name="table"/> Chamados registrados</h2><div className="flex flex-wrap gap-2"><label className="relative"><GsIcon className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" name="search"/><input aria-label="Buscar chamado" className="h-9 w-60 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100" onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Buscar chamado..." value={query}/></label><button className={`${controlClass} inline-flex items-center gap-2`} onClick={() => setShowFilters((value) => !value)} type="button"><GsIcon className="h-4 w-4" name="filter"/> Filtros</button></div></div>
+      {showFilters && <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4"><select aria-label="Filtrar por status" className={controlClass} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} value={statusFilter}><option value="">Todos os status</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select aria-label="Filtrar por tipo" className={controlClass} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }} value={typeFilter}><option value="">Todos os tipos</option>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className={controlClass} onClick={() => { setStatusFilter(""); setTypeFilter(""); setPage(1); }} type="button">Limpar filtros</button></div>}
+      <div className="overflow-x-auto"><table className="w-full min-w-[920px] table-fixed text-left text-xs"><colgroup><col className="w-[16%]"/><col className="w-[34%]"/><col className="w-[22%]"/><col className="w-[18%]"/><col className="w-[10%]"/></colgroup><thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Nº do chamado</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Abertura / conclusão</th><th className="px-4 py-3">Status</th><th className="px-3 py-3 text-center">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">
+        {visibleTickets.map((ticket) => <tr className="h-14 transition hover:bg-blue-50/30" key={ticket.id}>
+          <td className="whitespace-nowrap px-4 py-3"><button className="font-bold text-brand hover:underline" onClick={() => setSelectedTicketId(ticket.id)} type="button">SUP-{String(ticket.number).padStart(5, "0")}</button><p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">{typeLabel[ticket.type]}</p></td>
+          <td className="px-4 py-3"><p className="truncate font-semibold text-slate-700" title={ticket.title}>{ticket.title}</p><p className="mt-1 truncate text-[10px] text-slate-500" title={ticket.description}>{ticket.description}</p></td>
+          <td className="whitespace-nowrap px-4 py-3 text-[10px] text-slate-600"><p><b>Abertura:</b> {new Date(ticket.createdAt).toLocaleDateString("pt-BR")}</p><p className="mt-1"><b>Conclusão:</b> {concludedStatuses.has(ticket.status) ? new Date(ticket.updatedAt).toLocaleDateString("pt-BR") : "Em aberto"}</p></td>
+          <td className="px-4 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone[ticket.status] ?? statusTone.OPEN}`}>{statusLabel[ticket.status] ?? ticket.status}</span></td>
+          <td className="px-3 py-3 text-center"><button aria-label={`Visualizar SUP-${String(ticket.number).padStart(5, "0")}`} className="inline-grid rounded-md p-1.5 text-blue-700 transition hover:bg-blue-100" onClick={() => setSelectedTicketId(ticket.id)} title="Visualizar" type="button"><GsIcon className="h-4 w-4" name="eye"/></button></td>
         </tr>)}
-        {tickets.length === 0 && <tr><td className="px-5 py-12 text-center text-sm text-slate-500" colSpan={5}>Nenhum chamado registrado.</td></tr>}
+        {visibleTickets.length === 0 && <tr><td className="px-5 py-12 text-center text-sm text-slate-500" colSpan={5}>Nenhum chamado registrado.</td></tr>}
       </tbody></table></div>
+      <footer className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-[10px] text-slate-500 sm:flex-row sm:items-center"><span>Mostrando {firstRecord} a {lastRecord} de {filteredTickets.length} chamados</span><div className="ml-auto flex items-center gap-1.5"><select aria-label="Quantidade de linhas" className="h-8 rounded-lg border border-slate-200 bg-white px-2 font-semibold" onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} value={pageSize}>{[10, 25, 50, 100].map((value) => <option key={value} value={value}>{value}</option>)}</select><button className="h-8 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40" disabled={safePage <= 1} onClick={() => setPage((value) => value - 1)} type="button">Anterior</button><span className="grid h-8 min-w-8 place-items-center rounded-lg border border-brand font-bold text-brand">{safePage}</span><span className="px-1">de {totalPages}</span><button className="h-8 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40" disabled={safePage >= totalPages} onClick={() => setPage((value) => value + 1)} type="button">Próximo</button></div></footer>
     </section>
 
     {selectedTicket && <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="support-ticket-title">
