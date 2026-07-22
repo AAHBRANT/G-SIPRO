@@ -6,6 +6,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { GsIcon } from "@/components/ui/gs-icon";
 import { browserRandomUuid } from "@/core/browser/browser-random-uuid";
+import { detailFields } from "./extraction-view-model";
 
 type Field = { field: string; value: string };
 type Service = { discipline: string; description: string; quantities: string };
@@ -60,9 +61,11 @@ export function ArchiveWorkspace({ items, users, canCreate, canDelete, extractio
   const lastRecord = Math.min(safePage * pageSize, filtered.length);
   const controlClass = "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
   const selectedMatches = useMemo(() => {
-    if (!selected || !insideQuery.trim()) return selected?.fields ?? [];
+    if (!selected) return [];
+    const fields = detailFields(selected.fields, selected.services.length > 0);
+    if (!insideQuery.trim()) return fields;
     const normalized = insideQuery.toLocaleLowerCase("pt-BR");
-    return selected.fields.filter(field => `${field.field} ${field.value}`.toLocaleLowerCase("pt-BR").includes(normalized));
+    return fields.filter(field => `${field.field} ${field.value}`.toLocaleLowerCase("pt-BR").includes(normalized));
   }, [insideQuery, selected]);
   const recognized = items.filter(item => item.extractionStatus === "SUCCEEDED" && item.fields.length > 0).length;
   const services = items.reduce((sum, item) => sum + item.services.length, 0);

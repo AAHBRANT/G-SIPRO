@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fieldsFromExtractionOutput, servicesFromExtraction } from "./extraction-view-model";
+import { detailFields, fieldsFromExtractionOutput, servicesFromExtraction } from "./extraction-view-model";
 
 describe("technical archive extraction view model", () => {
   it("reads the direct array format persisted by the extraction repository", () => {
@@ -22,5 +22,19 @@ describe("technical archive extraction view model", () => {
     expect(servicesFromExtraction(fields)).toEqual([
       { discipline: "OAE", description: "Ponte", quantities: "120 m" },
     ]);
+  });
+
+  it("keeps recognized metadata but omits the raw services field when its table is available", () => {
+    const fields = [
+      { field: "Contratante", value: "Cliente A" },
+      { field: "Objeto", value: "Obra B" },
+      { field: "Serviços executados e quantidades", value: "[{...}]" },
+    ];
+
+    expect(detailFields(fields, true)).toEqual([
+      { field: "Contratante", value: "Cliente A" },
+      { field: "Objeto", value: "Obra B" },
+    ]);
+    expect(detailFields(fields, false)).toEqual(fields);
   });
 });

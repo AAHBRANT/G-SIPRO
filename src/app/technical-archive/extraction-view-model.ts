@@ -17,6 +17,11 @@ export function fieldsFromExtractionOutput(output: unknown): ExtractionField[] {
   });
 }
 
+export function detailFields(fields: ExtractionField[], hasServiceTable: boolean) {
+  if (!hasServiceTable) return fields;
+  return fields.filter((item) => !/serviços executados e quantidades/i.test(item.field));
+}
+
 export function servicesFromExtraction(fields: ExtractionField[]) {
   const serviceField = fields.find((item) => /serviços executados e quantidades/i.test(item.field));
   if (!serviceField) return [];
