@@ -8,8 +8,9 @@ import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import type { OpportunityStatus } from "@/modules/opportunities/domain/opportunity";
 import { CreateOpportunityForm } from "./create-opportunity-form";
+import { OpportunityPageSizeSelect, OpportunityTableControls } from "./opportunity-table-controls";
 
-type Filters = { query?: string; page?: string; pageSize?: string };
+type Filters = { query?: string; status?: string; page?: string; pageSize?: string };
 const statusLabels: Record<OpportunityStatus, string> = { DRAFT: "Rascunho", QUALIFICATION: "Qualificação", ACTIVE: "Ativa", SUSPENDED: "Suspensa", CLOSED: "Encerrada" };
 const statusTone: Record<OpportunityStatus, string> = { DRAFT: "bg-slate-100 text-slate-600", QUALIFICATION: "bg-violet-50 text-violet-700", ACTIVE: "bg-emerald-50 text-emerald-700", SUSPENDED: "bg-amber-50 text-amber-700", CLOSED: "bg-slate-200 text-slate-700" };
 const currency = (value: Prisma.Decimal | null, code: string | null) => value === null ? "—" : Number(value).toLocaleString("pt-BR", { style: "currency", currency: code ?? "BRL", maximumFractionDigits: 0 });
@@ -27,9 +28,11 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
 
   const filters = await searchParams;
   const query = filters.query?.trim().slice(0, 100);
+  const status = (["DRAFT", "QUALIFICATION", "ACTIVE", "SUSPENDED", "CLOSED"] as OpportunityStatus[]).includes(filters.status as OpportunityStatus) ? filters.status as OpportunityStatus : undefined;
   const pageSize = [10, 25, 50, 100].includes(Number(filters.pageSize)) ? Number(filters.pageSize) : 10;
   const page = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
   const where: Prisma.OpportunityWhereInput = {
+    ...(status && { status }),
     ...(query && { OR: [{ code: { contains: query, mode: "insensitive" } }, { subject: { contains: query, mode: "insensitive" } }, { customer: { name: { contains: query, mode: "insensitive" } } }, { contractingAuthority: { name: { contains: query, mode: "insensitive" } } }] }),
   };
   const database = getDatabase();
@@ -56,18 +59,11 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
     </section>
 
     <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center">
-        <h2 className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-800"><GsIcon className="h-4 w-4 text-brand" name="table"/> Relação de oportunidades</h2>
-        <form className="flex flex-wrap items-center gap-2" method="get">
-          <div className="relative"><button aria-label="Executar busca" className="absolute left-2 top-1.5 grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-brand" title="Buscar" type="submit"><GsIcon className="h-4 w-4" name="search"/></button><input aria-label="Buscar oportunidade" className="h-9 w-60 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100" defaultValue={query} name="query" placeholder="Buscar oportunidade..."/></div>
-          <input name="pageSize" type="hidden" value={pageSize}/>
-          {query && <Link className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/opportunities?pageSize=${pageSize}`}>Limpar</Link>}
-        </form>
-      </div>
+      <OpportunityTableControls pageSize={pageSize} query={query ?? ""} status={status ?? ""}/>
 
       <div className="overflow-x-auto"><table className="w-full min-w-[1050px] table-fixed text-left text-xs"><colgroup><col className="w-[13%]"/><col className="w-[25%]"/><col className="w-[16%]"/><col className="w-[14%]"/><col className="w-[11%]"/><col className="w-[10%]"/><col className="w-[8%]"/><col className="w-[6%]"/></colgroup><thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Código <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Objeto <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Cliente/órgão <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Responsável</th><th className="px-4 py-3">Prazo <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Valor</th><th className="px-4 py-3">Status <span className="ml-1 text-[8px]">↕</span></th><th className="px-3 py-3 text-center">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">{opportunities.map((entry) => <tr className="h-14 transition hover:bg-blue-50/30" key={entry.id}><td className="px-4 py-3"><Link className="block truncate font-bold text-brand hover:underline" href={`/opportunities/${entry.id}`}>{entry.code}</Link></td><td className="px-4 py-3"><span className="block truncate text-slate-700" title={entry.subject ?? ""}>{entry.subject ?? "—"}</span></td><td className="px-4 py-3"><span className="block truncate text-slate-600">{entry.customer?.name ?? entry.contractingAuthority?.name ?? "—"}</span></td><td className="px-4 py-3"><span className="block truncate text-slate-600">{entry.owner?.displayName ?? "Não atribuído"}</span></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.deliveryAt ? entry.deliveryAt.toLocaleDateString("pt-BR") : "—"}</td><td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">{currency(entry.estimatedValue, entry.currency)}</td><td className="px-4 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone[entry.status]}`}>{statusLabels[entry.status]}</span></td><td className="px-3 py-3 text-center"><Link aria-label={`Visualizar ${entry.code}`} className="inline-grid rounded-md p-1.5 text-blue-700 transition hover:bg-blue-100" href={`/opportunities/${entry.id}`} title="Visualizar"><GsIcon className="h-4 w-4" name="eye"/></Link></td></tr>)}{opportunities.length === 0 && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={8}>Nenhuma oportunidade encontrada.</td></tr>}</tbody></table></div>
 
-      <footer className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-[10px] text-slate-500 sm:flex-row sm:items-center"><span>Mostrando {firstRecord} a {lastRecord} de {totalFiltered} oportunidades</span><div className="ml-auto flex items-center gap-1.5"><span>Por página:</span><div className="flex gap-1">{[10, 25, 50, 100].map((size) => <Link className={`grid h-8 min-w-8 place-items-center rounded-lg border px-2 font-bold ${pageSize === size ? "border-brand text-brand" : "border-slate-200 bg-white"}`} href={pageHref(filters, 1, size)} key={size}>{size}</Link>)}</div><Link aria-disabled={safePage <= 1} className={`h-8 rounded-lg border border-slate-200 px-3 py-2 font-semibold ${safePage <= 1 ? "pointer-events-none opacity-40" : ""}`} href={pageHref(filters, safePage - 1, pageSize)}>Anterior</Link><span className="grid h-8 min-w-8 place-items-center rounded-lg border border-brand font-bold text-brand">{safePage}</span><span className="px-1">de {totalPages}</span><Link aria-disabled={safePage >= totalPages} className={`h-8 rounded-lg border border-slate-200 px-3 py-2 font-semibold ${safePage >= totalPages ? "pointer-events-none opacity-40" : ""}`} href={pageHref(filters, safePage + 1, pageSize)}>Próximo</Link></div></footer>
+      <footer className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-[10px] text-slate-500 sm:flex-row sm:items-center"><span>Mostrando {firstRecord} a {lastRecord} de {totalFiltered} oportunidades</span><div className="ml-auto flex items-center gap-1.5"><OpportunityPageSizeSelect pageSize={pageSize} query={query ?? ""} status={status ?? ""}/><Link aria-disabled={safePage <= 1} className={`h-8 rounded-lg border border-slate-200 px-3 py-2 font-semibold ${safePage <= 1 ? "pointer-events-none opacity-40" : ""}`} href={pageHref(filters, safePage - 1, pageSize)}>Anterior</Link><span className="grid h-8 min-w-8 place-items-center rounded-lg border border-brand font-bold text-brand">{safePage}</span><span className="px-1">de {totalPages}</span><Link aria-disabled={safePage >= totalPages} className={`h-8 rounded-lg border border-slate-200 px-3 py-2 font-semibold ${safePage >= totalPages ? "pointer-events-none opacity-40" : ""}`} href={pageHref(filters, safePage + 1, pageSize)}>Próximo</Link></div></footer>
     </section>
   </main>;
 }
