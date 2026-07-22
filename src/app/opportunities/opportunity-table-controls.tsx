@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { GsIcon } from "@/components/ui/gs-icon";
 
 const controlClass = "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
@@ -23,7 +23,7 @@ function opportunitiesHref(query: string, status: string, pageSize: number) {
   return `/opportunities?${params.toString()}`;
 }
 
-export function OpportunityTableControls({ query, status, pageSize }: { query: string; status: string; pageSize: number }) {
+export function OpportunityTableControls({ query, status, pageSize, action }: { query: string; status: string; pageSize: number; action?: ReactNode }) {
   const router = useRouter();
   const [search, setSearch] = useState(query);
   const [selectedStatus, setSelectedStatus] = useState(status);
@@ -42,6 +42,7 @@ export function OpportunityTableControls({ query, status, pageSize }: { query: s
           <div className="relative"><button aria-label="Executar busca" className="absolute left-2 top-1.5 grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-brand" title="Buscar" type="submit"><GsIcon className="h-4 w-4" name="search"/></button><input aria-label="Buscar oportunidade" className="h-9 w-60 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100" onChange={event => setSearch(event.target.value)} placeholder="Buscar oportunidade..." value={search}/></div>
         </form>
         <button className={`${controlClass} inline-flex items-center gap-2`} onClick={() => setShowFilters(value => !value)} type="button"><GsIcon className="h-4 w-4" name="filter"/> Filtros</button>
+        {action}
       </div>
     </div>
     {showFilters && <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-[minmax(220px,320px)_auto_auto] sm:items-end">

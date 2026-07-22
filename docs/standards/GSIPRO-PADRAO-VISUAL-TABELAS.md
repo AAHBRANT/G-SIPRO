@@ -17,8 +17,10 @@ O painel deve ser sóbrio, compacto e funcional, seguindo a identidade visual do
 5. Posicionar à direita, nesta ordem:
    - campo de busca compacto;
    - botão **Filtros**;
+   - botão principal do módulo, como **Nova proposta**, **Nova oportunidade**, **Importar e reconhecer** ou **Adicionar usuário**;
    - botão **Exportar**, apenas quando a funcionalidade existir.
-6. Não inserir texto explicativo ou faixa vazia entre a barra superior e o cabeçalho da tabela.
+6. O botão principal de cadastro ou importação deve ficar na barra da listagem, imediatamente após **Filtros**, e não no cabeçalho geral da página.
+7. Não inserir texto explicativo ou faixa vazia entre a barra superior e o cabeçalho da tabela.
 
 ## Busca e filtros
 
