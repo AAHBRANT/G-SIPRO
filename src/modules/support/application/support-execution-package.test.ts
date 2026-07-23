@@ -31,6 +31,7 @@ describe("support execution package", () => {
       reporter: { displayName: "Usuário", email: "usuario@example.com" },
       attachments: [{ id: "attachment-1", fileName: "evidencia.png", fileHash: "hash", mimeType: "image/png", sizeBytes: 2048n }],
       decisions: [],
+      executionAttempts: 2,
       resolutionAttempts: 1,
       updates: [{ note: "O problema continua no Teams.", toStatus: "TRIAGED", actorLabel: "Solicitante", createdAt: new Date("2026-07-20T13:00:00.000Z"), createdBy: null }],
     });

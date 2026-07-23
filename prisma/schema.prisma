@@ -47,6 +47,7 @@ enum SupportTicketStatus {
   APPROVED
   IN_PROGRESS
   WAITING_USER_VALIDATION
+  OWNER_ACTION_REQUIRED
   ESCALATED
   RESOLVED
   REJECTED
@@ -2136,6 +2137,8 @@ model SupportTicket {
   resolutionAttempts    Int                       @default(0)
   validationRequestedAt DateTime?                 @db.Timestamptz(6)
   validationQuestions   Json?
+  externalBlocker       Json?
+  ownerActionRequiredAt DateTime?                 @db.Timestamptz(6)
   escalatedAt           DateTime?                 @db.Timestamptz(6)
   correlationId         String                    @db.Uuid
   attachments           SupportTicketAttachment[]

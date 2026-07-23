@@ -117,10 +117,28 @@ jobs:
           LEASE_ID: ${{ steps.claim.outputs.lease_id }}
           EXECUTOR_ID: ${{ steps.claim.outputs.executor_id }}
         run: |
+          set -euo pipefail
           oidc_response="$(curl --fail --silent --show-error --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
           support_token="$(jq -r '.value' <<<"$oidc_response")"
           echo "::add-mask::$support_token"
-          body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" '{action:"REPORT_FAILURE",executorId:$executorId,leaseId:$leaseId,summary:"O Codex não produziu uma alteração segura nesta tentativa; o chamado retornou para avaliação."}')"
+          codex_summary="$(tail -c 1600 codex-output.md 2>/dev/null | tr '\n\r\t' ' ' | sed 's/[[:space:]]\+/ /g' || true)"
+          if [ -z "$codex_summary" ]; then
+            codex_summary="O Codex não produziu uma alteração segura nesta tentativa."
+          fi
+          outcome="$(jq -r '.outcome // "INSUFFICIENT_EVIDENCE"' .codex-support/result.json 2>/dev/null || echo "INSUFFICIENT_EVIDENCE")"
+          if [ "$outcome" = "OWNER_ACTION_REQUIRED" ]; then
+            category="$(jq -r '.category // "OTHER"' .codex-support/result.json)"
+            case "$category" in
+              MICROSOFT_365|TEAMS|AZURE|IDENTITY_ACCESS|SECURITY|EXTERNAL_SERVICE|OTHER) ;;
+              *) category="OTHER" ;;
+            esac
+            summary="$(jq -r '.summary // "Uma configuração externa requer atuação do proprietário."' .codex-support/result.json)"
+            owner_action="$(jq -r '.ownerAction // "Verifique a configuração externa indicada no diagnóstico."' .codex-support/result.json)"
+            security_guidance="$(jq -r '.securityGuidance // "Aplique somente o menor privilégio necessário e não compartilhe credenciais."' .codex-support/result.json)"
+            body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" --arg category "$category" --arg summary "$summary" --arg ownerAction "$owner_action" --arg securityGuidance "$security_guidance" '{action:"REPORT_OWNER_ACTION",executorId:$executorId,leaseId:$leaseId,category:$category,summary:$summary,ownerAction:$ownerAction,securityGuidance:$securityGuidance}')"
+          else
+            body="$(jq -n --arg executorId "$EXECUTOR_ID" --arg leaseId "$LEASE_ID" --arg summary "$codex_summary" '{action:"REPORT_FAILURE",executorId:$executorId,leaseId:$leaseId,summary:$summary}')"
+          fi
           curl --fail --silent --show-error --request POST \
             --header "Authorization: Bearer ${support_token}" \
             --header "Content-Type: application/json" --data "$body" \

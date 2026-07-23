@@ -6,7 +6,7 @@ import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { Prisma } from "@/generated/prisma/client";
 import { buildSupportExecutionPackage } from "@/modules/support/application/support-execution-package";
-import { supportAgentCommandSchema } from "@/modules/support/domain/support-agent";
+import { supportAgentCommandSchema, supportAgentFailureOutcome } from "@/modules/support/domain/support-agent";
 import { supportExecutionResolution } from "@/modules/support/domain/support-execution";
 import { requireSupportExecutor } from "@/modules/support/infrastructure/support-executor-auth";
 
@@ -33,7 +33,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             where: {
               id,
               executionLeaseId: null,
-              resolutionAttempts: { lt: 3 },
+              executionAttempts: { lt: 3 },
               OR: [{ status: "TRIAGED", approvalRequired: false }, { status: "APPROVED" }, { status: "IN_PROGRESS", executorId: null }],
             },
             data: {
@@ -81,15 +81,22 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       }
 
       const completed = input.action === "COMPLETE";
-      const retryStatus = "TRIAGED";
+      const ownerActionRequired = input.action === "REPORT_OWNER_ACTION";
+      const failure = completed || ownerActionRequired ? null : supportAgentFailureOutcome(ticket.executionAttempts);
+      const retryStatus = failure?.status ?? "TRIAGED";
+      const nextStatus = completed ? "WAITING_USER_VALIDATION" : ownerActionRequired ? "OWNER_ACTION_REQUIRED" : retryStatus;
       const note = completed
         ? supportExecutionResolution(input)
-        : `Falha informada pelo executor ${input.executorId}: ${input.summary}`;
+        : ownerActionRequired
+          ? `Ação do proprietário necessária (${input.category}).\n\nDiagnóstico: ${input.summary}\n\nComo resolver: ${input.ownerAction}\n\nCuidados de segurança: ${input.securityGuidance}`
+        : failure?.exhausted
+          ? `Falha informada pelo executor ${input.executorId} na tentativa ${failure.attempts} de 3: ${input.summary} O chamado foi escalado ao proprietário.`
+          : `Falha informada pelo executor ${input.executorId} na tentativa ${failure?.attempts ?? 1} de 3: ${input.summary} O chamado retornou à fila automática.`;
       await database.$transaction(async (transaction) => {
         const changed = await transaction.supportTicket.updateMany({
           where: { id, status: "IN_PROGRESS", executionLeaseId: input.leaseId, executorId: input.executorId },
           data: {
-            status: completed ? "WAITING_USER_VALIDATION" : retryStatus,
+            status: nextStatus,
             approvalRequired: false,
             approvalReason: null,
             resolution: completed ? note : ticket.resolution,
@@ -97,26 +104,41 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             resolvedById: null,
             executionHeartbeatAt: new Date(),
             executionLeaseId: null,
+            executorId: failure?.exhausted || ownerActionRequired ? null : ticket.executorId,
             validationRequestedAt: completed ? new Date() : ticket.validationRequestedAt,
             validationQuestions: completed ? Prisma.JsonNull : undefined,
+            externalBlocker: ownerActionRequired ? {
+              category: input.category,
+              summary: input.summary,
+              ownerAction: input.ownerAction,
+              securityGuidance: input.securityGuidance,
+              reportedBy: input.executorId,
+              reportedAt: new Date().toISOString(),
+            } : completed ? Prisma.JsonNull : undefined,
+            ownerActionRequiredAt: ownerActionRequired ? new Date() : completed ? null : undefined,
             resolutionAttempts: completed ? { increment: 1 } : undefined,
+            escalatedAt: failure?.exhausted ? new Date() : completed || ownerActionRequired ? ticket.escalatedAt : null,
           },
         });
         if (changed.count !== 1) throw new ConflictError("A reserva expirou ou foi alterada.");
         await transaction.supportTicketUpdate.create({
-          data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: completed ? "WAITING_USER_VALIDATION" : retryStatus, note: completed ? `${note}\n\nPosso encerrar este chamado? Aguardando validação do solicitante.` : note, actorLabel: input.executorId },
+          data: { id: randomUUID(), ticketId: id, fromStatus: "IN_PROGRESS", toStatus: nextStatus, note: completed ? `${note}\n\nPosso encerrar este chamado? Aguardando validação do solicitante.` : note, actorLabel: input.executorId },
         });
         await transaction.auditEvent.create({
           data: {
             id: randomUUID(), actorType: actor.actorType, actorId: input.executorId,
-            action: completed ? "SUPPORT_VALIDATION_REQUESTED" : "SUPPORT_AGENT_FAILED",
+            action: completed ? "SUPPORT_VALIDATION_REQUESTED" : ownerActionRequired ? "SUPPORT_OWNER_ACTION_REQUIRED" : "SUPPORT_AGENT_FAILED",
             entityType: "SUPPORT_TICKET", entityId: id, correlationId: context.correlationId,
-            outcome: completed ? "SUCCESS" : "FAILURE", origin: "support-agent",
-            metadata: completed ? { leaseId: input.leaseId, revision: input.revision ?? null, deploymentUrl: input.deploymentUrl ?? null, tests: input.tests } : { leaseId: input.leaseId, summary: input.summary },
+            outcome: completed || ownerActionRequired ? "SUCCESS" : "FAILURE", origin: "support-agent",
+            metadata: completed
+              ? { leaseId: input.leaseId, revision: input.revision ?? null, deploymentUrl: input.deploymentUrl ?? null, tests: input.tests }
+              : ownerActionRequired
+                ? { leaseId: input.leaseId, category: input.category, summary: input.summary, ownerAction: input.ownerAction }
+                : { leaseId: input.leaseId, summary: input.summary },
           },
         });
       });
-      return NextResponse.json({ data: { id, status: completed ? "WAITING_USER_VALIDATION" : retryStatus }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { id, status: nextStatus }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }

@@ -11,8 +11,8 @@ const tones = {
 
 const stages = ["Recebido", "Analisado", "Execução da IA", "Validação"];
 
-export function SupportProgressCard({ status, resolutionAttempts, updatedAt }: { status: string; resolutionAttempts: number; updatedAt: string }) {
-  const progress = supportProgress({ status, resolutionAttempts, updatedAt });
+export function SupportProgressCard({ status, executionAttempts, resolutionAttempts, updatedAt }: { status: string; executionAttempts: number; resolutionAttempts: number; updatedAt: string }) {
+  const progress = supportProgress({ status, executionAttempts, resolutionAttempts, updatedAt });
   return <section className={`rounded-xl border-2 p-5 ${tones[progress.tone]}`} aria-label="Andamento do chamado">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs font-black uppercase tracking-wider opacity-70">Andamento do chamado</p><h4 className="mt-1 text-lg font-black">{progress.headline}</h4></div>
