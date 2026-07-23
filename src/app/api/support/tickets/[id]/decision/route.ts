@@ -21,8 +21,8 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       const nextStatus = input.decision === "APPROVED" ? "APPROVED" : "REJECTED";
       await database.$transaction(async transaction => {
         await transaction.supportTicketDecision.create({ data: { id: randomUUID(), ticketId: id, decision: input.decision, note: input.note, decidedById: authorization.actorId } });
-        await transaction.supportTicket.update({ where: { id }, data: { status: nextStatus, assignedToId: input.decision === "APPROVED" ? authorization.actorId : null } });
-        await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId: id, fromStatus: ticket.status, toStatus: nextStatus, note: input.note, createdById: authorization.actorId } });
+        await transaction.supportTicket.update({ where: { id }, data: { status: nextStatus, approvalRequired: false, assignedToId: input.decision === "APPROVED" ? authorization.actorId : null } });
+        await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId: id, fromStatus: ticket.status, toStatus: nextStatus, note: input.decision === "APPROVED" ? `Aprovado pelo proprietário. A execução automática foi liberada. ${input.note}` : `Rejeitado pelo proprietário. ${input.note}`, createdById: authorization.actorId, actorLabel: "Proprietário" } });
         await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: input.decision === "APPROVED" ? "SUPPORT_CHANGE_APPROVED" : "SUPPORT_CHANGE_REJECTED", entityType: "SUPPORT_TICKET", entityId: id, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-approvals", metadata: { note: input.note } } });
       });
       return NextResponse.json({ data: { id, status: nextStatus }, correlationId: context.correlationId });

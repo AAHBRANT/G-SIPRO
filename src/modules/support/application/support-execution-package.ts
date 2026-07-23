@@ -65,7 +65,7 @@ export function buildSupportExecutionPackage(ticket: TicketForExecution) {
       claimedAt: ticket.executionClaimedAt?.toISOString() ?? null,
       heartbeatAt: ticket.executionHeartbeatAt?.toISOString() ?? null,
       deliveredAttempts: ticket.resolutionAttempts ?? 0,
-      currentAttempt: Math.min(3, (ticket.resolutionAttempts ?? 0) + 1),
+      currentAttempt: Math.min(3, Math.max(1, ticket.executionAttempts ?? 1)),
     },
     history: ticket.updates.map((update) => ({
       status: update.toStatus,

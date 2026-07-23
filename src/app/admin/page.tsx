@@ -19,7 +19,7 @@ export default async function AdminPage() {
     database.permission.findMany({ orderBy: [{ module: "asc" }, { action: "asc" }] }),
     database.department.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     database.auditEvent.count({ where: { occurredAt: { gte: since }, outcome: "FAILURE" } }),
-    database.supportTicket.count({ where: { status: "ESCALATED" } }),
+    database.supportTicket.count({ where: { status: { in: ["WAITING_APPROVAL", "OWNER_ACTION_REQUIRED", "ESCALATED"] } } }),
   ]);
   const activeUsers = users.filter((user) => user.status === "ACTIVE").length;
   const masterUsers = users.filter((user) => user.isMaster && user.status === "ACTIVE").length;

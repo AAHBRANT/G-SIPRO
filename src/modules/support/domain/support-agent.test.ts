@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { supportAgentCommandSchema } from "./support-agent";
+import { supportAgentCommandSchema, supportAgentFailureOutcome } from "./support-agent";
 
 describe("support agent protocol", () => {
   it("requires a lease to finish an execution", () => {
@@ -12,5 +12,25 @@ describe("support agent protocol", () => {
 
   it("accepts progress linked to a pull request", () => {
     expect(supportAgentCommandSchema.safeParse({ action: "REPORT_PROGRESS", executorId: "codex-runner", leaseId: crypto.randomUUID(), summary: "Correção proposta para revisão.", pullRequestUrl: "https://github.com/example/repo/pull/1" }).success).toBe(true);
+  });
+
+  it("accepts a controlled external blocker for the owner", () => {
+    expect(supportAgentCommandSchema.safeParse({
+      action: "REPORT_OWNER_ACTION",
+      executorId: "codex-runner",
+      leaseId: crypto.randomUUID(),
+      category: "TEAMS",
+      summary: "A publicação depende da política de aplicativos do Teams.",
+      ownerAction: "Confirme a atribuição do aplicativo ao grupo autorizado.",
+      securityGuidance: "Não amplie a política para toda a organização.",
+    }).success).toBe(true);
+  });
+
+  it("returns a failed first attempt to the autonomous queue", () => {
+    expect(supportAgentFailureOutcome(1)).toEqual({ attempts: 1, exhausted: false, status: "TRIAGED" });
+  });
+
+  it("escalates a failed third attempt to the owner", () => {
+    expect(supportAgentFailureOutcome(3)).toEqual({ attempts: 3, exhausted: true, status: "ESCALATED" });
   });
 });

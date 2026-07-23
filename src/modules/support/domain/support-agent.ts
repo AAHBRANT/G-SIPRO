@@ -18,6 +18,13 @@ export const supportAgentCommandSchema = z.discriminatedUnion("action", [
     summary: z.string().trim().min(3).max(2_000),
   }),
   z.object({
+    action: z.literal("REPORT_OWNER_ACTION"), executorId, leaseId,
+    category: z.enum(["MICROSOFT_365", "TEAMS", "AZURE", "IDENTITY_ACCESS", "SECURITY", "EXTERNAL_SERVICE", "OTHER"]),
+    summary: z.string().trim().min(3).max(2_000),
+    ownerAction: z.string().trim().min(3).max(4_000),
+    securityGuidance: z.string().trim().min(3).max(2_000),
+  }),
+  z.object({
     action: z.literal("REPORT_PROGRESS"), executorId, leaseId,
     summary: z.string().trim().min(3).max(2_000),
     pullRequestUrl: z.url().max(1_000).optional(),
@@ -26,3 +33,13 @@ export const supportAgentCommandSchema = z.discriminatedUnion("action", [
 ]);
 
 export type SupportAgentCommand = z.infer<typeof supportAgentCommandSchema>;
+
+export function supportAgentFailureOutcome(executionAttempts: number) {
+  const attempts = Math.max(1, Math.trunc(executionAttempts));
+  const exhausted = attempts >= 3;
+  return {
+    attempts,
+    exhausted,
+    status: exhausted ? "ESCALATED" as const : "TRIAGED" as const,
+  };
+}
