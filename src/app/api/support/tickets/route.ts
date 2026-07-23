@@ -20,6 +20,10 @@ function fallbackDiagnosis(input: SupportTicketInput): SupportDiagnosis {
     probableCause: input.type === "BUG" ? "A causa será confirmada com os registros técnicos e a reprodução do comportamento." : "Não se aplica até a avaliação funcional.",
     severity: input.priority === "CRITICAL" ? "CRITICAL" : input.priority === "HIGH" ? "HIGH" : "MEDIUM",
     changeClass: input.type === "NEW_FEATURE" ? "NEW_TOOL" : feature ? "FUNCTIONAL_CHANGE" : "CORRECTION",
+    requiredActor: "AI",
+    ownerActionCategory: null,
+    requiredAction: null,
+    securityGuidance: null,
     recommendedAction: feature ? "Avaliar escopo, impacto e critérios de aceite antes da execução." : "Reproduzir, corrigir a causa mínima e executar testes de regressão.",
     suggestedTests: ["Reproduzir o cenário informado", "Validar o fluxo corrigido", "Executar testes de regressão relacionados"],
     userGuidance: "Acompanhe este chamado; as próximas atualizações serão registradas aqui.",
@@ -72,11 +76,15 @@ export async function POST(request: Request) {
       let diagnosis: SupportDiagnosis;
       let model: string | undefined;
       try { diagnosis = await provider.diagnose(input, context.correlationId); model = provider.modelName; } catch { diagnosis = fallbackDiagnosis(input); }
-      const { approvalRequired, approvalReason, status } = supportApprovalPolicy(input, diagnosis);
+      const { approvalRequired, approvalReason, status, externalBlocker } = supportApprovalPolicy(input, diagnosis);
       await database.$transaction(async transaction => {
-        await transaction.supportTicket.update({ where: { id: ticketId }, data: { status, aiDiagnosis: diagnosis, aiProviderModel: model, aiDiagnosedAt: new Date(), approvalRequired, approvalReason, priority: diagnosis.severity === "CRITICAL" ? "CRITICAL" : input.priority } });
-        await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId, fromStatus: "OPEN", toStatus: status, note: model ? "Triagem assistida por inteligência concluída." : "Triagem inicial concluída; diagnóstico técnico detalhado ainda será realizado.", createdById: authorization.actorId } });
-        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: model ? "APPLICATION" : "SYSTEM", actorId: model ? "openai-support-triage" : "support-fallback-triage", action: "SUPPORT_TICKET_TRIAGED", entityType: "SUPPORT_TICKET", entityId: ticketId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-center", metadata: { approvalRequired, changeClass: diagnosis.changeClass, model: model ?? null } } });
+        const triagedAt = new Date();
+        await transaction.supportTicket.update({ where: { id: ticketId }, data: { status, aiDiagnosis: diagnosis, aiProviderModel: model, aiDiagnosedAt: triagedAt, approvalRequired, approvalReason, priority: diagnosis.severity === "CRITICAL" ? "CRITICAL" : input.priority, externalBlocker: externalBlocker ? { ...externalBlocker, reportedAt: triagedAt.toISOString() } : undefined, ownerActionRequiredAt: externalBlocker ? triagedAt : undefined } });
+        const triageNote = externalBlocker
+          ? "A triagem identificou imediatamente uma ação exclusiva do proprietário. O chamado foi direcionado sem consumir tentativas automáticas."
+          : model ? "Triagem assistida por inteligência concluída." : "Triagem inicial concluída; diagnóstico técnico detalhado ainda será realizado.";
+        await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId, fromStatus: "OPEN", toStatus: status, note: triageNote, createdById: authorization.actorId, actorLabel: externalBlocker ? "Triagem inteligente" : "Usuário" } });
+        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: model ? "APPLICATION" : "SYSTEM", actorId: model ? "openai-support-triage" : "support-fallback-triage", action: externalBlocker ? "SUPPORT_OWNER_ACTION_REQUIRED" : "SUPPORT_TICKET_TRIAGED", entityType: "SUPPORT_TICKET", entityId: ticketId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-center", metadata: { approvalRequired, changeClass: diagnosis.changeClass, requiredActor: diagnosis.requiredActor, model: model ?? null } } });
       });
       return NextResponse.json({ data: { id: ticketId, status, approvalRequired }, correlationId: context.correlationId }, { status: 201 });
     } catch (error) { return toApiError(error); }

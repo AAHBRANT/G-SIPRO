@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { userAccessDisposition } from "@/modules/admin/user-access-authority";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
 export async function PATCH(request: Request, route: { params: Promise<{ id: string }> }): Promise<NextResponse> {
@@ -20,10 +21,21 @@ export async function PATCH(request: Request, route: { params: Promise<{ id: str
       const database = getDatabase();
       const current = await database.user.findUnique({ where: { id: userId }, select: { id: true, isMaster: true, isOwner: true } });
       if (!current) throw new ResourceNotFoundError("Usuário não encontrado.");
-      if (current.isOwner && !authorization.isOwner) throw new ConflictError("Somente um proprietário pode alterar outro proprietário.");
-      if (current.isOwner !== input.isOwner && !authorization.isOwner) throw new ConflictError("Somente um proprietário pode alterar o perfil de proprietário.");
+      const disposition = userAccessDisposition({ actorIsOwner: Boolean(authorization.isOwner), requestedIsMaster: input.isMaster, requestedIsOwner: input.isOwner, currentIsMaster: current.isMaster, currentIsOwner: current.isOwner });
+      if (disposition === "FORBIDDEN") throw new ConflictError("Somente o proprietário pode cadastrar ou alterar proprietários.");
       if (await database.user.findFirst({ where: { email: input.email, id: { not: userId } }, select: { id: true } })) throw new ConflictError("Já existe outro usuário com este e-mail.");
       if (input.departmentId && !await database.department.findFirst({ where: { id: input.departmentId, active: true }, select: { id: true } })) throw new ValidationError("O departamento selecionado não está disponível.");
+      const permissionIds = [...new Set(input.permissionIds)];
+      if (await database.permission.count({ where: { id: { in: permissionIds } } }) !== permissionIds.length) throw new ValidationError("Uma ou mais permissões selecionadas são inválidas.");
+      if (disposition === "OWNER_APPROVAL") {
+        const requestId = randomUUID();
+        await database.$transaction(async transaction => {
+          await transaction.userAccessRequest.create({ data: { id: requestId, action: "UPDATE", requestedById: authorization.actorId, targetUserId: userId, payload: input } });
+          await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "MASTER_ACCESS_REQUESTED", entityType: "USER_ACCESS_REQUEST", entityId: requestId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { targetUserId: userId, email: input.email, requestedRole: input.isMaster ? "MASTER" : "COMMON" } } });
+        });
+        revalidatePath("/admin");
+        return NextResponse.json({ data: { requestId, pendingApproval: true }, correlationId: context.correlationId }, { status: 202 });
+      }
       if (current.isMaster && (!input.isMaster || input.status !== "ACTIVE")) {
         const otherMasters = await database.user.count({ where: { isMaster: true, status: "ACTIVE", id: { not: userId } } });
         if (!otherMasters) throw new ConflictError("O sistema deve manter pelo menos um usuário mestre ativo.");
@@ -32,8 +44,6 @@ export async function PATCH(request: Request, route: { params: Promise<{ id: str
         const otherOwners = await database.user.count({ where: { isOwner: true, status: "ACTIVE", id: { not: userId } } });
         if (!otherOwners) throw new ConflictError("O sistema deve manter pelo menos um proprietário ativo.");
       }
-      const permissionIds = [...new Set(input.permissionIds)];
-      if (await database.permission.count({ where: { id: { in: permissionIds } } }) !== permissionIds.length) throw new ValidationError("Uma ou mais permissões selecionadas são inválidas.");
       const now = new Date();
       const profileCode = `USER_ACCESS_${userId.replaceAll("-", "")}`;
       await database.$transaction(async (transaction) => {

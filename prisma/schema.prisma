@@ -15,6 +15,17 @@ enum UserStatus {
   BLOCKED
 }
 
+enum UserAccessRequestAction {
+  CREATE
+  UPDATE
+}
+
+enum UserAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum AuditActorType {
   USER
   APPLICATION
@@ -292,6 +303,9 @@ model User {
   supportTicketsResolved      SupportTicket[]                   @relation("SupportResolvedBy")
   supportDecisions            SupportTicketDecision[]           @relation("SupportDecidedBy")
   supportUpdates              SupportTicketUpdate[]             @relation("SupportUpdatedBy")
+  accessRequestsMade          UserAccessRequest[]               @relation("AccessRequestRequestedBy")
+  accessRequestsDecided       UserAccessRequest[]               @relation("AccessRequestDecidedBy")
+  accessRequestsTargeted      UserAccessRequest[]               @relation("AccessRequestTargetUser")
   createdAt                   DateTime                          @default(now()) @db.Timestamptz(6)
   createdBy                   String                            @db.Uuid
   updatedAt                   DateTime                          @updatedAt @db.Timestamptz(6)
@@ -301,6 +315,28 @@ model User {
   @@index([isOwner, status])
   @@index([displayName])
   @@map("users")
+}
+
+model UserAccessRequest {
+  id            String                  @id @default(uuid()) @db.Uuid
+  action        UserAccessRequestAction
+  status        UserAccessRequestStatus @default(PENDING)
+  requestedById String                  @db.Uuid
+  requestedBy   User                    @relation("AccessRequestRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  targetUserId  String?                 @db.Uuid
+  targetUser    User?                   @relation("AccessRequestTargetUser", fields: [targetUserId], references: [id], onDelete: Restrict)
+  payload       Json
+  decisionNote  String?                 @db.VarChar(1000)
+  decidedById   String?                 @db.Uuid
+  decidedBy     User?                   @relation("AccessRequestDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decidedAt     DateTime?               @db.Timestamptz(6)
+  createdAt     DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime                @updatedAt @db.Timestamptz(6)
+
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+  @@index([targetUserId])
+  @@map("user_access_requests")
 }
 
 model Customer {
