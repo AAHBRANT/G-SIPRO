@@ -38,6 +38,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             executorId: externalActionCompleted ? null : "proprietario",
             executionClaimedAt: externalActionCompleted ? null : new Date(),
             executionHeartbeatAt: externalActionCompleted ? null : new Date(),
+            executionAttempts: externalActionCompleted ? 0 : undefined,
             externalBlocker: externalActionCompleted ? Prisma.JsonNull : undefined,
             ownerActionRequiredAt: externalActionCompleted ? null : undefined,
           },

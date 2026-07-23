@@ -7,6 +7,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { userAccessDisposition } from "@/modules/admin/user-access-authority";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -16,11 +17,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       const authorization = await requireMaster();
       const input = userAccessSchema.parse(await request.json());
       const database = getDatabase();
-      if (input.isOwner && !authorization.isOwner) throw new ConflictError("Somente um proprietário pode conceder o perfil de proprietário.");
+      const disposition = userAccessDisposition({ actorIsOwner: Boolean(authorization.isOwner), requestedIsMaster: input.isMaster, requestedIsOwner: input.isOwner });
+      if (disposition === "FORBIDDEN") throw new ConflictError("Somente o proprietário pode cadastrar outro proprietário.");
       if (await database.user.findUnique({ where: { email: input.email }, select: { id: true } })) throw new ConflictError("Já existe um usuário com este e-mail.");
       if (input.departmentId && !await database.department.findFirst({ where: { id: input.departmentId, active: true }, select: { id: true } })) throw new ValidationError("O departamento selecionado não está disponível.");
       const permissionCount = await database.permission.count({ where: { id: { in: input.permissionIds } } });
       if (permissionCount !== new Set(input.permissionIds).size) throw new ValidationError("Uma ou mais permissões selecionadas são inválidas.");
+
+      if (disposition === "OWNER_APPROVAL") {
+        const requestId = randomUUID();
+        await database.$transaction(async transaction => {
+          await transaction.userAccessRequest.create({ data: { id: requestId, action: "CREATE", requestedById: authorization.actorId, payload: input } });
+          await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "MASTER_ACCESS_REQUESTED", entityType: "USER_ACCESS_REQUEST", entityId: requestId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, requestedRole: "MASTER" } } });
+        });
+        revalidatePath("/admin");
+        return NextResponse.json({ data: { requestId, pendingApproval: true }, correlationId: context.correlationId }, { status: 202 });
+      }
 
       const userId = randomUUID();
       const profileId = randomUUID();

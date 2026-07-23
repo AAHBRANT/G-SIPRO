@@ -20,16 +20,20 @@ export class OpenAiSupportProvider {
           model: this.model,
           store: false,
           input: [
-            { role: "system", content: "Você faz triagem técnica do G-SIPRO. Analise somente as evidências fornecidas. Não afirme que uma correção foi executada. Diferencie CORRECTION (restaurar comportamento esperado) de CONFIGURATION, FUNCTIONAL_CHANGE e NEW_TOOL. Mudanças funcionais e novas ferramentas exigem aprovação humana." },
+            { role: "system", content: "Você faz triagem técnica do G-SIPRO. Analise somente as evidências fornecidas. Não afirme que uma correção foi executada. Diferencie CORRECTION (restaurar comportamento esperado) de CONFIGURATION, FUNCTIONAL_CHANGE e NEW_TOOL. Mudanças funcionais e novas ferramentas exigem aprovação humana. Identifique já nesta triagem quem precisa executar a próxima ação: AI para código e automações, MASTER para administração comum dentro do G-SIPRO, OWNER somente para configurações externas protegidas, segurança, Azure, Microsoft 365, Teams ou concessão de perfil mestre/proprietário, e REQUESTER quando faltarem evidências. Quando requiredActor for OWNER, preencha categoria, ação exata de menor privilégio e orientação de segurança; nos demais casos retorne null nesses três campos." },
             { role: "user", content: `Tipo: ${input.type}\nPrioridade informada: ${input.priority}\nTítulo: ${input.title}\nDescrição: ${input.description}\nTela: ${input.pagePath || "não informada"}\nErro: ${input.errorMessage || "não informado"}\nPassos: ${input.stepsToReproduce || "não informados"}\nContexto técnico: ${JSON.stringify(input.clientContext || {})}` },
           ],
           text: { format: { type: "json_schema", name: "gsipro_support_triage", strict: true, schema: {
             type: "object", additionalProperties: false,
-            required: ["summary", "probableCause", "severity", "changeClass", "recommendedAction", "suggestedTests", "userGuidance", "confidence"],
+            required: ["summary", "probableCause", "severity", "changeClass", "requiredActor", "ownerActionCategory", "requiredAction", "securityGuidance", "recommendedAction", "suggestedTests", "userGuidance", "confidence"],
             properties: {
               summary: { type: "string" }, probableCause: { type: "string" },
               severity: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
               changeClass: { type: "string", enum: ["CORRECTION", "CONFIGURATION", "FUNCTIONAL_CHANGE", "NEW_TOOL"] },
+              requiredActor: { type: "string", enum: ["AI", "MASTER", "OWNER", "REQUESTER"] },
+              ownerActionCategory: { anyOf: [{ type: "string", enum: ["MICROSOFT_365", "TEAMS", "AZURE", "IDENTITY_ACCESS", "SECURITY", "EXTERNAL_SERVICE", "OTHER"] }, { type: "null" }] },
+              requiredAction: { anyOf: [{ type: "string" }, { type: "null" }] },
+              securityGuidance: { anyOf: [{ type: "string" }, { type: "null" }] },
               recommendedAction: { type: "string" }, suggestedTests: { type: "array", items: { type: "string" } },
               userGuidance: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
             },
