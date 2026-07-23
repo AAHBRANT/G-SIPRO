@@ -10,7 +10,7 @@ export type SupportAssistantDisposition = {
   response: string;
 };
 
-export function supportAssistantDisposition(status: string, isOwner: boolean): SupportAssistantDisposition {
+export function supportAssistantDisposition(status: string, isOwner: boolean, executorId?: string | null): SupportAssistantDisposition {
   switch (status) {
     case "OPEN":
       return {
@@ -23,9 +23,15 @@ export function supportAssistantDisposition(status: string, isOwner: boolean): S
         response: "Entendi. Sua orientação foi anexada ao chamado, que já está na fila automática da IA. A execução costuma iniciar em até 5 minutos.",
       };
     case "IN_PROGRESS":
-      return {
-        response: "Entendi. Sua orientação foi registrada no histórico técnico. A execução atual continuará e o resultado aparecerá aqui para validação.",
-      };
+      return isOwner && executorId === "proprietario"
+        ? {
+            nextStatus: "TRIAGED",
+            resetExecution: true,
+            response: "Entendi. Retirei o chamado da execução manual do proprietário e o devolvi à fila automática da IA para uma nova tentativa.",
+          }
+        : {
+            response: "Entendi. Sua orientação foi registrada no histórico técnico. A execução automática atual continuará e o resultado aparecerá aqui para validação.",
+          };
     case "WAITING_APPROVAL":
       return {
         response: "Registrei sua mensagem, mas esta alteração ainda depende da aprovação do proprietário. A IA começará automaticamente após a aprovação.",

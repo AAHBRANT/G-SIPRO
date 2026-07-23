@@ -15,6 +15,17 @@ describe("support assistant disposition", () => {
     expect(result.response).toContain("aprovação");
   });
 
+  it("returns an owner-assumed ticket to the automatic queue from the chat", () => {
+    expect(supportAssistantDisposition("IN_PROGRESS", true, "proprietario")).toMatchObject({
+      nextStatus: "TRIAGED",
+      resetExecution: true,
+    });
+  });
+
+  it("does not interrupt a running automatic executor", () => {
+    expect(supportAssistantDisposition("IN_PROGRESS", true, "github-codex-123").nextStatus).toBeUndefined();
+  });
+
   it("does not treat an owner blocker as completed from a chat message", () => {
     const result = supportAssistantDisposition("OWNER_ACTION_REQUIRED", true);
     expect(result.nextStatus).toBeUndefined();

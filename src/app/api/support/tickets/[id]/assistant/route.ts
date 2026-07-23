@@ -19,14 +19,14 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       const database = getDatabase();
       const ticket = await database.supportTicket.findUnique({
         where: { id: ticketId },
-        select: { id: true, reporterId: true, status: true },
+        select: { id: true, reporterId: true, status: true, executorId: true },
       });
       if (!ticket) throw new ResourceNotFoundError("Chamado não encontrado.");
       if (!authorization.isMaster && !authorization.isOwner && ticket.reporterId !== authorization.actorId) {
         throw new AuthorizationError("Você não participa deste chamado.");
       }
 
-      const disposition = supportAssistantDisposition(ticket.status, Boolean(authorization.isOwner));
+      const disposition = supportAssistantDisposition(ticket.status, Boolean(authorization.isOwner), ticket.executorId);
       const nextStatus = disposition.nextStatus ?? ticket.status;
       const userUpdateId = randomUUID();
       const assistantUpdateId = randomUUID();
