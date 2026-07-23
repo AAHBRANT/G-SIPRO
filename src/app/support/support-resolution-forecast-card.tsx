@@ -62,6 +62,25 @@ export function SupportResolutionForecastCard({ ticket, compact = false }: { tic
       <ForecastMetric label={forecast.state === "OVERDUE" ? "Atraso estimado" : "Tempo restante"} value={forecast.remainingMinutes === null ? "Pausado" : formatDuration(forecast.remainingMinutes)}/>
     </div>
     <p className="mt-3 text-xs leading-5 text-slate-600">{forecast.explanation}</p>
+    <div className="mt-4 rounded-lg border border-white/80 bg-white/75 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">O que falta</p>
+      <p className="mt-1 text-sm font-semibold leading-5 text-slate-800">{forecast.pendingSummary}</p>
+    </div>
+    {forecast.nextActions.length > 0 && <div className="mt-4">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Próximas ações</p>
+      <ol className="mt-2 grid gap-2">
+        {forecast.nextActions.map((action, index) => <li className="grid grid-cols-[24px_1fr] gap-2 rounded-lg border border-white/80 bg-white/75 p-3" key={`${action.label}-${index}`}>
+          <span className={`flex size-6 items-center justify-center rounded-full text-[10px] font-black ${action.state === "CURRENT" ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}>{index + 1}</span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-black text-slate-900">{action.label}</p>
+              <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${action.state === "CURRENT" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{action.responsible}</span>
+            </div>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600">{action.detail}</p>
+          </div>
+        </li>)}
+      </ol>
+    </div>}
     <p className="mt-2 text-[10px] font-semibold text-slate-400">Previsão operacional, atualizada automaticamente. Não representa SLA contratual.</p>
   </section>;
 }

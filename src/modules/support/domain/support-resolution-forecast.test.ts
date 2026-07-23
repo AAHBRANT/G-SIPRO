@@ -15,7 +15,16 @@ describe("supportResolutionForecast", () => {
       { ...ticket, status: "IN_PROGRESS", executionClaimedAt: "2026-07-23T12:10:00.000Z" },
       new Date("2026-07-23T12:20:00.000Z"),
     );
-    expect(result).toMatchObject({ state: "ON_TRACK", responsible: "IA do G-SIPRO", remainingMinutes: 35 });
+    expect(result).toMatchObject({
+      state: "ON_TRACK",
+      responsible: "IA do G-SIPRO",
+      remainingMinutes: 35,
+    });
+    expect(result.nextActions[0]).toMatchObject({
+      label: "Concluir a execução técnica",
+      responsible: "IA do G-SIPRO",
+      state: "CURRENT",
+    });
     expect(result.estimateAt).toBe("2026-07-23T12:55:00.000Z");
   });
 
@@ -31,13 +40,32 @@ describe("supportResolutionForecast", () => {
     expect(supportResolutionForecast(
       { ...ticket, status: "OWNER_ACTION_REQUIRED" },
       new Date("2026-07-23T13:00:00.000Z"),
-    )).toMatchObject({ state: "WAITING", responsible: "Proprietário", estimateAt: null });
+    )).toMatchObject({
+      state: "WAITING",
+      responsible: "Proprietário",
+      estimateAt: null,
+    });
+    const result = supportResolutionForecast(
+      { ...ticket, status: "OWNER_ACTION_REQUIRED" },
+      new Date("2026-07-23T13:00:00.000Z"),
+    );
+    expect(result.nextActions[0]).toMatchObject({
+      label: "Executar e confirmar a ação protegida",
+      responsible: "Proprietário",
+      state: "CURRENT",
+    });
   });
 
   it("reports the actual duration after resolution", () => {
     expect(supportResolutionForecast(
       { ...ticket, status: "RESOLVED", resolvedAt: "2026-07-23T12:42:00.000Z" },
       new Date("2026-07-23T14:00:00.000Z"),
-    )).toMatchObject({ state: "DONE", elapsedMinutes: 42, responsible: "Concluído" });
+    )).toMatchObject({
+      state: "DONE",
+      elapsedMinutes: 42,
+      responsible: "Concluído",
+      pendingSummary: "Nenhuma ação pendente.",
+      nextActions: [],
+    });
   });
 });
