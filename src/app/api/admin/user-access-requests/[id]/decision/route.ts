@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
 const decisionSchema = z.object({
@@ -71,8 +72,11 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "MASTER_ACCESS_APPROVED", entityType: "USER_ACCESS_REQUEST", entityId: requestId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { action: accessRequest.action, approvedUserId, isMaster: draft.isMaster, isOwner: draft.isOwner } } });
       });
 
+      const teamsProvisioning = draft.status === "ACTIVE"
+        ? await provisionTeamsAppForManagedUser({ userId: approvedUserId, email: draft.email, actorId: authorization.actorId, correlationId: context.correlationId })
+        : null;
       revalidatePath("/admin");
-      return NextResponse.json({ data: { id: requestId, status: "APPROVED", userId: approvedUserId }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { id: requestId, status: "APPROVED", userId: approvedUserId, teamsProvisioning }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }

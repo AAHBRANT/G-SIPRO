@@ -13,6 +13,14 @@ describe("parseEnvironment", () => {
     const environment = parseEnvironment({ DATABASE_URL: "postgresql://user:pass@localhost:5432/gsipro" });
     expect(environment.APP_NAME).toBe("G-SIPRO");
     expect(environment.NODE_ENV).toBe("development");
+    expect(environment.MICROSOFT_GRAPH_TIMEOUT_MS).toBe(20_000);
+  });
+
+  it("valida o identificador do aplicativo do catálogo do Teams", () => {
+    expect(() => parseEnvironment({
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/gsipro",
+      TEAMS_CATALOG_APP_ID: "identificador-invalido",
+    })).toThrow(ConfigurationError);
   });
 
   it("não expõe o valor inválido no erro", () => {

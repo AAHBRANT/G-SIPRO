@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
 import { userAccessDisposition } from "@/modules/admin/user-access-authority";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
@@ -19,7 +20,7 @@ export async function PATCH(request: Request, route: { params: Promise<{ id: str
       const userId = z.uuid().parse((await route.params).id);
       const input = userAccessSchema.parse(await request.json());
       const database = getDatabase();
-      const current = await database.user.findUnique({ where: { id: userId }, select: { id: true, isMaster: true, isOwner: true } });
+      const current = await database.user.findUnique({ where: { id: userId }, select: { id: true, email: true, status: true, isMaster: true, isOwner: true, teamsProvisioningStatus: true } });
       if (!current) throw new ResourceNotFoundError("Usuário não encontrado.");
       const disposition = userAccessDisposition({ actorIsOwner: Boolean(authorization.isOwner), requestedIsMaster: input.isMaster, requestedIsOwner: input.isOwner, currentIsMaster: current.isMaster, currentIsOwner: current.isOwner });
       if (disposition === "FORBIDDEN") throw new ConflictError("Somente o proprietário pode cadastrar ou alterar proprietários.");
@@ -55,8 +56,11 @@ export async function PATCH(request: Request, route: { params: Promise<{ id: str
         if (permissionIds.length) await transaction.profilePermission.createMany({ data: permissionIds.map((permissionId) => ({ profileId: profile.id, permissionId, grantedBy: authorization.actorId })) });
         await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_ACCESS_UPDATED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { isMaster: input.isMaster, isOwner: input.isOwner, status: input.status, permissionCount: permissionIds.length } } });
       });
+      const teamsProvisioning = input.status === "ACTIVE" && (current.email !== input.email || current.status !== "ACTIVE" || current.teamsProvisioningStatus !== "INSTALLED")
+        ? await provisionTeamsAppForManagedUser({ userId, email: input.email, actorId: authorization.actorId, correlationId: context.correlationId })
+        : null;
       revalidatePath("/admin");
-      return NextResponse.json({ data: { id: userId }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { id: userId, teamsProvisioning }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }

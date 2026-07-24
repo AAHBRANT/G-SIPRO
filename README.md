@@ -31,6 +31,8 @@ Configure a credencial somente no arquivo local `.env.local` do servidor:
 ```dotenv
 OPENAI_API_KEY=chave_criada_no_painel_da_openai
 OPENAI_REQUEST_TIMEOUT_MS=120000
+TEAMS_CATALOG_APP_ID=
+MICROSOFT_GRAPH_TIMEOUT_MS=20000
 ```
 
 Não registre a chave em Git, documentos, logs ou telas. O modelo utilizado é o `providerModelVersion` do inventário aprovado em `/ai-governance`; a execução documental ocorre em `/ai-extractions` e usa `store: false`.
