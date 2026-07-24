@@ -8,6 +8,7 @@ import { getEnvironment } from "@/core/config/env";
 import { getDatabase } from "@/core/database/prisma";
 import { getEntraConfiguration } from "@/core/identity/entra-config";
 import { createLogger } from "@/core/observability/logger";
+import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
 
 const entra = getEntraConfiguration();
 const environment = getEnvironment();
@@ -125,6 +126,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       } else {
         const id = randomUUID();
         await database.user.create({ data: { id, entraObjectId: profile.oid, displayName, email, createdBy: id, updatedBy: id } });
+        await provisionTeamsAppForManagedUser({ userId: id, email, actorId: id, correlationId: randomUUID() });
       }
       return true;
     },

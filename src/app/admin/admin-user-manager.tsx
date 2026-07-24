@@ -6,7 +6,9 @@ import { GsIcon } from "@/components/ui/gs-icon";
 
 type PermissionOption = { id: string; code: string; module: string; action: string; description: string | null };
 type DepartmentOption = { id: string; name: string };
-export type ManagedUser = { id: string; displayName: string; email: string; status: "ACTIVE" | "INACTIVE" | "BLOCKED"; isMaster: boolean; isOwner: boolean; departmentId: string | null; departmentName: string | null; profileNames: string[]; permissionIds: string[] };
+type TeamsProvisioningStatus = "NOT_CONFIGURED" | "PENDING" | "INSTALLED" | "FAILED";
+type TeamsProvisioningResponse = { status: TeamsProvisioningStatus; errorCode: string | null; message: string };
+export type ManagedUser = { id: string; displayName: string; email: string; status: "ACTIVE" | "INACTIVE" | "BLOCKED"; teamsProvisioningStatus: TeamsProvisioningStatus; teamsProvisioningAttempts: number; teamsProvisioningErrorCode: string | null; isMaster: boolean; isOwner: boolean; departmentId: string | null; departmentName: string | null; profileNames: string[]; permissionIds: string[] };
 type AccessRequestView = { id: string; action: "CREATE" | "UPDATE"; status: "PENDING" | "APPROVED" | "REJECTED"; requestedBy: string; displayName: string; email: string; requestedRole: string; createdAt: string; decisionNote: string | null };
 type Draft = { id?: string; displayName: string; email: string; departmentId: string; status: ManagedUser["status"]; isMaster: boolean; isOwner: boolean; permissionIds: string[] };
 
@@ -22,6 +24,7 @@ export function AdminUserManager({ users, departments, permissions, accessReques
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [decidingRequest, setDecidingRequest] = useState<string | null>(null);
+  const [provisioningUser, setProvisioningUser] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
@@ -50,14 +53,16 @@ export function AdminUserManager({ users, departments, permissions, accessReques
     event.preventDefault(); if (!draft) return; setSaving(true); setMessage(null);
     try {
       const response = await fetch(draft.id ? `/api/admin/users/${draft.id}` : "/api/admin/users", { method: draft.id ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...draft, departmentId: draft.departmentId || null }) });
-      const payload = await response.json() as { data?: { pendingApproval?: boolean }; error?: { message?: string } };
+      const payload = await response.json() as { data?: { pendingApproval?: boolean; teamsProvisioning?: TeamsProvisioningResponse | null }; error?: { message?: string } };
       if (!response.ok) throw new Error(payload.error?.message ?? "Não foi possível salvar o usuário.");
       if (payload.data?.pendingApproval) {
         setDraft(null);
         setNotice("Solicitação enviada ao proprietário. O usuário mestre será criado somente após a aprovação.");
         router.refresh();
       } else {
-        close(); router.refresh();
+        close();
+        setNotice(payload.data?.teamsProvisioning?.message ?? "Usuário e acessos salvos.");
+        router.refresh();
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível salvar o usuário."); }
     finally { setSaving(false); }
@@ -72,14 +77,30 @@ export function AdminUserManager({ users, departments, permissions, accessReques
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ decision, note: decision === "APPROVED" ? "Cadastro privilegiado aprovado pelo proprietário." : "Cadastro privilegiado rejeitado pelo proprietário." }),
       });
-      const payload = await response.json() as { error?: { message?: string } };
+      const payload = await response.json() as { data?: { teamsProvisioning?: TeamsProvisioningResponse | null }; error?: { message?: string } };
       if (!response.ok) throw new Error(payload.error?.message ?? "Não foi possível registrar a decisão.");
-      setNotice(decision === "APPROVED" ? "Solicitação aprovada e cadastro concluído." : "Solicitação rejeitada.");
+      setNotice(decision === "APPROVED" ? payload.data?.teamsProvisioning?.message ?? "Solicitação aprovada e cadastro concluído." : "Solicitação rejeitada.");
       router.refresh();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Não foi possível registrar a decisão.");
     } finally {
       setDecidingRequest(null);
+    }
+  }
+
+  async function retryTeamsProvisioning(userId: string) {
+    setProvisioningUser(userId);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/teams-provisioning`, { method: "POST" });
+      const payload = await response.json() as { data?: { teamsProvisioning?: TeamsProvisioningResponse }; error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message ?? "Não foi possível instalar o aplicativo no Teams.");
+      setNotice(payload.data?.teamsProvisioning?.message ?? "Solicitação enviada ao Microsoft Teams.");
+      router.refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Não foi possível instalar o aplicativo no Teams.");
+    } finally {
+      setProvisioningUser(null);
     }
   }
 
@@ -95,7 +116,7 @@ export function AdminUserManager({ users, departments, permissions, accessReques
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
       <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center"><h2 className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-800"><GsIcon className="h-4 w-4 text-brand" name="table"/> Usuários e acessos</h2><div className="flex flex-wrap gap-2"><label className="relative"><GsIcon className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" name="search"/><input aria-label="Buscar usuário" className="h-9 w-60 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100" onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Buscar usuário..." value={query}/></label><button className={`${controlClass} inline-flex items-center gap-2`} onClick={() => setShowFilters((value) => !value)} type="button"><GsIcon className="h-4 w-4" name="filter"/> Filtros</button><button className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white shadow-sm" onClick={() => { setMessage(null); setDraft(emptyDraft); }} type="button"><span className="text-base font-normal">＋</span> Adicionar usuário</button></div></div>
       {showFilters && <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4"><select aria-label="Filtrar por situação" className={controlClass} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} value={statusFilter}><option value="">Todas as situações</option><option value="ACTIVE">Ativo</option><option value="INACTIVE">Inativo</option><option value="BLOCKED">Bloqueado</option></select><select aria-label="Filtrar por categoria" className={controlClass} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }} value={categoryFilter}><option value="">Todas as categorias</option><option value="COMMON">Usuário comum</option><option value="MASTER">Usuário mestre</option><option value="OWNER">Proprietário</option></select><button className={controlClass} onClick={() => { setStatusFilter(""); setCategoryFilter(""); setPage(1); }} type="button">Limpar filtros</button></div>}
-      <div className="overflow-x-auto"><table className="w-full min-w-[980px] table-fixed text-left text-xs"><thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Usuário</th><th className="px-4 py-3">Setor / departamento</th><th className="px-4 py-3">Categoria</th><th className="px-4 py-3">Perfil de acesso</th><th className="px-4 py-3">Situação</th><th className="px-3 py-3 text-center">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleUsers.map((user) => <tr className="h-14 hover:bg-blue-50/30" key={user.id}><td className="px-4 py-3"><p className="truncate font-bold text-slate-900">{user.displayName}</p><p className="mt-1 truncate text-[10px] text-slate-500">{user.email}</p></td><td className="px-4 py-3 text-slate-600">{user.departmentName ?? "Não informado"}</td><td className="px-4 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${user.isOwner ? "bg-amber-50 text-amber-800" : user.isMaster ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{user.isOwner ? "Proprietário" : user.isMaster ? "Usuário mestre" : "Usuário comum"}</span></td><td className="max-w-[280px] px-4 py-3 text-[10px] text-slate-600"><p className="truncate">{user.isOwner ? "Acesso integral e aprovação de mudanças" : user.isMaster ? "Toda a estrutura e ações administrativas" : user.profileNames.join(" · ") || "Sem acesso atribuído"}</p></td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${user.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : user.status === "BLOCKED" ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600"}`}>{statusNames[user.status]}</span></td><td className="px-3 py-3 text-center"><button className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-700 hover:border-blue-300 hover:text-brand" onClick={() => edit(user)} type="button">Configurar acesso</button></td></tr>)}{visibleUsers.length === 0 && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={6}>Nenhum usuário encontrado.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1080px] table-fixed text-left text-xs"><thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Usuário</th><th className="px-4 py-3">Setor / departamento</th><th className="px-4 py-3">Categoria</th><th className="px-4 py-3">Perfil de acesso</th><th className="px-4 py-3">Situação</th><th className="px-3 py-3 text-center">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleUsers.map((user) => <tr className="h-14 hover:bg-blue-50/30" key={user.id}><td className="px-4 py-3"><p className="truncate font-bold text-slate-900">{user.displayName}</p><p className="mt-1 truncate text-[10px] text-slate-500">{user.email}</p></td><td className="px-4 py-3 text-slate-600">{user.departmentName ?? "Não informado"}</td><td className="px-4 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${user.isOwner ? "bg-amber-50 text-amber-800" : user.isMaster ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{user.isOwner ? "Proprietário" : user.isMaster ? "Usuário mestre" : "Usuário comum"}</span></td><td className="max-w-[280px] px-4 py-3 text-[10px] text-slate-600"><p className="truncate">{user.isOwner ? "Acesso integral e aprovação de mudanças" : user.isMaster ? "Toda a estrutura e ações administrativas" : user.profileNames.join(" · ") || "Sem acesso atribuído"}</p></td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${user.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : user.status === "BLOCKED" ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600"}`}>{statusNames[user.status]}</span><p className={`mt-1 text-[9px] font-semibold ${user.teamsProvisioningStatus === "INSTALLED" ? "text-emerald-700" : user.teamsProvisioningStatus === "PENDING" ? "text-blue-700" : "text-amber-700"}`}>Teams: {user.teamsProvisioningStatus === "INSTALLED" ? "instalado" : user.teamsProvisioningStatus === "PENDING" ? "instalando" : user.teamsProvisioningStatus === "FAILED" ? "tentativa pendente" : "não configurado"}</p></td><td className="px-3 py-3 text-center"><div className="flex items-center justify-center gap-2"><button className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-700 hover:border-blue-300 hover:text-brand" onClick={() => edit(user)} type="button">Configurar acesso</button>{user.status === "ACTIVE" && user.teamsProvisioningStatus !== "INSTALLED" && <button className="rounded-lg border border-blue-200 px-3 py-2 text-[10px] font-bold text-blue-700 disabled:opacity-50" disabled={provisioningUser === user.id} onClick={() => retryTeamsProvisioning(user.id)} title={user.teamsProvisioningErrorCode ?? undefined} type="button">{provisioningUser === user.id ? "Instalando..." : "Instalar no Teams"}</button>}</div></td></tr>)}{visibleUsers.length === 0 && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={6}>Nenhum usuário encontrado.</td></tr>}</tbody></table></div>
       <footer className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-[10px] text-slate-500 sm:flex-row sm:items-center"><span>Mostrando {firstRecord} a {lastRecord} de {filteredUsers.length} usuários</span><div className="ml-auto flex items-center gap-1.5"><select aria-label="Quantidade de linhas" className="h-8 rounded-lg border border-slate-200 bg-white px-2 font-semibold" onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} value={pageSize}>{[10, 25, 50, 100].map((value) => <option key={value} value={value}>{value}</option>)}</select><button className="h-8 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40" disabled={safePage <= 1} onClick={() => setPage((value) => value - 1)} type="button">Anterior</button><span className="grid h-8 min-w-8 place-items-center rounded-lg border border-brand font-bold text-brand">{safePage}</span><span className="px-1">de {totalPages}</span><button className="h-8 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40" disabled={safePage >= totalPages} onClick={() => setPage((value) => value + 1)} type="button">Próximo</button></div></footer>
     </section>
 

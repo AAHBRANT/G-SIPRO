@@ -15,6 +15,13 @@ enum UserStatus {
   BLOCKED
 }
 
+enum TeamsProvisioningStatus {
+  NOT_CONFIGURED
+  PENDING
+  INSTALLED
+  FAILED
+}
+
 enum UserAccessRequestAction {
   CREATE
   UPDATE
@@ -264,55 +271,61 @@ model Department {
 }
 
 model User {
-  id                          String                            @id @default(uuid()) @db.Uuid
-  entraObjectId               String                            @unique @db.Uuid
-  displayName                 String                            @db.VarChar(160)
-  email                       String                            @unique @db.VarChar(254)
-  status                      UserStatus                        @default(ACTIVE)
-  isMaster                    Boolean                           @default(false)
-  isOwner                     Boolean                           @default(false)
-  departmentId                String?                           @db.Uuid
-  department                  Department?                       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  profileMemberships          UserProfile[]
-  ownedOpportunities          Opportunity[]                     @relation("OpportunityOwner")
-  opportunityChanges          OpportunityHistory[]              @relation("OpportunityChangedBy")
-  requirementResponsibilities TenderRequirement[]               @relation("RequirementResponsible")
-  requirementChanges          RequirementHistory[]              @relation("RequirementChangedBy")
-  deadlineResponsibilities    TenderDeadline[]                  @relation("DeadlineResponsible")
-  deadlineConfirmations       TenderDeadline[]                  @relation("DeadlineConfirmedBy")
-  deadlineChanges             DeadlineHistory[]                 @relation("DeadlineChangedBy")
-  analysisAssignments         RequirementAnalysis[]             @relation("AnalysisAssignee")
-  analysisDecisions           RequirementAnalysis[]             @relation("AnalysisDecidedBy")
-  analysisChanges             AnalysisHistory[]                 @relation("AnalysisChangedBy")
-  ownedDocuments              ManagedDocument[]                 @relation("DocumentOwner")
-  technicalExperiences        ExecutedContract[]                @relation("TechnicalExperienceOwner")
-  technicalExperienceChanges  TechnicalExperienceHistory[]      @relation("TechnicalExperienceChangedBy")
-  technicalEvidenceRecords    TechnicalEvidence[]               @relation("TechnicalEvidenceCreatedBy")
-  professionalRecords         Professional[]                    @relation("ProfessionalCreatedBy")
-  professionalChanges         ProfessionalHistory[]             @relation("ProfessionalChangedBy")
-  professionalLinks           ProfessionalLink[]                @relation("ProfessionalLinkCreatedBy")
-  complianceMatrixChanges     ComplianceMatrixHistory[]         @relation("ComplianceMatrixChangedBy")
-  complianceResponsibilities  ComplianceItemAssessment[]        @relation("ComplianceAssessmentResponsible")
-  complianceValidations       ComplianceItemAssessment[]        @relation("ComplianceAssessmentValidatedBy")
-  complianceExports           ComplianceMatrixExport[]          @relation("ComplianceExportedBy")
-  proposalChanges             ProposalHistory[]                 @relation("ProposalChangedBy")
-  proposalSectionAssignments  ProposalTechnicalSection[]        @relation("ProposalSectionResponsible")
-  proposalSectionChanges      ProposalTechnicalSectionHistory[] @relation("ProposalSectionChangedBy")
-  supportTicketsReported      SupportTicket[]                   @relation("SupportReportedBy")
-  supportTicketsAssigned      SupportTicket[]                   @relation("SupportAssignedTo")
-  supportTicketsResolved      SupportTicket[]                   @relation("SupportResolvedBy")
-  supportDecisions            SupportTicketDecision[]           @relation("SupportDecidedBy")
-  supportUpdates              SupportTicketUpdate[]             @relation("SupportUpdatedBy")
-  accessRequestsMade          UserAccessRequest[]               @relation("AccessRequestRequestedBy")
-  accessRequestsDecided       UserAccessRequest[]               @relation("AccessRequestDecidedBy")
-  accessRequestsTargeted      UserAccessRequest[]               @relation("AccessRequestTargetUser")
-  createdAt                   DateTime                          @default(now()) @db.Timestamptz(6)
-  createdBy                   String                            @db.Uuid
-  updatedAt                   DateTime                          @updatedAt @db.Timestamptz(6)
-  updatedBy                   String                            @db.Uuid
+  id                             String                            @id @default(uuid()) @db.Uuid
+  entraObjectId                  String                            @unique @db.Uuid
+  displayName                    String                            @db.VarChar(160)
+  email                          String                            @unique @db.VarChar(254)
+  status                         UserStatus                        @default(ACTIVE)
+  teamsProvisioningStatus        TeamsProvisioningStatus           @default(PENDING)
+  teamsProvisioningAttempts      Int                               @default(0)
+  teamsProvisioningLastAttemptAt DateTime?                         @db.Timestamptz(6)
+  teamsProvisionedAt             DateTime?                         @db.Timestamptz(6)
+  teamsProvisioningErrorCode     String?                           @db.VarChar(80)
+  isMaster                       Boolean                           @default(false)
+  isOwner                        Boolean                           @default(false)
+  departmentId                   String?                           @db.Uuid
+  department                     Department?                       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  profileMemberships             UserProfile[]
+  ownedOpportunities             Opportunity[]                     @relation("OpportunityOwner")
+  opportunityChanges             OpportunityHistory[]              @relation("OpportunityChangedBy")
+  requirementResponsibilities    TenderRequirement[]               @relation("RequirementResponsible")
+  requirementChanges             RequirementHistory[]              @relation("RequirementChangedBy")
+  deadlineResponsibilities       TenderDeadline[]                  @relation("DeadlineResponsible")
+  deadlineConfirmations          TenderDeadline[]                  @relation("DeadlineConfirmedBy")
+  deadlineChanges                DeadlineHistory[]                 @relation("DeadlineChangedBy")
+  analysisAssignments            RequirementAnalysis[]             @relation("AnalysisAssignee")
+  analysisDecisions              RequirementAnalysis[]             @relation("AnalysisDecidedBy")
+  analysisChanges                AnalysisHistory[]                 @relation("AnalysisChangedBy")
+  ownedDocuments                 ManagedDocument[]                 @relation("DocumentOwner")
+  technicalExperiences           ExecutedContract[]                @relation("TechnicalExperienceOwner")
+  technicalExperienceChanges     TechnicalExperienceHistory[]      @relation("TechnicalExperienceChangedBy")
+  technicalEvidenceRecords       TechnicalEvidence[]               @relation("TechnicalEvidenceCreatedBy")
+  professionalRecords            Professional[]                    @relation("ProfessionalCreatedBy")
+  professionalChanges            ProfessionalHistory[]             @relation("ProfessionalChangedBy")
+  professionalLinks              ProfessionalLink[]                @relation("ProfessionalLinkCreatedBy")
+  complianceMatrixChanges        ComplianceMatrixHistory[]         @relation("ComplianceMatrixChangedBy")
+  complianceResponsibilities     ComplianceItemAssessment[]        @relation("ComplianceAssessmentResponsible")
+  complianceValidations          ComplianceItemAssessment[]        @relation("ComplianceAssessmentValidatedBy")
+  complianceExports              ComplianceMatrixExport[]          @relation("ComplianceExportedBy")
+  proposalChanges                ProposalHistory[]                 @relation("ProposalChangedBy")
+  proposalSectionAssignments     ProposalTechnicalSection[]        @relation("ProposalSectionResponsible")
+  proposalSectionChanges         ProposalTechnicalSectionHistory[] @relation("ProposalSectionChangedBy")
+  supportTicketsReported         SupportTicket[]                   @relation("SupportReportedBy")
+  supportTicketsAssigned         SupportTicket[]                   @relation("SupportAssignedTo")
+  supportTicketsResolved         SupportTicket[]                   @relation("SupportResolvedBy")
+  supportDecisions               SupportTicketDecision[]           @relation("SupportDecidedBy")
+  supportUpdates                 SupportTicketUpdate[]             @relation("SupportUpdatedBy")
+  accessRequestsMade             UserAccessRequest[]               @relation("AccessRequestRequestedBy")
+  accessRequestsDecided          UserAccessRequest[]               @relation("AccessRequestDecidedBy")
+  accessRequestsTargeted         UserAccessRequest[]               @relation("AccessRequestTargetUser")
+  createdAt                      DateTime                          @default(now()) @db.Timestamptz(6)
+  createdBy                      String                            @db.Uuid
+  updatedAt                      DateTime                          @updatedAt @db.Timestamptz(6)
+  updatedBy                      String                            @db.Uuid
 
   @@index([departmentId, status])
   @@index([isOwner, status])
+  @@index([teamsProvisioningStatus, status])
   @@index([displayName])
   @@map("users")
 }

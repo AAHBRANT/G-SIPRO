@@ -7,6 +7,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
+import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
 import { userAccessDisposition } from "@/modules/admin/user-access-authority";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
@@ -43,8 +44,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         await transaction.userProfile.create({ data: { userId, profileId, grantedBy: authorization.actorId, reason: "Provisionamento pelo painel administrativo" } });
         await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_PROVISIONED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, isMaster: input.isMaster, isOwner: input.isOwner, permissionCount: input.permissionIds.length } } });
       });
+      const teamsProvisioning = input.status === "ACTIVE"
+        ? await provisionTeamsAppForManagedUser({ userId, email: input.email, actorId: authorization.actorId, correlationId: context.correlationId })
+        : null;
       revalidatePath("/admin");
-      return NextResponse.json({ data: { id: userId }, correlationId: context.correlationId }, { status: 201 });
+      return NextResponse.json({ data: { id: userId, teamsProvisioning }, correlationId: context.correlationId }, { status: 201 });
     } catch (error) {
       return toApiError(error);
     }
