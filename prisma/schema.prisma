@@ -322,10 +322,13 @@ model User {
   createdBy                      String                            @db.Uuid
   updatedAt                      DateTime                          @updatedAt @db.Timestamptz(6)
   updatedBy                      String                            @db.Uuid
+  archivedAt                     DateTime?                         @db.Timestamptz(6)
+  archivedBy                     String?                           @db.Uuid
 
   @@index([departmentId, status])
   @@index([isOwner, status])
   @@index([teamsProvisioningStatus, status])
+  @@index([archivedAt])
   @@index([displayName])
   @@map("users")
 }
