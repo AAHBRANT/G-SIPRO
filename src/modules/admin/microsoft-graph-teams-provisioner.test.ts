@@ -61,6 +61,35 @@ describe("Microsoft Graph Teams provisioner", () => {
     await expect(installTeamsAppForUser("usuario@aahbrant.com")).resolves.toMatchObject({ status: "INSTALLED" });
   });
 
+  it("resolve o id interno do catálogo quando a configuração contém o id do manifesto", async () => {
+    configureEnvironment();
+    const catalogResourceId = "b1c5353a-7aca-41b3-830f-27d5218fe0e5";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token-seguro", expires_in: 3_600 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ value: [{ id: catalogResourceId, externalId: baseEnvironment.TEAMS_CATALOG_APP_ID }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(installTeamsAppForUser("usuario@aahbrant.com")).resolves.toMatchObject({ status: "INSTALLED", errorCode: null });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[2]?.[0]).toContain("externalId");
+    expect(fetchMock.mock.calls[3]?.[1]?.body).toContain(catalogResourceId);
+  });
+
+  it("orienta a permissão necessária quando o catálogo não pode ser consultado", async () => {
+    configureEnvironment();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token-seguro", expires_in: 3_600 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 })));
+
+    await expect(installTeamsAppForUser("usuario@aahbrant.com")).resolves.toMatchObject({
+      status: "FAILED",
+      errorCode: "GRAPH_APP_CATALOG_PERMISSION_REQUIRED",
+    });
+  });
+
   it("classifica falhas sem expor a resposta do provedor", () => {
     expect(classifyGraphFailure(403)).toBe("GRAPH_PERMISSION_REQUIRED");
     expect(classifyGraphFailure(404)).toBe("ENTRA_USER_NOT_FOUND");

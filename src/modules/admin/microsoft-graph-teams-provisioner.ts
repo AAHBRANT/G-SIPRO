@@ -19,6 +19,7 @@ export type TeamsProvisioningResult = {
 
 type TokenCache = { accessToken: string; expiresAt: number };
 let tokenCache: TokenCache | null = null;
+const catalogIdCache = new Map<string, string>();
 
 function getGraphConfiguration(): GraphConfiguration | null {
   const environment = getEnvironment();
@@ -76,29 +77,90 @@ export function classifyGraphFailure(status: number): string {
   return "GRAPH_INSTALLATION_FAILED";
 }
 
+async function resolveCatalogAppId(configuration: GraphConfiguration, accessToken: string): Promise<string> {
+  const cached = catalogIdCache.get(configuration.catalogAppId);
+  if (cached) return cached;
+  const query = new URLSearchParams({
+    "$filter": `externalId eq '${configuration.catalogAppId.replaceAll("'", "''")}'`,
+    "$select": "id,externalId,displayName,distributionMethod",
+  });
+  const response = await graphFetch(
+    `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?${query.toString()}`,
+    { method: "GET", headers: { authorization: `Bearer ${accessToken}` } },
+    configuration.timeoutMs,
+  );
+  if (response.status === 401 || response.status === 403) throw new GraphProvisioningError("GRAPH_APP_CATALOG_PERMISSION_REQUIRED");
+  if (!response.ok) throw new GraphProvisioningError("GRAPH_APP_CATALOG_LOOKUP_FAILED");
+  const payload = await response.json() as { value?: Array<{ id?: string }> };
+  const resolved = payload.value?.find((item) => typeof item.id === "string")?.id;
+  if (!resolved) throw new GraphProvisioningError("TEAMS_APP_NOT_PUBLISHED");
+  catalogIdCache.set(configuration.catalogAppId, resolved);
+  return resolved;
+}
+
+async function installUsingCatalogId(input: {
+  email: string;
+  catalogAppId: string;
+  accessToken: string;
+  timeoutMs: number;
+}): Promise<Response> {
+  return graphFetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(input.email)}/teamwork/installedApps`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${input.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${input.catalogAppId}`,
+      }),
+    },
+    input.timeoutMs,
+  );
+}
+
+function safeProvisioningMessage(errorCode: string): string {
+  const messages: Record<string, string> = {
+    GRAPH_APP_CATALOG_PERMISSION_REQUIRED: "O Microsoft Graph precisa da permissão AppCatalog.Read.All para localizar o aplicativo publicado no catálogo do Teams.",
+    GRAPH_APP_CATALOG_LOOKUP_FAILED: "O catálogo de aplicativos do Teams não respondeu. Tente novamente em alguns minutos.",
+    TEAMS_APP_NOT_PUBLISHED: "O G-SIPRO não foi localizado no catálogo corporativo do Teams. Confirme a publicação do aplicativo.",
+    GRAPH_PERMISSION_REQUIRED: "O Microsoft Graph recusou a instalação. Confirme o consentimento administrativo das permissões de instalação por usuário.",
+    ENTRA_USER_NOT_FOUND: "O usuário não foi localizado no Microsoft Entra ID. Confirme o e-mail corporativo e a existência da conta.",
+    TEAMS_APP_CONFIGURATION_INVALID: "O identificador do aplicativo do Teams está incorreto ou ainda não foi propagado no catálogo.",
+    GRAPH_TEMPORARY_FAILURE: "O Microsoft Graph está temporariamente indisponível. A tentativa pode ser repetida.",
+    GRAPH_TIMEOUT: "O Microsoft Graph excedeu o tempo de resposta. A tentativa pode ser repetida.",
+  };
+  return messages[errorCode] ?? "A instalação no Microsoft Teams não foi concluída. Consulte o código seguro apresentado.";
+}
+
 export async function installTeamsAppForUser(email: string): Promise<TeamsProvisioningResult> {
   const configuration = getGraphConfiguration();
   if (!configuration) return { status: "NOT_CONFIGURED", errorCode: "GRAPH_NOT_CONFIGURED", message: "Integração do Microsoft Teams ainda não configurada." };
   try {
     const accessToken = await getApplicationToken(configuration);
-    const response = await graphFetch(
-      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}/teamwork/installedApps`,
-      {
-        method: "POST",
-        headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          "teamsApp@odata.bind": `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${configuration.catalogAppId}`,
-        }),
-      },
-      configuration.timeoutMs,
-    );
+    let response = await installUsingCatalogId({
+      email,
+      catalogAppId: configuration.catalogAppId,
+      accessToken,
+      timeoutMs: configuration.timeoutMs,
+    });
+    if (response.status === 400 || response.status === 404) {
+      const resolvedCatalogAppId = await resolveCatalogAppId(configuration, accessToken);
+      if (resolvedCatalogAppId !== configuration.catalogAppId) {
+        response = await installUsingCatalogId({
+          email,
+          catalogAppId: resolvedCatalogAppId,
+          accessToken,
+          timeoutMs: configuration.timeoutMs,
+        });
+      }
+    }
     if (response.ok || response.status === 409) {
       return { status: "INSTALLED", errorCode: null, message: response.status === 409 ? "O aplicativo já estava instalado para este usuário." : "Aplicativo instalado automaticamente no Microsoft Teams." };
     }
-    return { status: "FAILED", errorCode: classifyGraphFailure(response.status), message: "Usuário cadastrado; a instalação no Teams será tentada novamente." };
+    const errorCode = classifyGraphFailure(response.status);
+    return { status: "FAILED", errorCode, message: safeProvisioningMessage(errorCode) };
   } catch (error) {
     const errorCode = error instanceof GraphProvisioningError ? error.safeCode : error instanceof DOMException && error.name === "AbortError" ? "GRAPH_TIMEOUT" : "GRAPH_UNAVAILABLE";
-    return { status: "FAILED", errorCode, message: "Usuário cadastrado; o Microsoft Graph está temporariamente indisponível." };
+    return { status: "FAILED", errorCode, message: safeProvisioningMessage(errorCode) };
   }
 }
 
@@ -149,4 +211,5 @@ export async function provisionTeamsAppForManagedUser(input: {
 
 export function resetMicrosoftGraphTokenCache(): void {
   tokenCache = null;
+  catalogIdCache.clear();
 }

@@ -66,3 +66,68 @@ export async function PATCH(request: Request, route: { params: Promise<{ id: str
     }
   });
 }
+
+export async function DELETE(request: Request, route: { params: Promise<{ id: string }> }): Promise<NextResponse> {
+  const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
+  return runWithRequestContext(context, async () => {
+    try {
+      const authorization = await requireMaster();
+      const userId = z.uuid().parse((await route.params).id);
+      if (userId === authorization.actorId) throw new ConflictError("Você não pode excluir o próprio usuário.");
+      const database = getDatabase();
+      const current = await database.user.findUnique({
+        where: { id: userId },
+        select: { id: true, displayName: true, email: true, status: true, isMaster: true, isOwner: true, archivedAt: true },
+      });
+      if (!current || current.archivedAt) throw new ResourceNotFoundError("Usuário não encontrado.");
+      if ((current.isMaster || current.isOwner) && !authorization.isOwner) {
+        throw new ConflictError("Somente o proprietário pode excluir usuários mestres ou proprietários.");
+      }
+      if (current.isMaster && current.status === "ACTIVE") {
+        const otherMasters = await database.user.count({ where: { isMaster: true, status: "ACTIVE", archivedAt: null, id: { not: userId } } });
+        if (!otherMasters) throw new ConflictError("O sistema deve manter pelo menos um usuário mestre ativo.");
+      }
+      if (current.isOwner && current.status === "ACTIVE") {
+        const otherOwners = await database.user.count({ where: { isOwner: true, status: "ACTIVE", archivedAt: null, id: { not: userId } } });
+        if (!otherOwners) throw new ConflictError("O sistema deve manter pelo menos um proprietário ativo.");
+      }
+      const now = new Date();
+      await database.$transaction(async transaction => {
+        await transaction.user.update({
+          where: { id: userId },
+          data: {
+            status: "INACTIVE",
+            archivedAt: now,
+            archivedBy: authorization.actorId,
+            updatedBy: authorization.actorId,
+          },
+        });
+        await transaction.userProfile.updateMany({
+          where: { userId, validTo: null },
+          data: { validTo: now },
+        });
+        await transaction.auditEvent.create({
+          data: {
+            id: randomUUID(),
+            actorType: "USER",
+            actorId: authorization.actorId,
+            action: "USER_ARCHIVED",
+            entityType: "USER",
+            entityId: userId,
+            correlationId: context.correlationId,
+            outcome: "SUCCESS",
+            origin: "admin-user-management",
+            metadata: { displayName: current.displayName, email: current.email, previousStatus: current.status },
+          },
+        });
+      });
+      revalidatePath("/admin");
+      return NextResponse.json({
+        data: { id: userId, message: "Usuário excluído, acessos revogados e histórico preservado para auditoria." },
+        correlationId: context.correlationId,
+      });
+    } catch (error) {
+      return toApiError(error);
+    }
+  });
+}
