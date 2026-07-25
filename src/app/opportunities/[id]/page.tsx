@@ -304,15 +304,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               )}
             </section>
 
-            {canReadAnalytics && <IntelligencePanel
-              analysis={analysis}
-              canCalculate={canCalculateAnalytics}
-              canReadFinancial={canReadFinancial}
-              integrationReadiness={integrationReadiness}
-              mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
-              opportunityCode={record.code}
-              opportunityId={record.id}
-            />}
           </div>
         }
         documents={
@@ -336,6 +327,17 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             </div>
           </section>
         }
+        analytics={canReadAnalytics ? (
+          <IntelligencePanel
+            analysis={analysis}
+            canCalculate={canCalculateAnalytics}
+            canReadFinancial={canReadFinancial}
+            integrationReadiness={integrationReadiness}
+            mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
+            opportunityCode={record.code}
+            opportunityId={record.id}
+          />
+        ) : undefined}
       />
     </main>
   );

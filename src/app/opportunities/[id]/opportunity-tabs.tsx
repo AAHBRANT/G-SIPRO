@@ -5,11 +5,13 @@ import { useState, type ReactNode } from "react";
 export function OpportunityTabs({
   summary,
   documents,
+  analytics,
 }: {
   summary: ReactNode;
   documents: ReactNode;
+  analytics?: ReactNode;
 }) {
-  const [active, setActive] = useState<"summary" | "documents">("summary");
+  const [active, setActive] = useState<"summary" | "documents" | "analytics">("summary");
 
   return (
     <div>
@@ -30,10 +32,23 @@ export function OpportunityTabs({
           role="tab"
           type="button"
         >
-          Documentos e análises
+          Documentos
         </button>
+        {analytics && (
+          <button
+            aria-selected={active === "analytics"}
+            className={`border-b-2 px-4 py-3 text-sm font-bold transition ${active === "analytics" ? "border-brand text-brand" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            onClick={() => setActive("analytics")}
+            role="tab"
+            type="button"
+          >
+            Modo analítico
+          </button>
+        )}
       </div>
-      <div role="tabpanel">{active === "summary" ? summary : documents}</div>
+      <div role="tabpanel">
+        {active === "summary" ? summary : active === "documents" ? documents : analytics}
+      </div>
     </div>
   );
 }
