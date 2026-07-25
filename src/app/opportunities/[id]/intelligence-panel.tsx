@@ -254,12 +254,18 @@ export function IntelligencePanel({
   ) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const latitude = form.get("latitude")?.toString().trim();
+    const longitude = form.get("longitude")?.toString().trim();
+    if (!latitude || !longitude) {
+      setMessage("Localize a cidade ou o endereço antes de executar o estudo. Se necessário, utilize a localização avançada.");
+      return;
+    }
     const payload = stage === "CLIMATE"
       ? {
           climateContext: {
             locationLabel: form.get("locationLabel"),
-            latitude: Number(form.get("latitude")),
-            longitude: Number(form.get("longitude")),
+            latitude: Number(latitude),
+            longitude: Number(longitude),
             workStart: form.get("workStart"),
             workEnd: form.get("workEnd"),
           },
@@ -267,8 +273,8 @@ export function IntelligencePanel({
       : {
           routeDestination: {
             label: form.get("locationLabel"),
-            latitude: Number(form.get("latitude")),
-            longitude: Number(form.get("longitude")),
+            latitude: Number(latitude),
+            longitude: Number(longitude),
             travelMode: "DRIVE",
           },
         };
@@ -525,7 +531,36 @@ function PendingDetail({ analysis }: { analysis: IntelligenceAnalysisView | null
 }
 
 function ContextForm({ busy, buttonLabel, defaults, onSubmit, showDates = false }: { busy: boolean; buttonLabel: string; defaults: AnalysisContextDefaults; onSubmit: (event: FormEvent<HTMLFormElement>) => void; showDates?: boolean }) {
-  return <form className="rounded-xl border border-slate-200 bg-slate-50 p-5" onSubmit={onSubmit}><h3 className="font-black text-slate-900">Dados do local da obra</h3><p className="mt-1 text-xs text-slate-500">{defaults.sources.length > 0 ? `O sistema preencheu sugestões encontradas em: ${defaults.sources.join(", ")}. Confirme os dados antes da consulta.` : "Informe dados confirmados. O sistema não presume localização ou período."}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-slate-700 sm:col-span-2">Local<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.locationLabel} maxLength={255} name="locationLabel" placeholder="Cidade/UF ou endereço da obra" required/></label><label className="grid gap-1 text-xs font-bold text-slate-700">Latitude<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.latitude} max="90" min="-90" name="latitude" placeholder="-23.5505" required step="0.0000001" type="number"/></label><label className="grid gap-1 text-xs font-bold text-slate-700">Longitude<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.longitude} max="180" min="-180" name="longitude" placeholder="-46.6333" required step="0.0000001" type="number"/></label>{showDates && <><label className="grid gap-1 text-xs font-bold text-slate-700">Início previsto<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.workStart} name="workStart" required type="date"/></label><label className="grid gap-1 text-xs font-bold text-slate-700">Fim previsto<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.workEnd} name="workEnd" required type="date"/></label></>}</div><button className="mt-4 rounded-lg bg-brand px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={busy}>{busy ? "Processando…" : buttonLabel}</button></form>;
+  const [locationLabel, setLocationLabel] = useState<string>(defaults.locationLabel ?? "");
+  const [latitude, setLatitude] = useState<string>(defaults.latitude?.toString() ?? "");
+  const [longitude, setLongitude] = useState<string>(defaults.longitude?.toString() ?? "");
+  const [searching, setSearching] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
+
+  async function locateAddress() {
+    if (locationLabel.trim().length < 2) {
+      setLocationMessage("Informe ao menos a cidade e o estado.");
+      return;
+    }
+    setSearching(true);
+    setLocationMessage("Localizando endereço…");
+    const response = await fetch(`/api/geocoding?address=${encodeURIComponent(locationLabel)}`);
+    const result = await response.json().catch(() => ({})) as {
+      data?: { formattedAddress: string; latitude: number; longitude: number; precision: string };
+      error?: { message?: string };
+    };
+    setSearching(false);
+    if (!response.ok || !result.data) {
+      setLocationMessage(result.error?.message ?? "Não foi possível localizar o endereço.");
+      return;
+    }
+    setLocationLabel(result.data.formattedAddress);
+    setLatitude(result.data.latitude.toString());
+    setLongitude(result.data.longitude.toString());
+    setLocationMessage(`Local confirmado: ${result.data.formattedAddress}.`);
+  }
+
+  return <form className="rounded-xl border border-slate-200 bg-slate-50 p-5" onSubmit={onSubmit}><h3 className="font-black text-slate-900">Local da obra</h3><p className="mt-1 text-xs text-slate-500">{defaults.sources.length > 0 ? `Sugestão encontrada nos documentos desta oportunidade: ${defaults.sources.join(", ")}. Confirme o local antes da consulta.` : "Pesquise pela cidade ou pelo endereço informado no edital."}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-slate-700 sm:col-span-2">Cidade ou endereço da obra<div className="flex flex-col gap-2 sm:flex-row"><input className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" maxLength={500} name="locationLabel" onChange={(event) => { setLocationLabel(event.target.value); setLatitude(""); setLongitude(""); setLocationMessage(""); }} placeholder="Ex.: Gravataí/RS ou endereço completo do edital" required value={locationLabel}/><button className="shrink-0 rounded-lg border border-brand bg-white px-4 py-2 text-xs font-bold text-brand disabled:opacity-50" disabled={searching} onClick={locateAddress} type="button">{searching ? "Localizando…" : "Localizar"}</button></div></label>{locationMessage && <p aria-live="polite" className="sm:col-span-2 text-xs font-semibold text-slate-600" role="status">{locationMessage}</p>}<details className="rounded-lg border border-slate-200 bg-white sm:col-span-2"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-slate-700">Localização avançada · latitude e longitude</summary><div className="grid gap-3 border-t border-slate-100 p-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-slate-700">Latitude<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" max="90" min="-90" name="latitude" onChange={(event) => setLatitude(event.target.value)} placeholder="-29.9448" step="0.0000001" type="number" value={latitude}/></label><label className="grid gap-1 text-xs font-bold text-slate-700">Longitude<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" max="180" min="-180" name="longitude" onChange={(event) => setLongitude(event.target.value)} placeholder="-50.9919" step="0.0000001" type="number" value={longitude}/></label><p className="text-[10px] leading-4 text-slate-500 sm:col-span-2">Use somente quando a busca por cidade/endereço não oferecer precisão suficiente.</p></div></details>{showDates && <><label className="grid gap-1 text-xs font-bold text-slate-700">Início previsto<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.workStart} name="workStart" required type="date"/></label><label className="grid gap-1 text-xs font-bold text-slate-700">Fim previsto<input className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={defaults.workEnd} name="workEnd" required type="date"/></label></>}</div><button className="mt-4 rounded-lg bg-brand px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={busy}>{busy ? "Processando…" : buttonLabel}</button></form>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {

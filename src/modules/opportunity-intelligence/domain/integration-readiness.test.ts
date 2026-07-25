@@ -32,4 +32,13 @@ describe("evaluateIntelligenceIntegrationReadiness", () => {
     expect(result.find(({ code }) => code === "GOOGLE_ROUTES")?.status).toBe("READY");
     expect(result.find(({ code }) => code === "GOOGLE_MAPS")?.status).toBe("OWNER_ACTION_REQUIRED");
   });
+
+  it("apresenta a busca de endereço como configuração independente", () => {
+    const result = evaluateIntelligenceIntegrationReadiness({
+      GOOGLE_ROUTES_API_KEY: "route-key",
+      GOOGLE_GEOCODING_API_KEY: "geocoding-key",
+    });
+
+    expect(result.find(({ code }) => code === "GOOGLE_GEOCODING")?.status).toBe("READY");
+  });
 });

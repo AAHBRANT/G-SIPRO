@@ -1,6 +1,7 @@
 export type IntelligenceIntegrationCode =
   | "CLIMATE"
   | "GOOGLE_ROUTES"
+  | "GOOGLE_GEOCODING"
   | "GOOGLE_MAPS"
   | "TEAMS_ACTIVITY"
   | "EMAIL";
@@ -28,6 +29,13 @@ export function evaluateIntelligenceIntegrationReadiness(
       required: ["CLIMATE_API_BASE_URL"],
       nextAction: "Contratar ou aprovar o provedor climático e registrar a URL da API no Azure.",
       responsible: "PROPRIETARIO" as const,
+    },
+    {
+      code: "GOOGLE_GEOCODING" as const,
+      label: "Busca de cidade/endereço",
+      required: ["GOOGLE_GEOCODING_API_KEY"],
+      nextAction: "Criar uma chave de servidor restrita à Geocoding API para converter cidade ou endereço em coordenadas.",
+      responsible: "ADMINISTRADOR_CLOUD" as const,
     },
     {
       code: "GOOGLE_ROUTES" as const,
