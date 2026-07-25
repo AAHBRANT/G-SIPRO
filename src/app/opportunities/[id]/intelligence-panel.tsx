@@ -46,6 +46,11 @@ export type RouteAlternativeView = Readonly<{
   condition: string;
   distanceKm?: number;
   durationHours?: number;
+  tolls: readonly {
+    currencyCode: string;
+    units: string;
+    nanos: number;
+  }[];
 }>;
 
 export type RouteView = Readonly<{
@@ -149,6 +154,18 @@ function buildMapsUrl(route: RouteView, alternative?: RouteAlternativeView) {
   if (!alternative) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
   const origin = `${alternative.origin.latitude},${alternative.origin.longitude}`;
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+}
+
+export function formatRouteTolls(tolls: RouteAlternativeView["tolls"]) {
+  if (tolls.length === 0) return "Não informado";
+  const totals = new Map<string, number>();
+  for (const toll of tolls) {
+    const value = Number(toll.units) + toll.nanos / 1_000_000_000;
+    totals.set(toll.currencyCode, (totals.get(toll.currencyCode) ?? 0) + value);
+  }
+  return [...totals.entries()]
+    .map(([currency, value]) => value.toLocaleString("pt-BR", { style: "currency", currency }))
+    .join(" + ");
 }
 
 export function IntelligencePanel({
@@ -421,7 +438,7 @@ function LogisticsDetail({ analysis, canCalculate, busy, mapsEmbedKey, onSubmit 
   const route = analysis?.route;
   const best = route?.alternatives.filter((item) => item.condition === "ROUTE_EXISTS").sort((left, right) => (left.distanceKm ?? Infinity) - (right.distanceKm ?? Infinity))[0];
   const embedUrl = route && best && mapsEmbedKey ? `https://www.google.com/maps/embed/v1/directions?key=${encodeURIComponent(mapsEmbedKey)}&origin=${best.origin.latitude},${best.origin.longitude}&destination=${route.destinationLat},${route.destinationLng}&mode=driving` : undefined;
-  return <div className="space-y-6">{route ? <><section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><div className="relative grid min-h-72 place-items-center">{embedUrl ? <iframe allowFullScreen className="h-80 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={embedUrl} title={`Rota para ${route.destinationLabel}`}/> : <div className="px-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-brand shadow"><GsIcon name="target"/></span><h3 className="mt-4 font-black text-slate-900">{route.destinationLabel}</h3><p className="mt-2 max-w-md text-xs leading-5 text-slate-500">A rota foi calculada. Configure a chave de navegador restrita para exibir o mapa incorporado ou abra diretamente no Google Maps.</p>{best && <a className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white" href={buildMapsUrl(route, best)} rel="noreferrer" target="_blank">Abrir rota no Google Maps</a>}</div>}</div></section><section className="rounded-xl border border-slate-200"><header className="border-b border-slate-100 px-4 py-3"><h3 className="font-black text-slate-900">Alternativas de mobilização</h3></header><div className="divide-y divide-slate-100">{route.alternatives.map((item) => <article className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center" key={item.baseId}><div><p className="font-bold text-slate-900">{item.baseCode} · {item.baseName}</p><p className="text-xs text-slate-500">{item.baseLocality}</p></div><MiniMetric label="Distância" value={item.distanceKm === undefined ? "Sem rota" : `${item.distanceKm.toLocaleString("pt-BR")} km`}/><MiniMetric label="Duração" value={item.durationHours === undefined ? "—" : `${item.durationHours.toLocaleString("pt-BR")} h`}/><a aria-label={`Abrir rota da base ${item.baseName}`} className="text-xs font-bold text-brand hover:underline" href={buildMapsUrl(route, item)} rel="noreferrer" target="_blank">Visualizar</a></article>)}</div></section></> : <EmptyDetail text="Ainda não há estudo logístico. Cadastre pelo menos uma base operacional e informe as coordenadas do local da obra."/>}{canCalculate && <ContextForm busy={busy} buttonLabel="Calcular rotas" onSubmit={onSubmit}/>}</div>;
+  return <div className="space-y-6">{route ? <><section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><div className="relative grid min-h-72 place-items-center">{embedUrl ? <iframe allowFullScreen className="h-80 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={embedUrl} title={`Rota para ${route.destinationLabel}`}/> : <div className="px-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-brand shadow"><GsIcon name="target"/></span><h3 className="mt-4 font-black text-slate-900">{route.destinationLabel}</h3><p className="mt-2 max-w-md text-xs leading-5 text-slate-500">A rota foi calculada. Configure a chave de navegador restrita para exibir o mapa incorporado ou abra diretamente no Google Maps.</p>{best && <a className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white" href={buildMapsUrl(route, best)} rel="noreferrer" target="_blank">Abrir rota no Google Maps</a>}</div>}</div></section><section className="rounded-xl border border-slate-200"><header className="border-b border-slate-100 px-4 py-3"><h3 className="font-black text-slate-900">Alternativas de mobilização</h3></header><div className="divide-y divide-slate-100">{route.alternatives.map((item) => <article className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-center" key={item.baseId}><div><p className="font-bold text-slate-900">{item.baseCode} · {item.baseName}</p><p className="text-xs text-slate-500">{item.baseLocality}</p></div><MiniMetric label="Distância" value={item.distanceKm === undefined ? "Sem rota" : `${item.distanceKm.toLocaleString("pt-BR")} km`}/><MiniMetric label="Duração" value={item.durationHours === undefined ? "—" : `${item.durationHours.toLocaleString("pt-BR")} h`}/><MiniMetric label="Pedágios" value={formatRouteTolls(item.tolls)}/><a aria-label={`Abrir rota da base ${item.baseName}`} className="text-xs font-bold text-brand hover:underline" href={buildMapsUrl(route, item)} rel="noreferrer" target="_blank">Visualizar</a></article>)}</div></section></> : <EmptyDetail text="Ainda não há estudo logístico. Cadastre pelo menos uma base operacional e informe as coordenadas do local da obra."/>}{canCalculate && <ContextForm busy={busy} buttonLabel="Calcular rotas" onSubmit={onSubmit}/>}</div>;
 }
 
 function FinancialDetail({ analysis, canCalculate, canReadFinancial, busy, onRun }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; canReadFinancial: boolean; busy: boolean; onRun: () => void }) {

@@ -33,6 +33,11 @@ const routeAlternativesSchema = z.array(z.object({
   condition: z.string(),
   distanceKm: z.number().optional(),
   durationHours: z.number().optional(),
+  tolls: z.array(z.object({
+    currencyCode: z.string(),
+    units: z.string(),
+    nanos: z.number(),
+  })).catch([]),
 }).passthrough());
 
 function localDateTime(value: Date | null): string | undefined {
