@@ -25,6 +25,9 @@ export default async function RootLayout({
         getDatabase().intelligencePolicy.count({ where: { approval: null } }),
       ])).reduce((total, count) => total + count, 0)
     : 0;
+  const unreadNotifications = authorization?.permissions.has("notifications.read")
+    ? await getDatabase().userNotification.count({ where: { recipientId: authorization.actorId, readAt: null } })
+    : 0;
   async function signOutAction() {
     "use server";
     await signOut({ redirectTo: "/" });
@@ -32,7 +35,7 @@ export default async function RootLayout({
 
   return (
     <html lang="pt-BR" className="h-full antialiased">
-      <body className="min-h-full"><AppShell isMaster={authorization?.isMaster} isOwner={authorization?.isOwner} pendingApprovals={pendingApprovals} permissions={permissions} userLabel={userLabel} signOutAction={signOutAction}>{children}</AppShell></body>
+      <body className="min-h-full"><AppShell isMaster={authorization?.isMaster} isOwner={authorization?.isOwner} pendingApprovals={pendingApprovals} permissions={permissions} unreadNotifications={unreadNotifications} userLabel={userLabel} signOutAction={signOutAction}>{children}</AppShell></body>
     </html>
   );
 }
