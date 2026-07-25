@@ -14,6 +14,7 @@ const transitionSchema = z.object({
   closureReasonCode: z.string().trim().min(1).max(80).optional(),
   closureJustification: z.string().trim().min(1).max(1000).optional(),
   reason: z.string().trim().min(1).max(1000).optional(),
+  ownerId: z.uuid().optional(),
 });
 
 export async function POST(request: Request, route: { params: Promise<{ id: string }> }): Promise<NextResponse> {

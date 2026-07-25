@@ -79,12 +79,12 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     })),
   }));
 
-  const canCreate = authorize(authorization, { permission: "proposals.create" }).allowed;
+  const canCreate = false;
   const documentTypes: ProposalDocumentType[] = ["EDITAL", "TERMO_REFERENCIA", "ESTUDO_TECNICO_PRELIMINAR", "ANEXO_EDITAL", "OUTRO"];
   const extractionDefinitions: ProposalExtractionDefinitions = {};
   if (authorize(authorization, { permission: "ai.execute" }).allowed) {
     for (const type of documentTypes) {
-      const permittedForType = (item: (typeof useCases)[number]) => Array.isArray(item.authorizedSources) && (item.authorizedSources as Array<{ documentType?: string; requiredPermission?: string }>).some((source) => source.documentType === type && typeof source.requiredPermission === "string" && authorization?.permissions.has(source.requiredPermission));
+      const permittedForType = (item: (typeof useCases)[number]) => Array.isArray(item.authorizedSources) && (item.authorizedSources as Array<{ documentType?: string; requiredPermission?: string }>).some((source) => source.documentType === type && typeof source.requiredPermission === "string" && authorize(authorization, { permission: source.requiredPermission }).allowed);
       const useCase = useCases.find((item) => item.code === "GSIPRO_ANALISE_EDITAL_TR_ETP" && permittedForType(item)) ?? useCases.find(permittedForType);
       if (useCase) extractionDefinitions[type] = useCase.id;
     }
@@ -112,6 +112,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
         users={users.map((user) => ({ id: user.id, label: user.displayName }))}
         extractionDefinitions={extractionDefinitions}
         canCreate={canCreate}
+        canUploadDocuments={authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed}
         canManageStatus={authorize(authorization, { permission: "proposals.manage-status" }).allowed}
         canDelete={authorize(authorization, { permission: "proposals.delete" }).allowed}
       />

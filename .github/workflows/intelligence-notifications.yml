@@ -1,0 +1,32 @@
+name: G-SIPRO Intelligence Notifications
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+concurrency:
+  group: gsipro-intelligence-notifications
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    env:
+      GSIPRO_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+      NOTIFICATION_DISPATCH_TOKEN: ${{ secrets.NOTIFICATION_DISPATCH_TOKEN }}
+    steps:
+      - name: Dispatch pending notifications
+        run: |
+          set -euo pipefail
+          test -n "$NOTIFICATION_DISPATCH_TOKEN"
+          echo "::add-mask::$NOTIFICATION_DISPATCH_TOKEN"
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${NOTIFICATION_DISPATCH_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"limit":50}' \
+            "${GSIPRO_URL}/api/notifications/dispatch"

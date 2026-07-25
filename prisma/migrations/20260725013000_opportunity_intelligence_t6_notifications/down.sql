@@ -1,0 +1,9 @@
+DELETE FROM profile_permissions WHERE "permissionId"='e5900000-0000-4000-8000-000000000012';
+DELETE FROM permissions WHERE id='e5900000-0000-4000-8000-000000000012';
+DROP TABLE IF EXISTS notification_deliveries;
+DROP TABLE IF EXISTS user_notifications;
+DROP TABLE IF EXISTS notification_outbox_events;
+DROP TYPE IF EXISTS "NotificationDeliveryStatus";
+DROP TYPE IF EXISTS "NotificationChannel";
+DROP TYPE IF EXISTS "NotificationOutboxStatus";
+DROP TYPE IF EXISTS "IntelligenceNotificationType";

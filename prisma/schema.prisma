@@ -22,6 +22,38 @@ enum TeamsProvisioningStatus {
   FAILED
 }
 
+enum IntelligenceNotificationType {
+  ANALYSIS_COMPLETED
+  RECOMMENDATION_CHANGED
+  INFORMATION_REQUESTED
+  IMPEDIMENT_DETECTED
+  OWNER_DECISION_REQUIRED
+  DECISION_RECORDED
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  RETRY
+  SENT
+  PARTIAL
+  FAILED
+}
+
+enum NotificationChannel {
+  PANEL
+  TEAMS
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  ACCEPTED
+  SKIPPED
+  RETRY
+  FAILED
+}
+
 enum UserAccessRequestAction {
   CREATE
   UPDATE
@@ -318,6 +350,8 @@ model User {
   accessRequestsMade             UserAccessRequest[]               @relation("AccessRequestRequestedBy")
   accessRequestsDecided          UserAccessRequest[]               @relation("AccessRequestDecidedBy")
   accessRequestsTargeted         UserAccessRequest[]               @relation("AccessRequestTargetUser")
+  intelligenceOutboxEvents       NotificationOutboxEvent[]         @relation("IntelligenceNotificationRecipient")
+  intelligenceNotifications      UserNotification[]
   createdAt                      DateTime                          @default(now()) @db.Timestamptz(6)
   createdBy                      String                            @db.Uuid
   updatedAt                      DateTime                          @updatedAt @db.Timestamptz(6)
@@ -356,15 +390,16 @@ model UserAccessRequest {
 }
 
 model Customer {
-  id            String        @id @default(uuid()) @db.Uuid
-  name          String        @db.VarChar(200)
-  identifiers   Json?
-  active        Boolean       @default(true)
-  opportunities Opportunity[]
-  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
-  createdBy     String        @db.Uuid
-  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
-  updatedBy     String        @db.Uuid
+  id                 String                      @id @default(uuid()) @db.Uuid
+  name               String                      @db.VarChar(200)
+  identifiers        Json?
+  active             Boolean                     @default(true)
+  opportunities      Opportunity[]
+  paymentAssessments CustomerPaymentAssessment[]
+  createdAt          DateTime                    @default(now()) @db.Timestamptz(6)
+  createdBy          String                      @db.Uuid
+  updatedAt          DateTime                    @updatedAt @db.Timestamptz(6)
+  updatedBy          String                      @db.Uuid
 
   @@index([name])
   @@index([active])
@@ -372,18 +407,19 @@ model Customer {
 }
 
 model ContractingAuthority {
-  id            String        @id @default(uuid()) @db.Uuid
-  name          String        @db.VarChar(200)
-  sphere        String?       @db.VarChar(80)
-  locality      String?       @db.VarChar(160)
-  identifiers   Json?
-  active        Boolean       @default(true)
-  opportunities Opportunity[]
-  tenders       Tender[]
-  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
-  createdBy     String        @db.Uuid
-  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
-  updatedBy     String        @db.Uuid
+  id                 String                      @id @default(uuid()) @db.Uuid
+  name               String                      @db.VarChar(200)
+  sphere             String?                     @db.VarChar(80)
+  locality           String?                     @db.VarChar(160)
+  identifiers        Json?
+  active             Boolean                     @default(true)
+  opportunities      Opportunity[]
+  tenders            Tender[]
+  paymentAssessments CustomerPaymentAssessment[]
+  createdAt          DateTime                    @default(now()) @db.Timestamptz(6)
+  createdBy          String                      @db.Uuid
+  updatedAt          DateTime                    @updatedAt @db.Timestamptz(6)
+  updatedBy          String                      @db.Uuid
 
   @@index([name])
   @@index([active])
@@ -391,41 +427,469 @@ model ContractingAuthority {
 }
 
 model Opportunity {
-  id                     String                @id @default(uuid()) @db.Uuid
-  code                   String                @unique @db.VarChar(50)
+  id                     String                        @id @default(uuid()) @db.Uuid
+  code                   String                        @unique @db.VarChar(50)
   origin                 OpportunityOrigin
-  subject                String?               @db.Text
-  customerId             String?               @db.Uuid
-  customer               Customer?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  contractingAuthorityId String?               @db.Uuid
-  contractingAuthority   ContractingAuthority? @relation(fields: [contractingAuthorityId], references: [id], onDelete: Restrict)
-  estimatedValue         Decimal?              @db.Decimal(19, 4)
-  currency               String?               @db.Char(3)
-  valueSource            String?               @db.VarChar(300)
-  publishedAt            DateTime?             @db.Timestamptz(6)
-  deliveryAt             DateTime?             @db.Timestamptz(6)
-  datesSource            String?               @db.VarChar(300)
-  datesTimeZone          String?               @db.VarChar(80)
-  ownerId                String?               @db.Uuid
-  owner                  User?                 @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  status                 OpportunityStatus     @default(DRAFT)
-  closureReasonCode      String?               @db.VarChar(80)
-  closureJustification   String?               @db.VarChar(1000)
-  closedAt               DateTime?             @db.Timestamptz(6)
-  version                Int                   @default(1)
+  subject                String?                       @db.Text
+  customerId             String?                       @db.Uuid
+  customer               Customer?                     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  contractingAuthorityId String?                       @db.Uuid
+  contractingAuthority   ContractingAuthority?         @relation(fields: [contractingAuthorityId], references: [id], onDelete: Restrict)
+  estimatedValue         Decimal?                      @db.Decimal(19, 4)
+  currency               String?                       @db.Char(3)
+  valueSource            String?                       @db.VarChar(300)
+  publishedAt            DateTime?                     @db.Timestamptz(6)
+  deliveryAt             DateTime?                     @db.Timestamptz(6)
+  datesSource            String?                       @db.VarChar(300)
+  datesTimeZone          String?                       @db.VarChar(80)
+  ownerId                String?                       @db.Uuid
+  owner                  User?                         @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  status                 OpportunityStatus             @default(DRAFT)
+  closureReasonCode      String?                       @db.VarChar(80)
+  closureJustification   String?                       @db.VarChar(1000)
+  closedAt               DateTime?                     @db.Timestamptz(6)
+  version                Int                           @default(1)
   history                OpportunityHistory[]
   tenders                Tender[]
   proposals              Proposal[]
-  createdAt              DateTime              @default(now()) @db.Timestamptz(6)
-  createdBy              String                @db.Uuid
-  updatedAt              DateTime              @updatedAt @db.Timestamptz(6)
-  updatedBy              String                @db.Uuid
+  intelligenceAnalyses   OpportunityAnalysis[]
+  financialAssessments   FinancialCapacityAssessment[]
+  notificationEvents     NotificationOutboxEvent[]
+  createdAt              DateTime                      @default(now()) @db.Timestamptz(6)
+  createdBy              String                        @db.Uuid
+  updatedAt              DateTime                      @updatedAt @db.Timestamptz(6)
+  updatedBy              String                        @db.Uuid
 
   @@index([status, deliveryAt])
   @@index([ownerId, status])
   @@index([customerId, status])
   @@index([contractingAuthorityId, status])
   @@map("opportunities")
+}
+
+model IntelligencePolicy {
+  id                String                      @id @default(uuid()) @db.Uuid
+  policyKey         String                      @db.Uuid
+  version           Int
+  previousVersionId String?                     @db.Uuid
+  previousVersion   IntelligencePolicy?         @relation("IntelligencePolicyChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions      IntelligencePolicy[]        @relation("IntelligencePolicyChain")
+  code              String                      @db.VarChar(80)
+  name              String                      @db.VarChar(200)
+  purpose           String                      @db.VarChar(1000)
+  dimensions        Json
+  weights           Json
+  thresholds        Json
+  impedimentRules   Json
+  authorizedSources Json
+  coverageMinimum   Decimal                     @db.Decimal(5, 2)
+  effectiveFrom     DateTime                    @db.Date
+  changeReason      String                      @db.VarChar(1000)
+  approval          IntelligencePolicyApproval?
+  analyses          OpportunityAnalysis[]
+  createdAt         DateTime                    @default(now()) @db.Timestamptz(6)
+  createdBy         String                      @db.Uuid
+  correlationId     String                      @db.Uuid
+
+  @@unique([policyKey, version])
+  @@index([code, effectiveFrom])
+  @@index([previousVersionId])
+  @@map("intelligence_policies")
+}
+
+model IntelligencePolicyApproval {
+  id            String             @id @default(uuid()) @db.Uuid
+  policyId      String             @unique @db.Uuid
+  policy        IntelligencePolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  note          String             @db.VarChar(1000)
+  approvedAt    DateTime           @db.Timestamptz(6)
+  approvedBy    String             @db.Uuid
+  correlationId String             @db.Uuid
+  createdAt     DateTime           @default(now()) @db.Timestamptz(6)
+
+  @@index([approvedAt])
+  @@map("intelligence_policy_approvals")
+}
+
+model OpportunityAnalysis {
+  id                 String                        @id @default(uuid()) @db.Uuid
+  opportunityId      String                        @db.Uuid
+  opportunity        Opportunity                   @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  policyId           String                        @db.Uuid
+  policy             IntelligencePolicy            @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  version            Int
+  type               OpportunityAnalysisType
+  status             OpportunityAnalysisStatus     @default(QUEUED)
+  inputHash          String                        @db.Char(64)
+  score              Decimal?                      @db.Decimal(7, 4)
+  coverage           Decimal?                      @db.Decimal(7, 4)
+  confidence         Decimal?                      @db.Decimal(7, 4)
+  recommendation     IntelligenceRecommendation?
+  executiveSummary   String?                       @db.Text
+  requestedAt        DateTime                      @default(now()) @db.Timestamptz(6)
+  requestedBy        String                        @db.Uuid
+  startedAt          DateTime?                     @db.Timestamptz(6)
+  completedAt        DateTime?                     @db.Timestamptz(6)
+  correlationId      String                        @db.Uuid
+  dimensions         AnalysisDimensionResult[]
+  evidences          AnalysisEvidence[]
+  pendingItems       AnalysisPendingItem[]
+  impediments        CriticalImpediment[]
+  decisions          OpportunityAnalysisDecision[]
+  climateStudy       ClimateStudy?
+  routeStudy         RouteStudy?
+  financialStudy     OpportunityFinancialStudy?
+  notificationEvents NotificationOutboxEvent[]
+
+  @@unique([opportunityId, version])
+  @@unique([opportunityId, policyId, inputHash])
+  @@index([opportunityId, status, requestedAt])
+  @@index([policyId])
+  @@index([correlationId])
+  @@map("opportunity_analyses")
+}
+
+model AnalysisDimensionResult {
+  id            String                  @id @default(uuid()) @db.Uuid
+  analysisId    String                  @db.Uuid
+  analysis      OpportunityAnalysis     @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  perspective   IntelligencePerspective
+  dimension     String                  @db.VarChar(120)
+  status        AnalysisDimensionStatus
+  score         Decimal?                @db.Decimal(7, 4)
+  weight        Decimal                 @db.Decimal(7, 4)
+  confidence    Decimal                 @db.Decimal(7, 4)
+  summary       String                  @db.Text
+  facts         Json
+  calculations  Json
+  inferences    Json
+  risks         Json
+  method        String                  @db.VarChar(160)
+  methodVersion String                  @db.VarChar(80)
+  resultHash    String                  @db.Char(64)
+  evidences     AnalysisEvidence[]
+  pendingItems  AnalysisPendingItem[]
+  createdAt     DateTime                @default(now()) @db.Timestamptz(6)
+
+  @@unique([analysisId, perspective, dimension])
+  @@index([analysisId, perspective])
+  @@map("analysis_dimension_results")
+}
+
+model AnalysisEvidence {
+  id                String                   @id @default(uuid()) @db.Uuid
+  analysisId        String                   @db.Uuid
+  analysis          OpportunityAnalysis      @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  dimensionResultId String?                  @db.Uuid
+  dimensionResult   AnalysisDimensionResult? @relation(fields: [dimensionResultId], references: [id], onDelete: Restrict)
+  sourceType        String                   @db.VarChar(80)
+  sourceId          String?                  @db.VarChar(160)
+  sourceVersion     String?                  @db.VarChar(80)
+  sourceHash        String?                  @db.Char(64)
+  locator           String?                  @db.VarChar(500)
+  excerpt           String?                  @db.Text
+  referenceDate     DateTime?                @db.Timestamptz(6)
+  obtainedAt        DateTime                 @default(now()) @db.Timestamptz(6)
+  accessLevel       String                   @db.VarChar(80)
+  evidenceHash      String                   @db.Char(64)
+
+  @@unique([analysisId, evidenceHash])
+  @@index([dimensionResultId])
+  @@index([sourceType, sourceId])
+  @@map("analysis_evidences")
+}
+
+model AnalysisPendingItem {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  analysisId          String                   @db.Uuid
+  analysis            OpportunityAnalysis      @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  dimensionResultId   String?                  @db.Uuid
+  dimensionResult     AnalysisDimensionResult? @relation(fields: [dimensionResultId], references: [id], onDelete: Restrict)
+  description         String                   @db.VarChar(1000)
+  reason              String                   @db.VarChar(1000)
+  requiredInformation String                   @db.VarChar(1000)
+  responsibleId       String?                  @db.Uuid
+  dueAt               DateTime?                @db.Timestamptz(6)
+  status              AnalysisPendingStatus    @default(OPEN)
+  response            String?                  @db.Text
+  confirmedAt         DateTime?                @db.Timestamptz(6)
+  confirmedBy         String?                  @db.Uuid
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(6)
+
+  @@index([analysisId, status, dueAt])
+  @@index([responsibleId, status])
+  @@map("analysis_pending_items")
+}
+
+model CriticalImpediment {
+  id               String                   @id @default(uuid()) @db.Uuid
+  analysisId       String                   @db.Uuid
+  analysis         OpportunityAnalysis      @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  type             CriticalImpedimentType
+  status           CriticalImpedimentStatus @default(OPEN)
+  ruleCode         String                   @db.VarChar(120)
+  severity         String                   @db.VarChar(40)
+  summary          String                   @db.VarChar(1000)
+  evidenceSnapshot Json
+  detectedAt       DateTime                 @default(now()) @db.Timestamptz(6)
+
+  @@unique([analysisId, type])
+  @@index([status, detectedAt])
+  @@map("critical_impediments")
+}
+
+model OpportunityAnalysisDecision {
+  id                     String                      @id @default(uuid()) @db.Uuid
+  analysisId             String                      @db.Uuid
+  analysis               OpportunityAnalysis         @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  decision               OpportunityDecisionType
+  justification          String                      @db.VarChar(2000)
+  observedRecommendation IntelligenceRecommendation?
+  observedImpediments    Json
+  decidedAt              DateTime                    @default(now()) @db.Timestamptz(6)
+  decidedBy              String                      @db.Uuid
+  correlationId          String                      @db.Uuid
+
+  @@index([analysisId, decidedAt])
+  @@index([decidedBy, decidedAt])
+  @@map("opportunity_analysis_decisions")
+}
+
+model ClimateStudy {
+  id                String              @id @default(uuid()) @db.Uuid
+  analysisId        String              @unique @db.Uuid
+  analysis          OpportunityAnalysis @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  provider          String              @db.VarChar(120)
+  providerRequestId String?             @db.VarChar(160)
+  locationLabel     String              @db.VarChar(255)
+  latitude          Decimal             @db.Decimal(10, 7)
+  longitude         Decimal             @db.Decimal(10, 7)
+  workStart         DateTime            @db.Date
+  workEnd           DateTime            @db.Date
+  historyStart      DateTime            @db.Date
+  historyEnd        DateTime            @db.Date
+  station           Json?
+  monthlySeries     Json
+  sourceMetadata    Json
+  dataCoverage      Decimal             @db.Decimal(7, 4)
+  responseHash      String              @db.Char(64)
+  retrievedAt       DateTime            @db.Timestamptz(6)
+  methodVersion     String              @db.VarChar(80)
+  resultHash        String              @db.Char(64)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, retrievedAt])
+  @@index([latitude, longitude])
+  @@map("climate_studies")
+}
+
+model OperationalBase {
+  id            String             @id @default(uuid()) @db.Uuid
+  code          String             @unique @db.VarChar(50)
+  name          String             @db.VarChar(200)
+  locality      String             @db.VarChar(200)
+  latitude      Decimal            @db.Decimal(10, 7)
+  longitude     Decimal            @db.Decimal(10, 7)
+  source        String             @db.VarChar(500)
+  active        Boolean            @default(true)
+  version       Int                @default(1)
+  selectedRoute RouteStudy[]       @relation("SelectedOperationalBase")
+  routeDetails  RouteDetailStudy[]
+  createdAt     DateTime           @default(now()) @db.Timestamptz(6)
+  createdBy     String             @db.Uuid
+  updatedAt     DateTime           @updatedAt @db.Timestamptz(6)
+  updatedBy     String             @db.Uuid
+
+  @@index([active, name])
+  @@map("operational_bases")
+}
+
+model RouteStudy {
+  id                String              @id @default(uuid()) @db.Uuid
+  analysisId        String              @unique @db.Uuid
+  analysis          OpportunityAnalysis @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  provider          String              @db.VarChar(120)
+  providerRequestId String?             @db.VarChar(160)
+  destinationLabel  String              @db.VarChar(255)
+  destinationLat    Decimal             @db.Decimal(10, 7)
+  destinationLng    Decimal             @db.Decimal(10, 7)
+  travelMode        String              @db.VarChar(40)
+  alternatives      Json
+  selectedBaseId    String?             @db.Uuid
+  selectedBase      OperationalBase?    @relation("SelectedOperationalBase", fields: [selectedBaseId], references: [id], onDelete: Restrict)
+  selectionStatus   String              @db.VarChar(40)
+  requestHash       String              @db.Char(64)
+  responseHash      String              @db.Char(64)
+  retrievedAt       DateTime            @db.Timestamptz(6)
+  methodVersion     String              @db.VarChar(80)
+  resultHash        String              @db.Char(64)
+  details           RouteDetailStudy[]
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, retrievedAt])
+  @@index([selectedBaseId])
+  @@map("route_studies")
+}
+
+model RouteDetailStudy {
+  id              String          @id @default(uuid()) @db.Uuid
+  routeStudyId    String          @db.Uuid
+  routeStudy      RouteStudy      @relation(fields: [routeStudyId], references: [id], onDelete: Restrict)
+  baseId          String          @db.Uuid
+  base            OperationalBase @relation(fields: [baseId], references: [id], onDelete: Restrict)
+  provider        String          @db.VarChar(120)
+  distanceMeters  Int
+  durationSeconds Decimal         @db.Decimal(12, 3)
+  encodedPolyline String          @db.Text
+  tolls           Json
+  responseHash    String          @db.Char(64)
+  retrievedAt     DateTime        @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @db.Timestamptz(6)
+
+  @@unique([routeStudyId, baseId, responseHash])
+  @@index([routeStudyId, baseId, retrievedAt])
+  @@map("route_detail_studies")
+}
+
+model FinancialCapacityAssessment {
+  id               String                        @id @default(uuid()) @db.Uuid
+  opportunityId    String                        @db.Uuid
+  opportunity      Opportunity                   @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  version          Int
+  periodStart      DateTime                      @db.Date
+  periodEnd        DateTime                      @db.Date
+  indices          Json
+  calculatedResult Json
+  conclusion       FinancialAssessmentConclusion
+  justification    String                        @db.Text
+  evidence         Json
+  assessmentHash   String                        @db.Char(64)
+  confirmedAt      DateTime                      @db.Timestamptz(6)
+  confirmedBy      String                        @db.Uuid
+  correlationId    String                        @db.Uuid
+  createdAt        DateTime                      @default(now()) @db.Timestamptz(6)
+  studies          OpportunityFinancialStudy[]
+
+  @@unique([opportunityId, version])
+  @@unique([opportunityId, assessmentHash])
+  @@index([opportunityId, confirmedAt])
+  @@map("financial_capacity_assessments")
+}
+
+model CustomerPaymentAssessment {
+  id                String                      @id @default(uuid()) @db.Uuid
+  customerId        String?                     @db.Uuid
+  customer          Customer?                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  authorityId       String?                     @db.Uuid
+  authority         ContractingAuthority?       @relation(fields: [authorityId], references: [id], onDelete: Restrict)
+  subjectKey        String                      @db.VarChar(200)
+  version           Int
+  periodStart       DateTime                    @db.Date
+  periodEnd         DateTime                    @db.Date
+  classification    PaymentRiskClassification
+  authorizedMetrics Json
+  justification     String                      @db.Text
+  evidence          Json
+  assessmentHash    String                      @db.Char(64)
+  confirmedAt       DateTime                    @db.Timestamptz(6)
+  confirmedBy       String                      @db.Uuid
+  correlationId     String                      @db.Uuid
+  createdAt         DateTime                    @default(now()) @db.Timestamptz(6)
+  studies           OpportunityFinancialStudy[]
+
+  @@unique([subjectKey, version])
+  @@unique([subjectKey, assessmentHash])
+  @@index([customerId, confirmedAt])
+  @@index([authorityId, confirmedAt])
+  @@map("customer_payment_assessments")
+}
+
+model OpportunityFinancialStudy {
+  id                    String                       @id @default(uuid()) @db.Uuid
+  analysisId            String                       @unique @db.Uuid
+  analysis              OpportunityAnalysis          @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  financialAssessmentId String?                      @db.Uuid
+  financialAssessment   FinancialCapacityAssessment? @relation(fields: [financialAssessmentId], references: [id], onDelete: Restrict)
+  paymentAssessmentId   String?                      @db.Uuid
+  paymentAssessment     CustomerPaymentAssessment?   @relation(fields: [paymentAssessmentId], references: [id], onDelete: Restrict)
+  highIndebtednessRisk  Boolean
+  nonPayingCustomer     Boolean
+  summary               String                       @db.Text
+  evidenceSnapshot      Json
+  resultHash            String                       @db.Char(64)
+  createdAt             DateTime                     @default(now()) @db.Timestamptz(6)
+
+  @@index([financialAssessmentId])
+  @@index([paymentAssessmentId])
+  @@map("opportunity_financial_studies")
+}
+
+model NotificationOutboxEvent {
+  id            String                       @id @default(uuid()) @db.Uuid
+  eventKey      String                       @unique @db.VarChar(200)
+  type          IntelligenceNotificationType
+  opportunityId String                       @db.Uuid
+  opportunity   Opportunity                  @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  analysisId    String?                      @db.Uuid
+  analysis      OpportunityAnalysis?         @relation(fields: [analysisId], references: [id], onDelete: Restrict)
+  recipientId   String                       @db.Uuid
+  recipient     User                         @relation("IntelligenceNotificationRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  summary       String                       @db.VarChar(500)
+  nextAction    String                       @db.VarChar(500)
+  deepLink      String                       @db.VarChar(500)
+  payload       Json
+  status        NotificationOutboxStatus     @default(PENDING)
+  attempts      Int                          @default(0)
+  availableAt   DateTime                     @default(now()) @db.Timestamptz(6)
+  leaseId       String?                      @unique @db.Uuid
+  leasedAt      DateTime?                    @db.Timestamptz(6)
+  lastErrorCode String?                      @db.VarChar(120)
+  sentAt        DateTime?                    @db.Timestamptz(6)
+  correlationId String                       @db.Uuid
+  deliveries    NotificationDelivery[]
+  notification  UserNotification?
+  createdAt     DateTime                     @default(now()) @db.Timestamptz(6)
+
+  @@index([status, availableAt])
+  @@index([recipientId, createdAt])
+  @@index([opportunityId, createdAt])
+  @@map("notification_outbox_events")
+}
+
+model UserNotification {
+  id            String                       @id @default(uuid()) @db.Uuid
+  outboxEventId String                       @unique @db.Uuid
+  outboxEvent   NotificationOutboxEvent      @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
+  recipientId   String                       @db.Uuid
+  recipient     User                         @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  type          IntelligenceNotificationType
+  summary       String                       @db.VarChar(500)
+  nextAction    String                       @db.VarChar(500)
+  deepLink      String                       @db.VarChar(500)
+  readAt        DateTime?                    @db.Timestamptz(6)
+  createdAt     DateTime                     @default(now()) @db.Timestamptz(6)
+
+  @@index([recipientId, readAt, createdAt])
+  @@map("user_notifications")
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(uuid()) @db.Uuid
+  outboxEventId     String                     @db.Uuid
+  outboxEvent       NotificationOutboxEvent    @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  attempts          Int                        @default(0)
+  providerReference String?                    @db.VarChar(200)
+  acceptedAt        DateTime?                  @db.Timestamptz(6)
+  attemptedAt       DateTime?                  @db.Timestamptz(6)
+  errorCode         String?                    @db.VarChar(120)
+  createdAt         DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                   @updatedAt @db.Timestamptz(6)
+
+  @@unique([outboxEventId, channel])
+  @@index([status, attemptedAt])
+  @@map("notification_deliveries")
 }
 
 model Tender {
@@ -532,6 +996,77 @@ enum AiExtractionStatus {
   RUNNING
   SUCCEEDED
   FAILED
+}
+
+enum OpportunityAnalysisType {
+  PRELIMINARY
+  ENRICHED
+}
+
+enum OpportunityAnalysisStatus {
+  QUEUED
+  COLLECTING
+  CALCULATING
+  AI_EXPLAINING
+  WAITING_INFORMATION
+  WAITING_OWNER
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+enum IntelligencePerspective {
+  COMMERCIAL
+  TECHNICAL
+  STUDIES
+}
+
+enum AnalysisDimensionStatus {
+  CALCULATED
+  NOT_CALCULABLE
+}
+
+enum IntelligenceRecommendation {
+  RECOMMENDED
+  RECOMMENDED_WITH_RESTRICTIONS
+  NOT_RECOMMENDED
+  WAITING_INFORMATION
+  WAITING_OWNER_DECISION
+}
+
+enum AnalysisPendingStatus {
+  OPEN
+  CONFIRMED
+  CANCELLED
+}
+
+enum CriticalImpedimentType {
+  HIGH_INDEBTEDNESS_RISK
+  NON_PAYING_CUSTOMER
+}
+
+enum FinancialAssessmentConclusion {
+  ADEQUATE
+  HIGH_RISK
+  INSUFFICIENT_DATA
+}
+
+enum PaymentRiskClassification {
+  GOOD_PAYER
+  ATTENTION
+  NON_PAYER
+  INSUFFICIENT_DATA
+}
+
+enum CriticalImpedimentStatus {
+  OPEN
+  DECIDED
+}
+
+enum OpportunityDecisionType {
+  PROCEED
+  PROCEED_WITH_RESTRICTIONS
+  DO_NOT_PROCEED
 }
 
 model Competitor {

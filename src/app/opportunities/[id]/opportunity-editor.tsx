@@ -8,7 +8,7 @@ type Status = "DRAFT" | "QUALIFICATION" | "ACTIVE" | "SUSPENDED" | "CLOSED";
 const transitions: Record<Status, readonly { target: Status; label: string }[]> = {
   DRAFT: [{ target: "QUALIFICATION", label: "Enviar para qualificação" }],
   QUALIFICATION: [
-    { target: "ACTIVE", label: "Ativar" },
+    { target: "ACTIVE", label: "Validar, delegar e gerar proposta" },
     { target: "SUSPENDED", label: "Suspender" },
     { target: "CLOSED", label: "Encerrar" },
   ],
@@ -17,7 +17,7 @@ const transitions: Record<Status, readonly { target: Status; label: string }[]> 
     { target: "CLOSED", label: "Encerrar" },
   ],
   SUSPENDED: [
-    { target: "ACTIVE", label: "Reativar" },
+    { target: "ACTIVE", label: "Reativar proposta" },
     { target: "CLOSED", label: "Encerrar" },
   ],
   CLOSED: [{ target: "QUALIFICATION", label: "Reabrir para qualificação" }],
@@ -31,6 +31,7 @@ export type OpportunityEditorData = Readonly<{
   estimatedValue?: string;
   currency?: string;
   valueSource?: string;
+  contractingAuthorityName?: string;
   publishedAt?: string;
   deliveryAt?: string;
   datesSource?: string;
@@ -88,11 +89,12 @@ export function OpportunityEditor({
         closureReasonCode: form.get("closureReasonCode") || undefined,
         closureJustification: form.get("closureJustification") || undefined,
         reason: form.get("reason") || undefined,
+        ownerId: form.get("ownerId") || undefined,
       }),
     });
     const result = (await response.json()) as { error?: { message?: string } };
     setBusy(false);
-    setMessage(response.ok ? "Situação alterada e auditada." : result.error?.message ?? "Falha na transição.");
+    setMessage(response.ok ? (form.get("target") === "ACTIVE" ? "Oportunidade validada. A proposta foi gerada e atribuída ao responsável." : "Situação alterada e auditada.") : result.error?.message ?? "Falha na transição.");
     if (response.ok) router.refresh();
   }
 
@@ -114,6 +116,16 @@ export function OpportunityEditor({
             <input className="rounded-xl border border-border px-3 py-2 font-normal" name="valueSource" defaultValue={opportunity.valueSource} disabled={!canUpdate} />
           </label>
         </div>
+        <label className="grid gap-1 text-sm font-semibold">Cliente/órgão contratante
+          <input
+            className="rounded-xl border border-border bg-slate-50 px-3 py-2 font-normal text-slate-700"
+            value={opportunity.contractingAuthorityName ?? "Não identificado"}
+            readOnly
+          />
+          <span className="text-xs font-normal text-muted">
+            Fontes institucionais inequívocas, como “Prefeitura de …”, são reconhecidas ao salvar.
+          </span>
+        </label>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold">Publicação
             <input className="rounded-xl border border-border px-3 py-2 font-normal" name="publishedAt" type="datetime-local" defaultValue={opportunity.publishedAt} disabled={!canUpdate} />
@@ -128,7 +140,7 @@ export function OpportunityEditor({
             <input className="rounded-xl border border-border px-3 py-2 font-normal" name="datesTimeZone" defaultValue={opportunity.datesTimeZone ?? "America/Sao_Paulo"} disabled={!canUpdate} />
           </label>
         </div>
-        <label className="grid gap-1 text-sm font-semibold">Responsável
+        <label className="grid gap-1 text-sm font-semibold">Responsável pela oportunidade e futura proposta
           <select className="rounded-xl border border-border px-3 py-2 font-normal" name="ownerId" defaultValue={opportunity.ownerId ?? ""} disabled={!canUpdate}>
             <option value="">Não definido</option>
             {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
@@ -139,7 +151,9 @@ export function OpportunityEditor({
 
       {canTransition && (
         <form className="h-fit grid gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm" onSubmit={transition}>
-          <h2 className="text-xl font-bold">Movimentar ciclo</h2>
+          <h2 className="text-xl font-bold">Validar e avançar</h2>
+          {opportunity.status === "QUALIFICATION" && <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-900">Ao validar, a oportunidade será convertida em proposta, os documentos serão preservados e a demanda será delegada ao responsável selecionado.</p>}
+          {(opportunity.status === "QUALIFICATION" || opportunity.status === "SUSPENDED") && <label className="grid gap-1 text-sm font-semibold">Delegar proposta para<select className="rounded-xl border border-border px-3 py-2 font-normal" name="ownerId" defaultValue={opportunity.ownerId ?? ""} required><option value="">Selecione o responsável</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>}
           <label className="grid gap-1 text-sm font-semibold">Próxima situação
             <select className="rounded-xl border border-border px-3 py-2 font-normal" name="target">
               {transitions[opportunity.status].map((entry) => <option key={entry.target} value={entry.target}>{entry.label}</option>)}

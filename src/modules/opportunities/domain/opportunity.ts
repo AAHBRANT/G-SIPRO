@@ -94,7 +94,23 @@ export function assertOpportunityTransition(
   }
 }
 
-const criticalFields = ["subject", "estimatedValue", "currency", "deliveryAt", "ownerId", "status"] as const;
+export function shouldConvertOpportunityToProposal(
+  current: OpportunityStatus,
+  target: OpportunityStatus,
+): boolean {
+  return current !== "ACTIVE" && target === "ACTIVE";
+}
+
+const criticalFields = [
+  "subject",
+  "customerId",
+  "contractingAuthorityId",
+  "estimatedValue",
+  "currency",
+  "deliveryAt",
+  "ownerId",
+  "status",
+] as const;
 
 export function collectCriticalChanges(
   before: Readonly<Record<string, unknown>>,
