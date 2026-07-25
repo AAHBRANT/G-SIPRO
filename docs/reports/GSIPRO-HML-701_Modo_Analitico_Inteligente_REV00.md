@@ -182,3 +182,42 @@ Evidências:
 A segregação de funções foi mantida: usuário mestre registra a proposta e um proprietário diferente do autor a aprova. A publicação não criou nem aprovou uma política em nome de terceiros.
 
 Após autorização posterior do proprietário, a política `Modo Analítico Inteligente · v1` foi registrada por Gutemberg Pontes com os parâmetros propostos e permaneceu em `Aguardando proprietário`. Como o autor não pode aprovar a própria política, a decisão deve ser registrada por Wellington Loureço, o outro proprietário cadastrado. O bloqueio foi apresentado corretamente na interface.
+
+## 11. Atualização funcional publicada em 25/07/2026
+
+Após a aprovação da política e a evolução da interface, foram publicados incrementos adicionais no mesmo ambiente HML:
+
+- separação do detalhe da oportunidade em resumo, documentos e Modo Analítico;
+- preenchimento assistido de local, coordenadas e período somente a partir dos documentos vinculados à própria oportunidade, sempre sujeito a confirmação humana;
+- apresentação de pedágios por rota, sem tratar ausência do dado como custo zero;
+- cadastro formal de capacidade financeira da oportunidade;
+- cadastro formal do desempenho de pagamento do cliente ou órgão vinculado;
+- decisão empresarial no próprio painel, com exigência de proprietário para superar recomendação negativa ou impedimento crítico;
+- cadastro administrativo de bases operacionais para os estudos de rota;
+- central persistente de notificações, contador de não lidas, próxima ação e deep link autenticado.
+
+Evidências de versionamento e publicação:
+
+| Incremento | Commit | Revisão HML | Resultado |
+|---|---|---|---|
+| Contexto documental assistido | `88d6fa0` | `0000018` | saudável, 100% do tráfego durante sua ativação |
+| Avaliações financeiras formais | `a582610` | `0000019` | saudável, 100% do tráfego durante sua ativação |
+| Decisão empresarial | `6880422` | `0000020` | saudável, 100% do tráfego durante sua ativação |
+| Bases operacionais e notificações | `b8ad6bc` | `0000021` | saudável, ativa e com 100% do tráfego |
+
+Verificações automatizadas da versão consolidada:
+
+- 99 arquivos de teste e 322 testes aprovados;
+- ESLint aprovado sem avisos;
+- TypeScript aprovado;
+- construção de imagem no Azure Container Registry concluída;
+- integridade do diff aprovada.
+
+Continuam bloqueados, sem uso de valores inventados:
+
+1. fonte e credenciais da API climática;
+2. credenciais, faturamento e quotas do Google Routes e Google Maps Embed;
+3. remetente, consentimentos e token de despacho das notificações externas;
+4. fórmula empresarial do custo de mobilização;
+5. ensaios de carga, resiliência, WCAG 2.2 AA e testes com oportunidades reais autorizadas;
+6. aprovação explícita do proprietário para produção.
