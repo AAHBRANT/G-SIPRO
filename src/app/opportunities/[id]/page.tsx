@@ -59,6 +59,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     && authorize(authorization, { permission: "analytics.read-client-risk" }).allowed;
   const canAssessFinancial = authorize(authorization, { permission: "analytics.assess-financial" }).allowed;
   const canAssessClientRisk = authorize(authorization, { permission: "analytics.assess-client-risk" }).allowed;
+  const canDecideAnalytics = authorize(authorization, { permission: "analytics.decide" }).allowed;
   const database = getDatabase();
 
   const [record, users, latestAnalysis, useCases, linkedDocuments] = await Promise.all([
@@ -84,6 +85,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             },
             pendingItems: { orderBy: { createdAt: "asc" } },
             impediments: { orderBy: { detectedAt: "asc" } },
+            decisions: { orderBy: { decidedAt: "desc" }, take: 1 },
             financialStudy: { select: { summary: true, highIndebtednessRisk: true, nonPayingCustomer: true } },
             climateStudy: true,
             routeStudy: true,
@@ -162,6 +164,14 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
       summary: item.summary,
       status: item.status,
     })),
+    ...(latestAnalysis.decisions[0] && {
+      decision: {
+        id: latestAnalysis.decisions[0].id,
+        decision: latestAnalysis.decisions[0].decision,
+        justification: latestAnalysis.decisions[0].justification,
+        decidedAt: latestAnalysis.decisions[0].decidedAt.toISOString(),
+      },
+    }),
     ...(latestAnalysis.financialStudy && {
       financial: {
         summary: latestAnalysis.financialStudy.summary,
@@ -344,6 +354,8 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             canReadFinancial={canReadFinancial}
             canAssessFinancial={canAssessFinancial}
             canAssessClientRisk={canAssessClientRisk}
+            canDecide={canDecideAnalytics}
+            isOwner={Boolean(authorization?.isOwner)}
             financialSubject={record.customer
               ? { type: "customer", id: record.customer.id, name: record.customer.name }
               : record.contractingAuthority

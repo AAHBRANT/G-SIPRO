@@ -11,7 +11,7 @@ import {
 } from "./financial-assessment-manager";
 
 type Perspective = "ALL" | "COMMERCIAL" | "TECHNICAL" | "STUDIES";
-type DrawerKind = "COMMERCIAL" | "TECHNICAL" | "CLIMATE" | "LOGISTICS" | "FINANCIAL" | "PENDING" | null;
+type DrawerKind = "COMMERCIAL" | "TECHNICAL" | "CLIMATE" | "LOGISTICS" | "FINANCIAL" | "PENDING" | "DECISION" | null;
 
 export type IntelligenceDimensionView = Readonly<{
   id: string;
@@ -98,6 +98,12 @@ export type IntelligenceAnalysisView = Readonly<{
     highIndebtednessRisk?: boolean;
     nonPayingCustomer?: boolean;
   };
+  decision?: {
+    id: string;
+    decision: string;
+    justification: string;
+    decidedAt: string;
+  };
   climate?: ClimateView;
   route?: RouteView;
 }>;
@@ -182,6 +188,8 @@ export function IntelligencePanel({
   canAssessFinancial,
   canAssessClientRisk,
   financialSubject,
+  canDecide,
+  isOwner,
   mapsEmbedKey,
   integrationReadiness,
   contextDefaults,
@@ -194,6 +202,8 @@ export function IntelligencePanel({
   canAssessFinancial: boolean;
   canAssessClientRisk: boolean;
   financialSubject?: FinancialSubject;
+  canDecide: boolean;
+  isOwner: boolean;
   mapsEmbedKey?: string;
   integrationReadiness?: readonly IntegrationReadinessView[];
   contextDefaults: AnalysisContextDefaults;
@@ -300,6 +310,7 @@ export function IntelligencePanel({
               <button className="rounded-lg border border-white/20 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/10 disabled:opacity-50" disabled={Boolean(busyStage)} onClick={() => runStage("TECHNICAL")} type="button">
                 Capacidade operacional
               </button>
+              {canDecide && <button className="rounded-lg border border-white/20 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/10" onClick={() => setDrawer("DECISION")} type="button">Decisão empresarial</button>}
             </div>
           )}
         </div>
@@ -406,6 +417,7 @@ export function IntelligencePanel({
           {drawer === "FINANCIAL" && <FinancialDetail analysis={analysis} busy={busyStage === "FINANCIAL"} canAssessClientRisk={canAssessClientRisk} canAssessFinancial={canAssessFinancial} canCalculate={canCalculate} canReadFinancial={canReadFinancial} financialSubject={financialSubject} onRun={() => runStage("FINANCIAL")} opportunityId={opportunityId}/>}
           {(drawer === "COMMERCIAL" || drawer === "TECHNICAL") && <DimensionDetail analysis={analysis} perspective={drawer}/>}
           {drawer === "PENDING" && <PendingDetail analysis={analysis}/>}
+          {drawer === "DECISION" && <DecisionDetail analysis={analysis} isOwner={isOwner} onSaved={() => router.refresh()}/>}
         </IntelligenceDrawer>
       )}
     </section>
@@ -428,7 +440,54 @@ function drawerTitle(drawer: Exclude<DrawerKind, null>) {
     LOGISTICS: "Logística, distância e rota",
     FINANCIAL: "Capacidade financeira e cliente",
     PENDING: "Pendências da análise",
+    DECISION: "Decisão empresarial",
   }[drawer];
+}
+
+function DecisionDetail({ analysis, isOwner, onSaved }: { analysis: IntelligenceAnalysisView | null; isOwner: boolean; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  if (!analysis) return <EmptyDetail text="Execute ao menos uma etapa da análise antes de registrar a decisão empresarial."/>;
+  const hasCriticalContext = analysis.recommendation === "NOT_RECOMMENDED"
+    || analysis.impediments.some((item) => item.status === "OPEN");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    setMessage("Registrando decisão imutável…");
+    const response = await fetch(`/api/opportunity-analyses/${analysis!.id}/decision`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        decision: form.get("decision"),
+        justification: form.get("justification"),
+      }),
+    });
+    const result = await response.json().catch(() => ({})) as { error?: { message?: string } };
+    setBusy(false);
+    setMessage(response.ok ? "Decisão registrada e encaminhamento notificado." : result.error?.message ?? "Não foi possível registrar a decisão.");
+    if (response.ok) onSaved();
+  }
+
+  return <div className="space-y-5">
+    {analysis.decision && <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-[9px] font-black uppercase tracking-wide text-emerald-700">Última decisão registrada</p><h3 className="mt-2 font-black text-emerald-950">{humanize(analysis.decision.decision)}</h3><p className="mt-2 text-sm leading-6 text-emerald-900">{analysis.decision.justification}</p><p className="mt-3 text-[10px] text-emerald-700">{new Date(analysis.decision.decidedAt).toLocaleString("pt-BR")}</p></section>}
+    {hasCriticalContext && <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-5 text-red-900"><strong>Decisão protegida:</strong> existe recomendação negativa ou impedimento crítico aberto. Somente o proprietário pode decidir prosseguir; os demais perfis podem registrar “Não prosseguir”.</section>}
+    <form className="rounded-xl border border-slate-200 bg-slate-50 p-5" onSubmit={submit}>
+      <label className="grid gap-1 text-xs font-bold text-slate-700">Encaminhamento
+        <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" defaultValue={hasCriticalContext && !isOwner ? "DO_NOT_PROCEED" : "PROCEED_WITH_RESTRICTIONS"} name="decision">
+          {(!hasCriticalContext || isOwner) && <option value="PROCEED">Prosseguir</option>}
+          {(!hasCriticalContext || isOwner) && <option value="PROCEED_WITH_RESTRICTIONS">Prosseguir com restrições</option>}
+          <option value="DO_NOT_PROCEED">Não prosseguir</option>
+        </select>
+      </label>
+      <label className="mt-4 grid gap-1 text-xs font-bold text-slate-700">Justificativa empresarial
+        <textarea className="min-h-28 rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" maxLength={2000} minLength={20} name="justification" placeholder="Registre os fundamentos, restrições e próximos passos da decisão." required/>
+      </label>
+      <button className="mt-4 rounded-lg bg-brand px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={busy} type="submit">{busy ? "Registrando…" : "Registrar decisão"}</button>
+      {message && <p aria-live="polite" className="mt-3 text-xs font-semibold text-slate-700" role="status">{message}</p>}
+    </form>
+  </div>;
 }
 
 function IntelligenceDrawer({ title, children, onClose, closeButtonRef }: { title: string; children: React.ReactNode; onClose: () => void; closeButtonRef: React.RefObject<HTMLButtonElement | null> }) {
