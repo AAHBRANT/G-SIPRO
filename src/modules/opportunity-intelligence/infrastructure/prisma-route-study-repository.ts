@@ -15,6 +15,7 @@ import {
 } from "../domain/intelligence-policy";
 import {
   calculateRouteStudy,
+  createRoutePracticabilityDimension,
   mergePracticabilityDimension,
   type RouteBase,
   type RouteDestination,
@@ -72,10 +73,6 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
       if (!previous) {
         throw new RouteStudyRuleError("Execute a análise da oportunidade antes do estudo logístico.");
       }
-      const studyDimensionRecord = previous.dimensions.find(item => item.perspective === "STUDIES");
-      if (!studyDimensionRecord) {
-        throw new RouteStudyRuleError("Dimensão de estudos não encontrada na análise anterior.");
-      }
       const policyDimensions = intelligenceDimensionSchema.array().parse(previous.policy.dimensions);
       const policy = approvedPolicySnapshotSchema.parse({
         id: previous.policy.id,
@@ -87,10 +84,23 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
       });
       const route = calculateRouteStudy(destination, bases, response, selectedBaseId);
       const previousDimensions = previous.dimensions.map(dimension => this.toDomainDimension(dimension));
-      const previousStudy = previousDimensions.find(item => item.perspective === "STUDIES")!;
-      const mergedStudy = mergePracticabilityDimension(previousStudy, route);
+      const studyPolicyDimensions = policyDimensions.filter(item => item.perspective === "STUDIES");
+      const routePolicyDimension = studyPolicyDimensions.find(item => item.code === "PRACTICABILITY")
+        ?? studyPolicyDimensions[0];
+      if (!routePolicyDimension) {
+        throw new RouteStudyRuleError("A política aprovada não possui dimensão de estudos para a logística.");
+      }
+      const previousStudy = previousDimensions.find(
+        item => item.perspective === "STUDIES" && item.dimension === routePolicyDimension.code,
+      );
+      const dimensionWeight = policy.weights.studies / studyPolicyDimensions.length;
+      const mergedStudy = previousStudy
+        ? mergePracticabilityDimension(previousStudy, route)
+        : createRoutePracticabilityDimension(routePolicyDimension.code, dimensionWeight, route);
       const allDimensions = [
-        ...previousDimensions.filter(item => item.perspective !== "STUDIES"),
+        ...previousDimensions.filter(
+          item => !(item.perspective === "STUDIES" && item.dimension === routePolicyDimension.code),
+        ),
         mergedStudy,
       ];
       const technicalFacts = previous.dimensions.find(

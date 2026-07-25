@@ -136,3 +136,27 @@ export function mergePracticabilityDimension(
   };
   return Object.freeze({ ...partial, resultHash: hash(partial) });
 }
+
+export function createRoutePracticabilityDimension(
+  dimension: string,
+  weight: number,
+  route: ReturnType<typeof calculateRouteStudy>,
+): CommercialDimensionResult {
+  const initial: CommercialDimensionResult = Object.freeze({
+    perspective: "STUDIES",
+    dimension,
+    status: "NOT_CALCULABLE",
+    weight,
+    confidence: 0,
+    summary: "Estudo de praticabilidade iniciado pela análise logística.",
+    facts: {},
+    calculations: {},
+    inferences: [],
+    risks: [],
+    method: "practicability-climate-logistics",
+    methodVersion: "1.0.0",
+    resultHash: hash({ dimension, weight, source: "ROUTE_ONLY" }),
+    pendingItems: [],
+  });
+  return mergePracticabilityDimension(initial, route);
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateRouteStudy } from "./route-study";
+import { calculateRouteStudy, createRoutePracticabilityDimension } from "./route-study";
 
 const base = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -59,5 +59,36 @@ describe("route study", () => {
     expect(result.selectedBaseId).toBe(base.id);
     expect(result.selectionStatus).toBe("USER_SELECTED");
     expect(result.pendingItems.some(item => item.description.includes("seleção da base"))).toBe(false);
+  });
+
+  it("creates the practicability dimension when no climate study exists", () => {
+    const route = calculateRouteStudy(destination, [base], {
+      provider: "Azure Maps",
+      retrievedAt: "2026-07-24T19:00:00.000Z",
+      routes: [{
+        baseId: base.id,
+        condition: "ROUTE_EXISTS",
+        distanceMeters: 586_400,
+        durationSeconds: 28_800,
+        tolls: [],
+      }],
+      sourceMetadata: {},
+    }, base.id);
+
+    const dimension = createRoutePracticabilityDimension("PRACTICABILITY", 25, route);
+
+    expect(dimension).toMatchObject({
+      perspective: "STUDIES",
+      dimension: "PRACTICABILITY",
+      status: "NOT_CALCULABLE",
+      weight: 25,
+      method: "practicability-climate-logistics",
+    });
+    expect(dimension.facts).toMatchObject({
+      logistics: {
+        selectionStatus: "USER_SELECTED",
+        alternatives: [{ baseId: base.id, distanceKm: 586.4 }],
+      },
+    });
   });
 });
