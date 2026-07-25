@@ -8,7 +8,7 @@ import { SupportProgressCard } from "@/app/support/support-progress-card";
 import { SupportResolutionForecastCard } from "@/app/support/support-resolution-forecast-card";
 import { GsIcon } from "@/components/ui/gs-icon";
 
-const typeLabel: Record<string, string> = { BUG: "Erro", QUESTION: "Dúvida", IMPROVEMENT: "Melhoria", NEW_FEATURE: "Nova ferramenta" };
+const typeLabel: Record<string, string> = { BUG: "Correção de bug", QUESTION: "Dúvida", IMPROVEMENT: "Melhoria", NEW_FEATURE: "Nova ferramenta" };
 const statusLabel: Record<string, string> = { OPEN: "Recebido", TRIAGED: "Na fila técnica", WAITING_APPROVAL: "Aguardando aprovação", APPROVED: "Autorizado", IN_PROGRESS: "Em execução", WAITING_USER_VALIDATION: "Validação do solicitante", OWNER_ACTION_REQUIRED: "Ação do proprietário", ESCALATED: "Escalado ao proprietário", RESOLVED: "Resolvido", REJECTED: "Rejeitado", CANCELLED: "Cancelado" };
 const statusTone: Record<string, string> = { OPEN: "bg-slate-100 text-slate-700", TRIAGED: "bg-slate-100 text-slate-700", WAITING_APPROVAL: "bg-amber-50 text-amber-800", APPROVED: "bg-slate-100 text-slate-700", IN_PROGRESS: "bg-blue-50 text-blue-800", WAITING_USER_VALIDATION: "bg-amber-50 text-amber-800", OWNER_ACTION_REQUIRED: "bg-amber-100 text-amber-900", ESCALATED: "bg-rose-50 text-rose-800", RESOLVED: "bg-emerald-50 text-emerald-800", REJECTED: "bg-slate-100 text-slate-600", CANCELLED: "bg-slate-100 text-slate-600" };
 const concludedStatuses = new Set(["RESOLVED", "REJECTED", "CANCELLED"]);
@@ -23,6 +23,7 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [classFilter, setClassFilter] = useState<"" | "CORRECTION" | "CHANGE">("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -54,8 +55,11 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
   const executionAuthorized = selectedTicket ? (selectedTicket.status === "TRIAGED" && !selectedTicket.approvalRequired) || ["APPROVED", "IN_PROGRESS", "WAITING_USER_VALIDATION", "OWNER_ACTION_REQUIRED", "ESCALATED", "RESOLVED"].includes(selectedTicket.status) : false;
   const filteredTickets = useMemo(() => tickets.filter((ticket) => {
     const haystack = `SUP-${String(ticket.number).padStart(5, "0")} ${ticket.title} ${ticket.description} ${ticket.reporter} ${typeLabel[ticket.type] ?? ticket.type} ${statusLabel[ticket.status] ?? ticket.status}`.toLocaleLowerCase("pt-BR");
-    return (!query || haystack.includes(query.toLocaleLowerCase("pt-BR"))) && (!statusFilter || ticket.status === statusFilter) && (!typeFilter || ticket.type === typeFilter);
-  }), [tickets, query, statusFilter, typeFilter]);
+    const matchesClass = !classFilter
+      || (classFilter === "CORRECTION" && ["BUG", "QUESTION"].includes(ticket.type))
+      || (classFilter === "CHANGE" && ["IMPROVEMENT", "NEW_FEATURE"].includes(ticket.type));
+    return (!query || haystack.includes(query.toLocaleLowerCase("pt-BR"))) && (!statusFilter || ticket.status === statusFilter) && (!typeFilter || ticket.type === typeFilter) && matchesClass;
+  }), [tickets, query, statusFilter, typeFilter, classFilter]);
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleTickets = filteredTickets.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -67,7 +71,14 @@ export function SupportAdmin({ tickets, canApprove, currentActorId }: { tickets:
     {message && <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">{message}</p>}
     <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]" aria-label="Relação de chamados">
       <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center"><h2 className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-800"><GsIcon className="h-4 w-4 text-brand" name="table"/> Chamados registrados</h2><div className="flex flex-wrap gap-2"><label className="relative"><GsIcon className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" name="search"/><input aria-label="Buscar chamado" className="h-9 w-60 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100" onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Buscar chamado..." value={query}/></label><button className={`${controlClass} inline-flex items-center gap-2`} onClick={() => setShowFilters((value) => !value)} type="button"><GsIcon className="h-4 w-4" name="filter"/> Filtros</button></div></div>
-      {showFilters && <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4"><select aria-label="Filtrar por status" className={controlClass} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} value={statusFilter}><option value="">Todos os status</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select aria-label="Filtrar por tipo" className={controlClass} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }} value={typeFilter}><option value="">Todos os tipos</option>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className={controlClass} onClick={() => { setStatusFilter(""); setTypeFilter(""); setPage(1); }} type="button">Limpar filtros</button></div>}
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50/60 px-4 py-2.5" aria-label="Separação por natureza do chamado">
+        {[
+          { value: "" as const, label: "Todos", count: tickets.length },
+          { value: "CORRECTION" as const, label: "Correções e dúvidas", count: tickets.filter(ticket => ["BUG", "QUESTION"].includes(ticket.type)).length },
+          { value: "CHANGE" as const, label: "Melhorias e novas ferramentas", count: tickets.filter(ticket => ["IMPROVEMENT", "NEW_FEATURE"].includes(ticket.type)).length },
+        ].map(option => <button className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition ${classFilter === option.value ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`} key={option.value || "ALL"} onClick={() => { setClassFilter(option.value); setPage(1); }} type="button">{option.label} · {option.count}</button>)}
+      </div>
+      {showFilters && <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4"><select aria-label="Filtrar por status" className={controlClass} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} value={statusFilter}><option value="">Todos os status</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select aria-label="Filtrar por tipo" className={controlClass} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }} value={typeFilter}><option value="">Todos os tipos</option>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className={controlClass} onClick={() => { setStatusFilter(""); setTypeFilter(""); setClassFilter(""); setPage(1); }} type="button">Limpar filtros</button></div>}
       <div className="overflow-x-auto"><table className="w-full min-w-[1180px] table-fixed text-left text-xs"><colgroup><col className="w-[12%]"/><col className="w-[15%]"/><col className="w-[24%]"/><col className="w-[16%]"/><col className="w-[14%]"/><col className="w-[12%]"/><col className="w-[7%]"/></colgroup><thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Nº do chamado</th><th className="px-4 py-3">Solicitante</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Abertura / conclusão</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Previsão</th><th className="px-3 py-3 text-center">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">
         {visibleTickets.map((ticket) => <tr className="h-14 transition hover:bg-blue-50/30" key={ticket.id}>
           <td className="whitespace-nowrap px-4 py-3"><button className="font-bold text-brand hover:underline" onClick={() => setSelectedTicketId(ticket.id)} type="button">SUP-{String(ticket.number).padStart(5, "0")}</button><p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">{typeLabel[ticket.type]}</p></td>

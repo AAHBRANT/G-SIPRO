@@ -8,7 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ResourceNotFoundError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
-import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
+import { provisionTeamsAppForManagedUser, resolveEntraIdentityByEmail } from "@/modules/admin/microsoft-graph-teams-provisioner";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
 const decisionSchema = z.object({
@@ -47,11 +47,14 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       if (!approvedUserId) throw new ConflictError("A solicitação de alteração não informa o usuário de destino.");
       const conflictingUser = await database.user.findFirst({ where: { email: draft.email, id: { not: approvedUserId } }, select: { id: true } });
       if (conflictingUser) throw new ConflictError("Já existe outro usuário com este e-mail.");
+      const entraIdentity = accessRequest.action === "CREATE"
+        ? await resolveEntraIdentityByEmail(draft.email)
+        : null;
 
       await database.$transaction(async transaction => {
         if (accessRequest.action === "CREATE") {
           const profileId = randomUUID();
-          await transaction.user.create({ data: { id: approvedUserId, entraObjectId: randomUUID(), displayName: draft.displayName, email: draft.email, status: draft.status, isMaster: draft.isMaster, isOwner: draft.isOwner, departmentId: draft.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
+          await transaction.user.create({ data: { id: approvedUserId, entraObjectId: entraIdentity?.objectId ?? approvedUserId, displayName: draft.displayName, email: draft.email, status: draft.status, isMaster: draft.isMaster, isOwner: draft.isOwner, departmentId: draft.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
           await transaction.profile.create({ data: { id: profileId, code: `USER_ACCESS_${approvedUserId.replaceAll("-", "")}`, name: `Acesso individual — ${draft.displayName}`, description: "Perfil individual administrado pelo painel de usuários.", createdBy: authorization.actorId, updatedBy: authorization.actorId } });
           if (permissionIds.length) await transaction.profilePermission.createMany({ data: permissionIds.map(permissionId => ({ profileId, permissionId, grantedBy: authorization.actorId })) });
           await transaction.userProfile.create({ data: { userId: approvedUserId, profileId, grantedBy: authorization.actorId, reason: "Provisionamento aprovado pelo proprietário" } });
@@ -76,7 +79,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         ? await provisionTeamsAppForManagedUser({ userId: approvedUserId, email: draft.email, actorId: authorization.actorId, correlationId: context.correlationId })
         : null;
       revalidatePath("/admin");
-      return NextResponse.json({ data: { id: requestId, status: "APPROVED", userId: approvedUserId, teamsProvisioning }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { id: requestId, status: "APPROVED", userId: approvedUserId, entraIdentity, teamsProvisioning }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }

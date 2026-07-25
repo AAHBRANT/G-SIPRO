@@ -34,7 +34,11 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
               id,
               executionLeaseId: null,
               executionAttempts: { lt: 3 },
-              OR: [{ status: "TRIAGED", approvalRequired: false }, { status: "APPROVED" }, { status: "IN_PROGRESS", executorId: null }],
+              OR: [
+                { status: "TRIAGED", approvalRequired: false, type: { in: ["BUG", "QUESTION"] } },
+                { status: "APPROVED" },
+                { status: "IN_PROGRESS", executorId: null },
+              ],
             },
             data: {
               status: "IN_PROGRESS",
@@ -80,10 +84,58 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         return NextResponse.json({ data: { id, status: "IN_PROGRESS", progress: true }, correlationId: context.correlationId });
       }
 
+      if (input.action === "REPORT_CLARIFICATION") {
+        await database.$transaction(async transaction => {
+          const changed = await transaction.supportTicket.updateMany({
+            where: { id, status: "IN_PROGRESS", executionLeaseId: input.leaseId, executorId: input.executorId },
+            data: {
+              status: "WAITING_USER_VALIDATION",
+              executionLeaseId: null,
+              executorId: null,
+              executionClaimedAt: null,
+              executionHeartbeatAt: null,
+              executionAttempts: { decrement: 1 },
+              validationQuestions: input.clarification,
+              validationRequestedAt: new Date(),
+            },
+          });
+          if (changed.count !== 1) throw new ConflictError("A reserva expirou ou foi alterada.");
+          await transaction.supportTicketUpdate.create({
+            data: {
+              id: randomUUID(),
+              ticketId: id,
+              fromStatus: "IN_PROGRESS",
+              toStatus: "WAITING_USER_VALIDATION",
+              note: `${input.summary}\n\n${input.clarification.introduction}`,
+              actorLabel: input.executorId,
+            },
+          });
+          await transaction.auditEvent.create({
+            data: {
+              id: randomUUID(),
+              actorType: actor.actorType,
+              actorId: input.executorId,
+              action: "SUPPORT_CLARIFICATION_REQUESTED",
+              entityType: "SUPPORT_TICKET",
+              entityId: id,
+              correlationId: context.correlationId,
+              outcome: "SUCCESS",
+              origin: "support-agent",
+              metadata: { leaseId: input.leaseId, questionCount: input.clarification.questions.length },
+            },
+          });
+        });
+        return NextResponse.json({ data: { id, status: "WAITING_USER_VALIDATION", clarification: true }, correlationId: context.correlationId });
+      }
+
       const completed = input.action === "COMPLETE";
       const ownerActionRequired = input.action === "REPORT_OWNER_ACTION";
       const failure = completed || ownerActionRequired ? null : supportAgentFailureOutcome(ticket.executionAttempts);
-      const retryStatus = failure?.status ?? "TRIAGED";
+      const retryStatus = failure?.exhausted
+        ? failure.status
+        : ticket.type === "IMPROVEMENT" || ticket.type === "NEW_FEATURE"
+          ? "APPROVED"
+          : failure?.status ?? "TRIAGED";
       const nextStatus = completed ? "WAITING_USER_VALIDATION" : ownerActionRequired ? "OWNER_ACTION_REQUIRED" : retryStatus;
       const note = completed
         ? supportExecutionResolution(input)
@@ -104,7 +156,8 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
             resolvedById: null,
             executionHeartbeatAt: new Date(),
             executionLeaseId: null,
-            executorId: failure?.exhausted || ownerActionRequired ? null : ticket.executorId,
+            executorId: completed ? input.executorId : null,
+            executionClaimedAt: completed ? ticket.executionClaimedAt : null,
             validationRequestedAt: completed ? new Date() : ticket.validationRequestedAt,
             validationQuestions: completed ? Prisma.JsonNull : undefined,
             externalBlocker: ownerActionRequired ? {

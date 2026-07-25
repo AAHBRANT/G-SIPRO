@@ -1,14 +1,12 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
-import { randomUUID } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 import { getEnvironment } from "@/core/config/env";
 import { getDatabase } from "@/core/database/prisma";
 import { getEntraConfiguration } from "@/core/identity/entra-config";
 import { createLogger } from "@/core/observability/logger";
-import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
 
 const entra = getEntraConfiguration();
 const environment = getEnvironment();
@@ -124,9 +122,8 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (provisioned) {
         await database.user.update({ where: { id: provisioned.id }, data: { entraObjectId: profile.oid, displayName, email } });
       } else {
-        const id = randomUUID();
-        await database.user.create({ data: { id, entraObjectId: profile.oid, displayName, email, createdBy: id, updatedBy: id } });
-        await provisionTeamsAppForManagedUser({ userId: id, email, actorId: id, correlationId: randomUUID() });
+        authLogger.warn({ reason: "USER_NOT_PROVISIONED", email }, "Usuário corporativo não cadastrado no painel administrativo.");
+        return false;
       }
       return true;
     },
