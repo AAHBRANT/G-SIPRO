@@ -44,8 +44,7 @@ export class AzureMapsGeocodingApi {
     const address = z.string().trim().min(2).max(500).parse(addressInput);
     const url = new URL("https://atlas.microsoft.com/geocode");
     url.searchParams.set("api-version", "2026-01-01");
-    url.searchParams.set("query", address);
-    url.searchParams.set("countryRegion", "BR");
+    url.searchParams.set("query", `${address}, Brasil`);
     url.searchParams.set("top", "1");
 
     const response = await this.client.request(url);

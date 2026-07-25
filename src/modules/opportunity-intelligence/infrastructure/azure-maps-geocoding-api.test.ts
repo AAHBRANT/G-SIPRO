@@ -27,7 +27,7 @@ describe("AzureMapsGeocodingApi", () => {
       fetcher as typeof fetch,
     ).locate("Gravataí/RS");
     expect(result).toMatchObject({ latitude: -29.9448, longitude: -50.9919, provider: "AZURE_MAPS" });
-    expect(new URL(requestedUrl).searchParams.get("query")).toBe("Gravataí/RS");
+    expect(new URL(requestedUrl).searchParams.get("query")).toBe("Gravataí/RS, Brasil");
     expect(requestedUrl).not.toContain("server-secret");
     expect(JSON.stringify(result)).not.toContain("server-secret");
   });
