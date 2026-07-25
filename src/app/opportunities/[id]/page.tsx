@@ -14,6 +14,8 @@ import {
   type IntelligenceAnalysisView,
 } from "./intelligence-panel";
 import { OpportunityEditor, type OpportunityEditorData } from "./opportunity-editor";
+import { OpportunityTabs } from "./opportunity-tabs";
+import { collectRequestedServices } from "./requested-services";
 
 const statusLabels = { DRAFT: "Rascunho", QUALIFICATION: "Em análise", ACTIVE: "Validada / em proposta", SUSPENDED: "Suspensa", CLOSED: "Encerrada" } as const;
 const climateMonthlySchema = z.array(z.object({
@@ -56,7 +58,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
       where: { id: id.data },
       include: {
         contractingAuthority: true,
-        history: { orderBy: { version: "desc" } },
+        owner: true,
         proposals: { where: { deletedAt: null }, select: { id: true, code: true }, orderBy: { createdAt: "desc" }, take: 1 },
       },
     }),
@@ -216,57 +218,125 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     };
   });
 
+  const requestedServices = collectRequestedServices(documents);
+  const estimatedValue = record.estimatedValue === null
+    ? "Não informado"
+    : Number(record.estimatedValue).toLocaleString("pt-BR", { style: "currency", currency: record.currency ?? "BRL" });
+
   return (
     <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div><Link className="text-sm font-bold text-brand" href="/opportunities">← Voltar às oportunidades</Link>
-        <div className="mt-6 flex flex-wrap items-center gap-3"><h1 className="text-3xl font-bold">{record.code}</h1>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold">{statusLabels[record.status]}</span>
-          <span className="text-sm text-muted">Versão {record.version}</span>
+      <div>
+        <Link className="text-sm font-bold text-brand" href="/opportunities">← Voltar às oportunidades</Link>
+        <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold">{record.code}</h1>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold">{statusLabels[record.status]}</span>
+              <span className="text-sm text-muted">Versão {record.version}</span>
+            </div>
+            <p className="mt-2 max-w-4xl text-sm text-slate-500">Informações essenciais, documentos exclusivos desta oportunidade e decisão de avanço.</p>
+          </div>
+          <OpportunityEditor
+            opportunity={opportunity}
+            users={users.map((user) => ({ id: user.id, name: user.displayName }))}
+            canUpdate={authorize(authorization, { permission: "opportunities.update" }).allowed}
+            canTransition={authorize(authorization, { permission: "opportunities.transition" }).allowed}
+          />
         </div>
       </div>
-      {canReadAnalytics && <IntelligencePanel
-        analysis={analysis}
-        canCalculate={canCalculateAnalytics}
-        canReadFinancial={canReadFinancial}
-        integrationReadiness={integrationReadiness}
-        mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
-        opportunityCode={record.code}
-        opportunityId={record.id}
-      />}
-      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-brand">Documentação da oportunidade</p>
-            <h2 className="mt-1 text-xl font-bold">Arquivos e análises do contexto</h2>
-            <p className="mt-1 text-sm text-muted">Somente os documentos desta oportunidade são considerados. Novos arquivos, revisões e retificações podem ser adicionados durante a análise.</p>
+
+      <OpportunityTabs
+        summary={
+          <div className="grid gap-6">
+            <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+              <header className="border-b border-slate-200 px-5 py-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand">Resumo da oportunidade</p>
+                <h2 className="mt-1 text-xl font-bold">Informações principais</h2>
+              </header>
+              <div className="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Cliente/órgão", record.contractingAuthority?.name ?? "Não identificado"],
+                  ["Responsável", record.owner?.displayName ?? "Não atribuído"],
+                  ["Valor estimado", estimatedValue],
+                  ["Origem", record.origin],
+                  ["Publicação", record.publishedAt?.toLocaleDateString("pt-BR") ?? "Não informada"],
+                  ["Entrega", record.deliveryAt?.toLocaleDateString("pt-BR") ?? "Não informada"],
+                  ["Documentos", String(documents.length)],
+                  ["Proposta vinculada", record.proposals[0]?.code ?? "Ainda não gerada"],
+                ].map(([label, value]) => (
+                  <dl className="min-h-24 bg-white p-4" key={label}>
+                    <dt className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</dt>
+                    <dd className="mt-2 text-sm font-bold text-slate-900">{value}</dd>
+                  </dl>
+                ))}
+              </div>
+              <div className="border-t border-slate-200 p-5">
+                <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Objeto</p>
+                <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-700">{record.subject ?? "Não informado"}</p>
+              </div>
+            </section>
+
+            <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+              <header className="border-b border-slate-200 px-5 py-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand">Escopo identificado</p>
+                <h2 className="mt-1 text-xl font-bold">Serviços solicitados</h2>
+                <p className="mt-1 text-xs text-slate-500">Itens extraídos somente dos documentos vinculados a esta oportunidade.</p>
+              </header>
+              {requestedServices.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-sm">
+                    <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
+                      <tr><th className="px-5 py-3">Item/serviço</th><th className="px-5 py-3">Exigência ou quantidade</th><th className="px-5 py-3">Fonte</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {requestedServices.map((service, index) => (
+                        <tr key={`${service.item}-${index}`}>
+                          <td className="px-5 py-4 font-semibold text-slate-800">{service.item}</td>
+                          <td className="max-w-2xl whitespace-pre-wrap px-5 py-4 text-slate-600">{service.requirement}</td>
+                          <td className="px-5 py-4 text-xs text-slate-500">{service.source}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="p-6 text-center text-sm text-slate-500">Nenhum serviço solicitado foi identificado nos documentos analisados.</p>
+              )}
+            </section>
+
+            {canReadAnalytics && <IntelligencePanel
+              analysis={analysis}
+              canCalculate={canCalculateAnalytics}
+              canReadFinancial={canReadFinancial}
+              integrationReadiness={integrationReadiness}
+              mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
+              opportunityCode={record.code}
+              opportunityId={record.id}
+            />}
           </div>
-          {record.proposals[0] && <Link className="rounded-lg border border-brand px-4 py-2 text-xs font-bold text-brand" href="/proposals">Abrir {record.proposals[0].code}</Link>}
-        </div>
-        {authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed && (
-          <div className="mt-4">
-            <ContextDocumentUploader entityType="OPPORTUNITY" entityId={record.id} ownerId={record.ownerId ?? authorization!.actorId} contextLabel={`oportunidade ${record.code}`} extractionDefinitions={extractionDefinitions}/>
-          </div>
-        )}
-        <div className="mt-4 grid gap-4">
-          {documents.map((document) => <ProposalDocumentAnalysis document={document} key={document.id}/>)}
-          {documents.length === 0 && <p className="rounded-xl border border-slate-200 p-5 text-center text-sm text-slate-500">Nenhum documento vinculado a esta oportunidade.</p>}
-        </div>
-      </section>
-      <OpportunityEditor
-        opportunity={opportunity}
-        users={users.map((user) => ({ id: user.id, name: user.displayName }))}
-        canUpdate={authorize(authorization, { permission: "opportunities.update" }).allowed}
-        canTransition={authorize(authorization, { permission: "opportunities.transition" }).allowed}
+        }
+        documents={
+          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-brand">Documentação da oportunidade</p>
+                <h2 className="mt-1 text-xl font-bold">Arquivos e análises do contexto</h2>
+                <p className="mt-1 text-sm text-muted">Somente os documentos desta oportunidade são considerados. Novos arquivos, revisões e retificações podem ser adicionados durante a análise.</p>
+              </div>
+              {record.proposals[0] && <Link className="rounded-lg border border-brand px-4 py-2 text-xs font-bold text-brand" href="/proposals">Abrir {record.proposals[0].code}</Link>}
+            </div>
+            {authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed && (
+              <div className="mt-4">
+                <ContextDocumentUploader entityType="OPPORTUNITY" entityId={record.id} ownerId={record.ownerId ?? authorization!.actorId} contextLabel={`oportunidade ${record.code}`} extractionDefinitions={extractionDefinitions}/>
+              </div>
+            )}
+            <div className="mt-4 grid gap-4">
+              {documents.map((document) => <ProposalDocumentAnalysis document={document} key={document.id}/>)}
+              {documents.length === 0 && <p className="rounded-xl border border-slate-200 p-5 text-center text-sm text-slate-500">Nenhum documento vinculado a esta oportunidade.</p>}
+            </div>
+          </section>
+        }
       />
-      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-        <h2 className="text-xl font-bold">Histórico imutável</h2>
-        <ol className="mt-4 space-y-3">
-          {record.history.map((entry) => <li className="rounded-xl border border-border p-4 text-sm" key={entry.id}>
-            <div className="flex flex-wrap justify-between gap-2"><strong>Versão {entry.version} · {entry.action}</strong><span className="text-muted">{entry.changedAt.toLocaleString("pt-BR")}</span></div>
-            <p className="mt-1 text-muted">Situação: {statusLabels[entry.toStatus]}{entry.reason ? ` · Motivo: ${entry.reason}` : ""}</p>
-          </li>)}
-        </ol>
-      </section>
     </main>
   );
 }
