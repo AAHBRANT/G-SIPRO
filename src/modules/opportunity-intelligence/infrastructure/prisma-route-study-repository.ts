@@ -69,8 +69,8 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
           },
         },
       });
-      if (!previous?.climateStudy) {
-        throw new RouteStudyRuleError("Execute o estudo climático antes da análise logística.");
+      if (!previous) {
+        throw new RouteStudyRuleError("Execute a análise da oportunidade antes do estudo logístico.");
       }
       const studyDimensionRecord = previous.dimensions.find(item => item.perspective === "STUDIES");
       if (!studyDimensionRecord) {
@@ -219,29 +219,31 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
       }
 
       const climate = previous.climateStudy;
-      await transaction.climateStudy.create({
-        data: {
-          id: randomUUID(),
-          analysisId: analysis.id,
-          provider: climate.provider,
-          providerRequestId: climate.providerRequestId,
-          locationLabel: climate.locationLabel,
-          latitude: climate.latitude,
-          longitude: climate.longitude,
-          workStart: climate.workStart,
-          workEnd: climate.workEnd,
-          historyStart: climate.historyStart,
-          historyEnd: climate.historyEnd,
-          station: climate.station === null ? undefined : json(climate.station),
-          monthlySeries: json(climate.monthlySeries),
-          sourceMetadata: json(climate.sourceMetadata),
-          dataCoverage: climate.dataCoverage,
-          responseHash: climate.responseHash,
-          retrievedAt: climate.retrievedAt,
-          methodVersion: climate.methodVersion,
-          resultHash: climate.resultHash,
-        },
-      });
+      if (climate) {
+        await transaction.climateStudy.create({
+          data: {
+            id: randomUUID(),
+            analysisId: analysis.id,
+            provider: climate.provider,
+            providerRequestId: climate.providerRequestId,
+            locationLabel: climate.locationLabel,
+            latitude: climate.latitude,
+            longitude: climate.longitude,
+            workStart: climate.workStart,
+            workEnd: climate.workEnd,
+            historyStart: climate.historyStart,
+            historyEnd: climate.historyEnd,
+            station: climate.station === null ? undefined : json(climate.station),
+            monthlySeries: json(climate.monthlySeries),
+            sourceMetadata: json(climate.sourceMetadata),
+            dataCoverage: climate.dataCoverage,
+            responseHash: climate.responseHash,
+            retrievedAt: climate.retrievedAt,
+            methodVersion: climate.methodVersion,
+            resultHash: climate.resultHash,
+          },
+        });
+      }
       const routeStudy = await transaction.routeStudy.create({
         data: {
           id: randomUUID(),

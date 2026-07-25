@@ -33,8 +33,15 @@ describe("AzureMapsRoutesApi", () => {
       fetcher,
     ).computeMatrix([base], destination);
     const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(url.toString()).not.toContain("secret");
     expect((init.headers as Record<string, string>)["subscription-key"]).toBe("secret");
+    expect(body).toMatchObject({
+      departAt: "now",
+      optimizeRoute: "fastest",
+      traffic: "live",
+      travelMode: "driving",
+    });
     expect(result.routes[0]?.durationSeconds).toBe(28_800);
     expect(result.provider).toBe("Azure Maps");
   });
