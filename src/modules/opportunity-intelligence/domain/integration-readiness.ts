@@ -1,8 +1,6 @@
 export type IntelligenceIntegrationCode =
   | "CLIMATE"
-  | "GOOGLE_ROUTES"
-  | "GOOGLE_GEOCODING"
-  | "GOOGLE_MAPS"
+  | "AZURE_MAPS"
   | "TEAMS_ACTIVITY"
   | "EMAIL";
 
@@ -31,24 +29,10 @@ export function evaluateIntelligenceIntegrationReadiness(
       responsible: "PROPRIETARIO" as const,
     },
     {
-      code: "GOOGLE_GEOCODING" as const,
-      label: "Busca de cidade/endereço",
-      required: ["GOOGLE_GEOCODING_API_KEY"],
-      nextAction: "Criar uma chave de servidor restrita à Geocoding API para converter cidade ou endereço em coordenadas.",
-      responsible: "ADMINISTRADOR_CLOUD" as const,
-    },
-    {
-      code: "GOOGLE_ROUTES" as const,
-      label: "Google Routes",
-      required: ["GOOGLE_ROUTES_API_KEY"],
-      nextAction: "Criar uma chave de servidor restrita à Routes API, com quota e alerta de custo.",
-      responsible: "ADMINISTRADOR_CLOUD" as const,
-    },
-    {
-      code: "GOOGLE_MAPS" as const,
-      label: "Mapa incorporado",
-      required: ["NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY"],
-      nextAction: "Criar uma chave de navegador separada, restrita ao domínio HML e à Maps Embed API.",
+      code: "AZURE_MAPS" as const,
+      label: "Localização, rotas e mapas",
+      required: ["AZURE_MAPS_CLIENT_ID"],
+      nextAction: "Criar a conta Azure Maps e conceder à identidade gerenciada do G-SIPRO acesso somente de leitura.",
       responsible: "ADMINISTRADOR_CLOUD" as const,
     },
     {

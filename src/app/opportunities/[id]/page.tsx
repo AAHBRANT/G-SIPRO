@@ -362,7 +362,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 ? { type: "authority", id: record.contractingAuthority.id, name: record.contractingAuthority.name }
                 : undefined}
             integrationReadiness={integrationReadiness}
-            mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
             opportunityCode={record.code}
             opportunityId={record.id}
             contextDefaults={analysisContextDefaults}

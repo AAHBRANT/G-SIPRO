@@ -130,7 +130,7 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
           confidence: consolidated.confidence,
           recommendation: consolidated.recommendation,
           executiveSummary: `${previous.executiveSummary ?? "Análise anterior preservada"} `
-            + `${route.alternatives.length} alternativa(s) logística(s) consultada(s) via Google Routes API. `
+            + `${route.alternatives.length} alternativa(s) logística(s) consultada(s) via Azure Maps. `
             + "A melhor base não foi selecionada porque a regra de custo, equipe e mobilização ainda depende de aprovação.",
           requestedBy: actorId,
           startedAt: new Date(),
@@ -188,11 +188,11 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
               id: randomUUID(),
               analysisId: analysis.id,
               dimensionResultId: dimensionRecord.id,
-              sourceType: "GOOGLE_ROUTES_API",
+              sourceType: "AZURE_MAPS_ROUTE_API",
               sourceId: response.requestId,
               sourceVersion: "v2",
               sourceHash: route.responseHash,
-              locator: "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix",
+              locator: "https://atlas.microsoft.com/route/matrix?api-version=2025-01-01",
               excerpt: `Matriz de rotas para ${destination.label} com ${bases.length} base(s) de origem.`,
               referenceDate: new Date(response.retrievedAt),
               accessLevel: "INTERNAL",

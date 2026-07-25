@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { GsIcon } from "@/components/ui/gs-icon";
@@ -161,10 +162,14 @@ function scoreTone(value: number | null) {
 }
 
 function buildMapsUrl(route: RouteView, alternative?: RouteAlternativeView) {
-  const destination = `${route.destinationLat},${route.destinationLng}`;
-  if (!alternative) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
-  const origin = `${alternative.origin.latitude},${alternative.origin.longitude}`;
-  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+  if (!alternative) return "";
+  const query = new URLSearchParams({
+    originLat: alternative.origin.latitude.toString(),
+    originLng: alternative.origin.longitude.toString(),
+    destinationLat: route.destinationLat.toString(),
+    destinationLng: route.destinationLng.toString(),
+  });
+  return `/api/maps/route?${query}`;
 }
 
 export function formatRouteTolls(tolls: RouteAlternativeView["tolls"]) {
@@ -190,7 +195,6 @@ export function IntelligencePanel({
   financialSubject,
   canDecide,
   isOwner,
-  mapsEmbedKey,
   integrationReadiness,
   contextDefaults,
 }: {
@@ -204,7 +208,6 @@ export function IntelligencePanel({
   financialSubject?: FinancialSubject;
   canDecide: boolean;
   isOwner: boolean;
-  mapsEmbedKey?: string;
   integrationReadiness?: readonly IntegrationReadinessView[];
   contextDefaults: AnalysisContextDefaults;
 }) {
@@ -419,7 +422,7 @@ export function IntelligencePanel({
       {drawer && (
         <IntelligenceDrawer title={drawerTitle(drawer)} onClose={() => setDrawer(null)} closeButtonRef={closeButtonRef}>
           {drawer === "CLIMATE" && <ClimateDetail analysis={analysis} busy={busyStage === "CLIMATE"} canCalculate={canCalculate} contextDefaults={contextDefaults} onSubmit={(event) => runContextualStage(event, "CLIMATE")}/>}
-          {drawer === "LOGISTICS" && <LogisticsDetail analysis={analysis} busy={busyStage === "LOGISTICS"} canCalculate={canCalculate} contextDefaults={contextDefaults} mapsEmbedKey={mapsEmbedKey} onSubmit={(event) => runContextualStage(event, "LOGISTICS")}/>}
+          {drawer === "LOGISTICS" && <LogisticsDetail analysis={analysis} busy={busyStage === "LOGISTICS"} canCalculate={canCalculate} contextDefaults={contextDefaults} onSubmit={(event) => runContextualStage(event, "LOGISTICS")}/>}
           {drawer === "FINANCIAL" && <FinancialDetail analysis={analysis} busy={busyStage === "FINANCIAL"} canAssessClientRisk={canAssessClientRisk} canAssessFinancial={canAssessFinancial} canCalculate={canCalculate} canReadFinancial={canReadFinancial} financialSubject={financialSubject} onRun={() => runStage("FINANCIAL")} opportunityId={opportunityId}/>}
           {(drawer === "COMMERCIAL" || drawer === "TECHNICAL") && <DimensionDetail analysis={analysis} perspective={drawer}/>}
           {drawer === "PENDING" && <PendingDetail analysis={analysis}/>}
@@ -512,11 +515,11 @@ function ClimateDetail({ analysis, canCalculate, busy, contextDefaults, onSubmit
   return <div className="space-y-6">{climate ? <><section className="rounded-xl border border-slate-200 p-5"><div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-black text-slate-900">{climate.locationLabel}</h3><p className="mt-1 text-xs text-slate-500">{climate.provider} · histórico de {new Date(climate.historyStart).toLocaleDateString("pt-BR")} a {new Date(climate.historyEnd).toLocaleDateString("pt-BR")}</p></div><span className="h-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Cobertura {Math.round(climate.dataCoverage)}%</span></div><p className="mt-3 text-xs text-slate-500">Período previsto da obra: {new Date(climate.workStart).toLocaleDateString("pt-BR")} a {new Date(climate.workEnd).toLocaleDateString("pt-BR")}</p></section><section aria-labelledby="precipitation-chart-title" className="rounded-xl border border-slate-200 p-5"><h3 className="font-black text-slate-900" id="precipitation-chart-title">Precipitação histórica mensal</h3><div aria-hidden="true" className="mt-6 flex h-56 items-end gap-1.5 border-b border-slate-200 px-1">{monthLabels.map((label, index) => { const item = climate.monthlySeries.find((entry) => entry.month === index + 1); const height = item ? Math.max(4, item.precipitationMm / max * 100) : 0; return <div className="flex h-full min-w-0 flex-1 flex-col justify-end text-center" key={label}><span className="mb-1 text-[8px] font-bold text-slate-500">{item ? Math.round(item.precipitationMm) : "—"}</span><span className="mx-auto w-full max-w-7 rounded-t bg-gradient-to-t from-blue-700 to-blue-400" style={{ height: `${height}%` }}/><span className="mt-2 text-[8px] font-bold text-slate-500">{label}</span></div>; })}</div><div className="mt-5 overflow-x-auto"><table className="w-full text-left text-xs"><caption className="sr-only">Tabela equivalente ao gráfico de precipitação mensal</caption><thead className="bg-slate-50 text-[9px] uppercase text-slate-500"><tr><th className="px-3 py-2">Mês</th><th className="px-3 py-2">Precipitação</th><th className="px-3 py-2">Temperatura</th><th className="px-3 py-2">Completude</th></tr></thead><tbody className="divide-y divide-slate-100">{climate.monthlySeries.map((item) => <tr key={item.month}><td className="px-3 py-2 font-bold">{monthLabels[item.month - 1]}</td><td className="px-3 py-2">{item.precipitationMm.toLocaleString("pt-BR")} mm</td><td className="px-3 py-2">{item.averageTemperatureC === undefined ? "—" : `${item.averageTemperatureC.toLocaleString("pt-BR")} °C`}</td><td className="px-3 py-2">{Math.round(item.completeness)}%</td></tr>)}</tbody></table></div></section></> : <EmptyDetail text="Ainda não há estudo climático para esta oportunidade. A ausência de dados não é convertida em clima favorável ou nota zero."/>}{canCalculate && <ContextForm busy={busy} buttonLabel="Consultar API climática" defaults={contextDefaults} onSubmit={onSubmit} showDates/>}</div>;
 }
 
-function LogisticsDetail({ analysis, canCalculate, busy, contextDefaults, mapsEmbedKey, onSubmit }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; mapsEmbedKey?: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function LogisticsDetail({ analysis, canCalculate, busy, contextDefaults, onSubmit }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   const route = analysis?.route;
   const best = route?.alternatives.filter((item) => item.condition === "ROUTE_EXISTS").sort((left, right) => (left.distanceKm ?? Infinity) - (right.distanceKm ?? Infinity))[0];
-  const embedUrl = route && best && mapsEmbedKey ? `https://www.google.com/maps/embed/v1/directions?key=${encodeURIComponent(mapsEmbedKey)}&origin=${best.origin.latitude},${best.origin.longitude}&destination=${route.destinationLat},${route.destinationLng}&mode=driving` : undefined;
-  return <div className="space-y-6">{route ? <><section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><div className="relative grid min-h-72 place-items-center">{embedUrl ? <iframe allowFullScreen className="h-80 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={embedUrl} title={`Rota para ${route.destinationLabel}`}/> : <div className="px-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-brand shadow"><GsIcon name="target"/></span><h3 className="mt-4 font-black text-slate-900">{route.destinationLabel}</h3><p className="mt-2 max-w-md text-xs leading-5 text-slate-500">A rota foi calculada. Configure a chave de navegador restrita para exibir o mapa incorporado ou abra diretamente no Google Maps.</p>{best && <a className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white" href={buildMapsUrl(route, best)} rel="noreferrer" target="_blank">Abrir rota no Google Maps</a>}</div>}</div></section><section className="rounded-xl border border-slate-200"><header className="border-b border-slate-100 px-4 py-3"><h3 className="font-black text-slate-900">Alternativas de mobilização</h3></header><div className="divide-y divide-slate-100">{route.alternatives.map((item) => <article className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-center" key={item.baseId}><div><p className="font-bold text-slate-900">{item.baseCode} · {item.baseName}</p><p className="text-xs text-slate-500">{item.baseLocality}</p></div><MiniMetric label="Distância" value={item.distanceKm === undefined ? "Sem rota" : `${item.distanceKm.toLocaleString("pt-BR")} km`}/><MiniMetric label="Duração" value={item.durationHours === undefined ? "—" : `${item.durationHours.toLocaleString("pt-BR")} h`}/><MiniMetric label="Pedágios" value={formatRouteTolls(item.tolls)}/><a aria-label={`Abrir rota da base ${item.baseName}`} className="text-xs font-bold text-brand hover:underline" href={buildMapsUrl(route, item)} rel="noreferrer" target="_blank">Visualizar</a></article>)}</div></section></> : <EmptyDetail text="Ainda não há estudo logístico. Cadastre pelo menos uma base operacional e informe as coordenadas do local da obra."/>}{canCalculate && <ContextForm busy={busy} buttonLabel="Calcular rotas" defaults={contextDefaults} onSubmit={onSubmit}/>}</div>;
+  const mapUrl = route && best ? buildMapsUrl(route, best) : undefined;
+  return <div className="space-y-6">{route ? <><section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><div className="relative grid min-h-80 place-items-center">{mapUrl ? <Image alt={`Rota da base ${best?.baseName} para ${route.destinationLabel}`} className="object-cover" fill sizes="(max-width: 768px) 100vw, 768px" src={mapUrl} unoptimized/> : <div className="px-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-brand shadow"><GsIcon name="target"/></span><h3 className="mt-4 font-black text-slate-900">{route.destinationLabel}</h3><p className="mt-2 max-w-md text-xs leading-5 text-slate-500">Nenhuma rota válida foi retornada para exibição no Azure Maps.</p></div>}</div></section><section className="rounded-xl border border-slate-200"><header className="border-b border-slate-100 px-4 py-3"><h3 className="font-black text-slate-900">Alternativas de mobilização</h3></header><div className="divide-y divide-slate-100">{route.alternatives.map((item) => <article className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-center" key={item.baseId}><div><p className="font-bold text-slate-900">{item.baseCode} · {item.baseName}</p><p className="text-xs text-slate-500">{item.baseLocality}</p></div><MiniMetric label="Distância" value={item.distanceKm === undefined ? "Sem rota" : `${item.distanceKm.toLocaleString("pt-BR")} km`}/><MiniMetric label="Duração" value={item.durationHours === undefined ? "—" : `${item.durationHours.toLocaleString("pt-BR")} h`}/><MiniMetric label="Pedágios" value={formatRouteTolls(item.tolls)}/>{item.condition === "ROUTE_EXISTS" ? <a aria-label={`Abrir rota da base ${item.baseName}`} className="text-xs font-bold text-brand hover:underline" href={buildMapsUrl(route, item)} rel="noreferrer" target="_blank">Visualizar</a> : <span className="text-xs text-slate-400">Sem rota</span>}</article>)}</div></section></> : <EmptyDetail text="Ainda não há estudo logístico. Cadastre pelo menos uma base operacional e informe as coordenadas do local da obra."/>}{canCalculate && <ContextForm busy={busy} buttonLabel="Calcular rotas" defaults={contextDefaults} onSubmit={onSubmit}/>}</div>;
 }
 
 function FinancialDetail({ analysis, canCalculate, canReadFinancial, canAssessFinancial, canAssessClientRisk, financialSubject, opportunityId, busy, onRun }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; canReadFinancial: boolean; canAssessFinancial: boolean; canAssessClientRisk: boolean; financialSubject?: FinancialSubject; opportunityId: string; busy: boolean; onRun: () => void }) {

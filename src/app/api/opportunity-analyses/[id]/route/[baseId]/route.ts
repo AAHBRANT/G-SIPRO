@@ -5,7 +5,7 @@ import { requirePermission } from "@/core/authorization/authorization-context";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { RouteStudyService } from "@/modules/opportunity-intelligence/application/route-study-service";
-import { GoogleRoutesApi } from "@/modules/opportunity-intelligence/infrastructure/google-routes-api";
+import { AzureMapsRoutesApi } from "@/modules/opportunity-intelligence/infrastructure/azure-maps-routes-api";
 import { PrismaRouteStudyRepository } from "@/modules/opportunity-intelligence/infrastructure/prisma-route-study-repository";
 import { mapOpportunityAnalysisApiError } from "@/modules/opportunity-intelligence/presentation/opportunity-analysis-api";
 
@@ -22,7 +22,7 @@ export async function POST(
       const baseId = z.uuid().parse(params.baseId);
       const data = await new RouteStudyService(
         new PrismaRouteStudyRepository(),
-        new GoogleRoutesApi(),
+        new AzureMapsRoutesApi(),
       ).loadMapRoute(analysisId, baseId, authorization.actorId, context.correlationId);
       return NextResponse.json({ data, correlationId: context.correlationId }, { status: 201 });
     } catch (error) {

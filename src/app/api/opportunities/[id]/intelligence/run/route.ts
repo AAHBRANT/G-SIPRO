@@ -13,7 +13,7 @@ import { mapOpportunityAnalysisApiError } from "@/modules/opportunity-intelligen
 import { climateStudyContextSchema } from "@/modules/opportunity-intelligence/domain/climate-study";
 import { routeDestinationSchema } from "@/modules/opportunity-intelligence/domain/route-study";
 import { RouteStudyService } from "@/modules/opportunity-intelligence/application/route-study-service";
-import { GoogleRoutesApi } from "@/modules/opportunity-intelligence/infrastructure/google-routes-api";
+import { AzureMapsRoutesApi } from "@/modules/opportunity-intelligence/infrastructure/azure-maps-routes-api";
 import { PrismaRouteStudyRepository } from "@/modules/opportunity-intelligence/infrastructure/prisma-route-study-repository";
 import { FinancialAnalysisService } from "@/modules/opportunity-intelligence/application/financial-analysis-service";
 import { PrismaFinancialAnalysisRepository } from "@/modules/opportunity-intelligence/infrastructure/prisma-financial-analysis-repository";
@@ -61,7 +61,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
           context.correlationId,
         );
       } else if (command.stage === "LOGISTICS") {
-        data = await new RouteStudyService(new PrismaRouteStudyRepository(), new GoogleRoutesApi()).run(
+        data = await new RouteStudyService(new PrismaRouteStudyRepository(), new AzureMapsRoutesApi()).run(
           opportunityId,
           command.routeDestination,
           authorization.actorId,
