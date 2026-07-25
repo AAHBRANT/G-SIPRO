@@ -62,7 +62,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const canDecideAnalytics = authorize(authorization, { permission: "analytics.decide" }).allowed;
   const database = getDatabase();
 
-  const [record, users, latestAnalysis, useCases, linkedDocuments] = await Promise.all([
+  const [record, users, latestAnalysis, useCases, linkedDocuments, operationalBases] = await Promise.all([
     database.opportunity.findUnique({
       where: { id: id.data },
       include: {
@@ -108,6 +108,13 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
       },
       orderBy: { createdAt: "asc" },
     }),
+    canReadAnalytics
+      ? database.operationalBase.findMany({
+          where: { active: true },
+          select: { id: true, code: true, name: true, locality: true },
+          orderBy: [{ name: "asc" }, { code: "asc" }],
+        })
+      : Promise.resolve([]),
   ]);
   if (!record) notFound();
 
@@ -199,6 +206,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         destinationLat: Number(latestAnalysis.routeStudy.destinationLat),
         destinationLng: Number(latestAnalysis.routeStudy.destinationLng),
         provider: latestAnalysis.routeStudy.provider,
+        ...(latestAnalysis.routeStudy.selectedBaseId && { selectedBaseId: latestAnalysis.routeStudy.selectedBaseId }),
         selectionStatus: latestAnalysis.routeStudy.selectionStatus,
         alternatives: routeAlternativesSchema.catch([]).parse(latestAnalysis.routeStudy.alternatives),
       },
@@ -365,6 +373,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             opportunityCode={record.code}
             opportunityId={record.id}
             contextDefaults={analysisContextDefaults}
+            operationalBases={operationalBases}
           />
         ) : undefined}
       />

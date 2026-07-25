@@ -48,6 +48,7 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
     destination: RouteDestination,
     bases: RouteBase[],
     response: RouteMatrixResponse,
+    selectedBaseId: string,
     actorId: string,
     correlationId: string,
   ) {
@@ -84,7 +85,7 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
         thresholds: intelligenceThresholdsSchema.parse(previous.policy.thresholds),
         coverageMinimum: Number(previous.policy.coverageMinimum),
       });
-      const route = calculateRouteStudy(destination, bases, response);
+      const route = calculateRouteStudy(destination, bases, response, selectedBaseId);
       const previousDimensions = previous.dimensions.map(dimension => this.toDomainDimension(dimension));
       const previousStudy = previousDimensions.find(item => item.perspective === "STUDIES")!;
       const mergedStudy = mergePracticabilityDimension(previousStudy, route);
@@ -130,8 +131,7 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
           confidence: consolidated.confidence,
           recommendation: consolidated.recommendation,
           executiveSummary: `${previous.executiveSummary ?? "Análise anterior preservada"} `
-            + `${route.alternatives.length} alternativa(s) logística(s) consultada(s) via Azure Maps. `
-            + "A melhor base não foi selecionada porque a regra de custo, equipe e mobilização ainda depende de aprovação.",
+            + `Rota logística calculada via Azure Maps a partir da base selecionada pelo usuário.`,
           requestedBy: actorId,
           startedAt: new Date(),
           completedAt: new Date(),
@@ -253,6 +253,7 @@ export class PrismaRouteStudyRepository implements RouteStudyRepository {
           destinationLng: destination.longitude,
           travelMode: destination.travelMode,
           alternatives: json(route.alternatives),
+          selectedBaseId,
           selectionStatus: route.selectionStatus,
           requestHash: route.requestHash,
           responseHash: route.responseHash,

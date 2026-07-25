@@ -23,6 +23,7 @@ const commandSchema = z.object({
   stage: z.enum(["COMMERCIAL", "TECHNICAL", "CLIMATE", "LOGISTICS", "FINANCIAL"]).default("COMMERCIAL"),
   climateContext: climateStudyContextSchema.optional(),
   routeDestination: routeDestinationSchema.optional(),
+  routeBaseId: z.uuid().optional(),
 }).strict().superRefine((value, context) => {
   if (value.stage === "CLIMATE" && !value.climateContext) {
     context.addIssue({
@@ -36,6 +37,13 @@ const commandSchema = z.object({
       code: "custom",
       path: ["routeDestination"],
       message: "O destino da obra é obrigatório para consultar as rotas.",
+    });
+  }
+  if (value.stage === "LOGISTICS" && !value.routeBaseId) {
+    context.addIssue({
+      code: "custom",
+      path: ["routeBaseId"],
+      message: "Selecione a base operacional que será o endereço de partida.",
     });
   }
 });
@@ -64,6 +72,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         data = await new RouteStudyService(new PrismaRouteStudyRepository(), new AzureMapsRoutesApi()).run(
           opportunityId,
           command.routeDestination,
+          command.routeBaseId!,
           authorization.actorId,
           context.correlationId,
         );

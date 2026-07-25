@@ -16,6 +16,7 @@ export interface RouteStudyRepository {
     destination: RouteDestination,
     bases: RouteBase[],
     response: RouteMatrixResponse,
+    selectedBaseId: string,
     actorId: string,
     correlationId: string,
   ): Promise<unknown>;
@@ -45,21 +46,28 @@ export class RouteStudyService {
   async run(
     opportunityId: string,
     destinationInput: unknown,
+    selectedBaseId: string,
     actorId: string,
     correlationId: string = randomUUID(),
   ) {
     if (!this.routeApi) throw new Error("API de rotas obrigatória para executar a consulta.");
     const destination = routeDestinationSchema.parse(destinationInput);
-    const bases = routeBaseSchema.array().parse(await this.repository.listActiveRouteBases());
-    if (bases.length === 0) {
+    const activeBases = routeBaseSchema.array().parse(await this.repository.listActiveRouteBases());
+    if (activeBases.length === 0) {
       throw new RouteStudyRuleError("Cadastre ao menos uma base operacional ativa.");
     }
+    const selectedBase = activeBases.find(base => base.id === selectedBaseId);
+    if (!selectedBase) {
+      throw new RouteStudyRuleError("Selecione uma base operacional ativa para o endereço de partida.");
+    }
+    const bases = [selectedBase];
     const response = await this.routeApi.computeMatrix(bases, destination);
     return this.repository.recordRouteStudy(
       opportunityId,
       destination,
       bases,
       response,
+      selectedBase.id,
       actorId,
       correlationId,
     );

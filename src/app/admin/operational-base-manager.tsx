@@ -53,7 +53,7 @@ export function OperationalBaseManager({ bases, canConfigure }: { bases: readonl
     <header className="flex flex-col justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center">
       <div className="flex items-center gap-2">
         <GsIcon className="h-4 w-4 text-brand" name="target"/>
-        <div><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Bases operacionais</h2><p className="mt-1 text-[10px] text-slate-500">Cadastre matriz e filiais uma única vez. Todas as bases ativas serão comparadas no cálculo de distância e rota.</p></div>
+        <div><h2 className="text-xs font-black uppercase tracking-wide text-slate-900">Bases operacionais</h2><p className="mt-1 text-[10px] text-slate-500">Cadastre matriz e filiais uma única vez. As bases ativas ficam disponíveis como endereço de partida no cálculo de rota.</p></div>
       </div>
       {canConfigure && <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3 text-xs font-bold text-white" onClick={() => setOpen((value) => !value)} type="button"><span className="text-base leading-none">+</span> Adicionar base</button>}
     </header>

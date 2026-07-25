@@ -60,6 +60,7 @@ export function calculateRouteStudy(
   destinationInput: RouteDestination,
   basesInput: RouteBase[],
   responseInput: RouteMatrixResponse,
+  selectedBaseId?: string,
 ) {
   const destination = routeDestinationSchema.parse(destinationInput);
   const bases = routeBaseSchema.array().min(1).parse(basesInput);
@@ -89,11 +90,11 @@ export function calculateRouteStudy(
       reason: "Ausência de rota não pode ser interpretada como distância ou custo zero.",
       requiredInformation: "Revisar coordenadas ou consultar alternativa logística autorizada.",
     }] : []),
-    {
+    ...(!selectedBaseId ? [{
       description: "Regra empresarial de seleção da base ainda não aprovada.",
       reason: "Menor distância não representa necessariamente menor custo ou melhor mobilização.",
       requiredInformation: "Definir pesos de custo, tempo, equipe e capacidade de mobilização.",
-    },
+    }] : []),
     {
       description: "Custos internos de mobilização ainda não informados.",
       reason: "A API fornece rota e estimativas externas, mas não conhece os custos operacionais da empresa.",
@@ -108,7 +109,8 @@ export function calculateRouteStudy(
     responseHash,
     resultHash,
     alternatives,
-    selectionStatus: "PENDING_RULE" as const,
+    selectedBaseId,
+    selectionStatus: selectedBaseId ? "USER_SELECTED" as const : "PENDING_RULE" as const,
     pendingItems,
   });
 }

@@ -37,10 +37,19 @@ describe("RouteStudyService", () => {
     await new RouteStudyService(target, routeApi).run(
       "00000000-0000-4000-8000-000000000002",
       destination,
+      base.id,
       "00000000-0000-4000-8000-000000000003",
     );
     expect(routeApi.computeMatrix).toHaveBeenCalledWith([base], destination);
-    expect(target.recordRouteStudy).toHaveBeenCalledOnce();
+    expect(target.recordRouteStudy).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-000000000002",
+      destination,
+      [base],
+      expect.any(Object),
+      base.id,
+      "00000000-0000-4000-8000-000000000003",
+      expect.any(String),
+    );
   });
 
   it("requires at least one active operational base", async () => {
@@ -49,7 +58,20 @@ describe("RouteStudyService", () => {
     await expect(new RouteStudyService(target, routeApi).run(
       "00000000-0000-4000-8000-000000000002",
       destination,
+      base.id,
       "00000000-0000-4000-8000-000000000003",
     )).rejects.toBeInstanceOf(RouteStudyRuleError);
+  });
+
+  it("rejects a departure base that is not active", async () => {
+    const target = repository();
+    const routeApi = { computeMatrix: vi.fn(), computeRoute: vi.fn() } satisfies RouteApi;
+    await expect(new RouteStudyService(target, routeApi).run(
+      "00000000-0000-4000-8000-000000000002",
+      destination,
+      "00000000-0000-4000-8000-000000000099",
+      "00000000-0000-4000-8000-000000000003",
+    )).rejects.toThrow("Selecione uma base operacional ativa");
+    expect(routeApi.computeMatrix).not.toHaveBeenCalled();
   });
 });
