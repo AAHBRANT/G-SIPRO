@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { GsIcon } from "@/components/ui/gs-icon";
 import type { AnalysisContextDefaults } from "./analysis-context-defaults";
+import {
+  FinancialAssessmentManager,
+  type FinancialSubject,
+} from "./financial-assessment-manager";
 
 type Perspective = "ALL" | "COMMERCIAL" | "TECHNICAL" | "STUDIES";
 type DrawerKind = "COMMERCIAL" | "TECHNICAL" | "CLIMATE" | "LOGISTICS" | "FINANCIAL" | "PENDING" | null;
@@ -175,6 +179,9 @@ export function IntelligencePanel({
   analysis,
   canCalculate,
   canReadFinancial,
+  canAssessFinancial,
+  canAssessClientRisk,
+  financialSubject,
   mapsEmbedKey,
   integrationReadiness,
   contextDefaults,
@@ -184,6 +191,9 @@ export function IntelligencePanel({
   analysis: IntelligenceAnalysisView | null;
   canCalculate: boolean;
   canReadFinancial: boolean;
+  canAssessFinancial: boolean;
+  canAssessClientRisk: boolean;
+  financialSubject?: FinancialSubject;
   mapsEmbedKey?: string;
   integrationReadiness?: readonly IntegrationReadinessView[];
   contextDefaults: AnalysisContextDefaults;
@@ -393,7 +403,7 @@ export function IntelligencePanel({
         <IntelligenceDrawer title={drawerTitle(drawer)} onClose={() => setDrawer(null)} closeButtonRef={closeButtonRef}>
           {drawer === "CLIMATE" && <ClimateDetail analysis={analysis} busy={busyStage === "CLIMATE"} canCalculate={canCalculate} contextDefaults={contextDefaults} onSubmit={(event) => runContextualStage(event, "CLIMATE")}/>}
           {drawer === "LOGISTICS" && <LogisticsDetail analysis={analysis} busy={busyStage === "LOGISTICS"} canCalculate={canCalculate} contextDefaults={contextDefaults} mapsEmbedKey={mapsEmbedKey} onSubmit={(event) => runContextualStage(event, "LOGISTICS")}/>}
-          {drawer === "FINANCIAL" && <FinancialDetail analysis={analysis} busy={busyStage === "FINANCIAL"} canCalculate={canCalculate} canReadFinancial={canReadFinancial} onRun={() => runStage("FINANCIAL")}/>}
+          {drawer === "FINANCIAL" && <FinancialDetail analysis={analysis} busy={busyStage === "FINANCIAL"} canAssessClientRisk={canAssessClientRisk} canAssessFinancial={canAssessFinancial} canCalculate={canCalculate} canReadFinancial={canReadFinancial} financialSubject={financialSubject} onRun={() => runStage("FINANCIAL")} opportunityId={opportunityId}/>}
           {(drawer === "COMMERCIAL" || drawer === "TECHNICAL") && <DimensionDetail analysis={analysis} perspective={drawer}/>}
           {drawer === "PENDING" && <PendingDetail analysis={analysis}/>}
         </IntelligenceDrawer>
@@ -444,9 +454,9 @@ function LogisticsDetail({ analysis, canCalculate, busy, contextDefaults, mapsEm
   return <div className="space-y-6">{route ? <><section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><div className="relative grid min-h-72 place-items-center">{embedUrl ? <iframe allowFullScreen className="h-80 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={embedUrl} title={`Rota para ${route.destinationLabel}`}/> : <div className="px-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-brand shadow"><GsIcon name="target"/></span><h3 className="mt-4 font-black text-slate-900">{route.destinationLabel}</h3><p className="mt-2 max-w-md text-xs leading-5 text-slate-500">A rota foi calculada. Configure a chave de navegador restrita para exibir o mapa incorporado ou abra diretamente no Google Maps.</p>{best && <a className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white" href={buildMapsUrl(route, best)} rel="noreferrer" target="_blank">Abrir rota no Google Maps</a>}</div>}</div></section><section className="rounded-xl border border-slate-200"><header className="border-b border-slate-100 px-4 py-3"><h3 className="font-black text-slate-900">Alternativas de mobilização</h3></header><div className="divide-y divide-slate-100">{route.alternatives.map((item) => <article className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-center" key={item.baseId}><div><p className="font-bold text-slate-900">{item.baseCode} · {item.baseName}</p><p className="text-xs text-slate-500">{item.baseLocality}</p></div><MiniMetric label="Distância" value={item.distanceKm === undefined ? "Sem rota" : `${item.distanceKm.toLocaleString("pt-BR")} km`}/><MiniMetric label="Duração" value={item.durationHours === undefined ? "—" : `${item.durationHours.toLocaleString("pt-BR")} h`}/><MiniMetric label="Pedágios" value={formatRouteTolls(item.tolls)}/><a aria-label={`Abrir rota da base ${item.baseName}`} className="text-xs font-bold text-brand hover:underline" href={buildMapsUrl(route, item)} rel="noreferrer" target="_blank">Visualizar</a></article>)}</div></section></> : <EmptyDetail text="Ainda não há estudo logístico. Cadastre pelo menos uma base operacional e informe as coordenadas do local da obra."/>}{canCalculate && <ContextForm busy={busy} buttonLabel="Calcular rotas" defaults={contextDefaults} onSubmit={onSubmit}/>}</div>;
 }
 
-function FinancialDetail({ analysis, canCalculate, canReadFinancial, busy, onRun }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; canReadFinancial: boolean; busy: boolean; onRun: () => void }) {
+function FinancialDetail({ analysis, canCalculate, canReadFinancial, canAssessFinancial, canAssessClientRisk, financialSubject, opportunityId, busy, onRun }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; canReadFinancial: boolean; canAssessFinancial: boolean; canAssessClientRisk: boolean; financialSubject?: FinancialSubject; opportunityId: string; busy: boolean; onRun: () => void }) {
   const financial = analysis?.financial;
-  return <div className="space-y-5">{financial ? <section className="rounded-xl border border-slate-200 p-5"><h3 className="font-black text-slate-900">Conclusão consolidada</h3><p className="mt-3 text-sm leading-6 text-slate-600">{financial.summary}</p>{canReadFinancial ? <div className="mt-5 grid gap-3 sm:grid-cols-2"><RiskFlag active={financial.highIndebtednessRisk === true} label="Alto risco de endividamento"/><RiskFlag active={financial.nonPayingCustomer === true} label="Cliente classificado como não pagador"/></div> : <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Os indicadores detalhados exigem permissão financeira específica. O resumo seguro permanece disponível.</p>}</section> : <EmptyDetail text="Não há avaliação financeira consolidada. Dados ausentes não geram reprovação automática."/>}{canCalculate && <button className="rounded-lg bg-brand px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={busy} onClick={onRun} type="button">{busy ? "Analisando…" : "Executar avaliação financeira"}</button>}</div>;
+  return <div className="space-y-5">{financial ? <section className="rounded-xl border border-slate-200 p-5"><h3 className="font-black text-slate-900">Conclusão consolidada</h3><p className="mt-3 text-sm leading-6 text-slate-600">{financial.summary}</p>{canReadFinancial ? <div className="mt-5 grid gap-3 sm:grid-cols-2"><RiskFlag active={financial.highIndebtednessRisk === true} label="Alto risco de endividamento"/><RiskFlag active={financial.nonPayingCustomer === true} label="Cliente classificado como não pagador"/></div> : <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Os indicadores detalhados exigem permissão financeira específica. O resumo seguro permanece disponível.</p>}</section> : <EmptyDetail text="Não há avaliação financeira consolidada. Dados ausentes não geram reprovação automática."/>}<FinancialAssessmentManager canAssessClientRisk={canAssessClientRisk} canAssessFinancial={canAssessFinancial} canRead={canReadFinancial} opportunityId={opportunityId} subject={financialSubject}/>{canCalculate && <button className="rounded-lg bg-brand px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={busy} onClick={onRun} type="button">{busy ? "Consolidando…" : "Consolidar avaliação financeira"}</button>}</div>;
 }
 
 function PendingDetail({ analysis }: { analysis: IntelligenceAnalysisView | null }) {

@@ -57,12 +57,15 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const canConfigureAnalytics = authorize(authorization, { permission: "analytics.configure" }).allowed;
   const canReadFinancial = authorize(authorization, { permission: "analytics.read-financial" }).allowed
     && authorize(authorization, { permission: "analytics.read-client-risk" }).allowed;
+  const canAssessFinancial = authorize(authorization, { permission: "analytics.assess-financial" }).allowed;
+  const canAssessClientRisk = authorize(authorization, { permission: "analytics.assess-client-risk" }).allowed;
   const database = getDatabase();
 
   const [record, users, latestAnalysis, useCases, linkedDocuments] = await Promise.all([
     database.opportunity.findUnique({
       where: { id: id.data },
       include: {
+        customer: true,
         contractingAuthority: true,
         owner: true,
         proposals: { where: { deletedAt: null }, select: { id: true, code: true }, orderBy: { createdAt: "desc" }, take: 1 },
@@ -339,6 +342,13 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             analysis={analysis}
             canCalculate={canCalculateAnalytics}
             canReadFinancial={canReadFinancial}
+            canAssessFinancial={canAssessFinancial}
+            canAssessClientRisk={canAssessClientRisk}
+            financialSubject={record.customer
+              ? { type: "customer", id: record.customer.id, name: record.customer.name }
+              : record.contractingAuthority
+                ? { type: "authority", id: record.contractingAuthority.id, name: record.contractingAuthority.name }
+                : undefined}
             integrationReadiness={integrationReadiness}
             mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
             opportunityCode={record.code}
