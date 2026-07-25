@@ -13,6 +13,7 @@ import {
   IntelligencePanel,
   type IntelligenceAnalysisView,
 } from "./intelligence-panel";
+import { collectAnalysisContextDefaults } from "./analysis-context-defaults";
 import { OpportunityEditor, type OpportunityEditorData } from "./opportunity-editor";
 import { OpportunityTabs } from "./opportunity-tabs";
 import { collectRequestedServices } from "./requested-services";
@@ -224,6 +225,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   });
 
   const requestedServices = collectRequestedServices(documents);
+  const analysisContextDefaults = collectAnalysisContextDefaults(documents);
   const estimatedValue = record.estimatedValue === null
     ? "Não informado"
     : Number(record.estimatedValue).toLocaleString("pt-BR", { style: "currency", currency: record.currency ?? "BRL" });
@@ -341,6 +343,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             mapsEmbedKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY}
             opportunityCode={record.code}
             opportunityId={record.id}
+            contextDefaults={analysisContextDefaults}
           />
         ) : undefined}
       />
