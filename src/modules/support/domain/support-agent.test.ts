@@ -26,6 +26,23 @@ describe("support agent protocol", () => {
     }).success).toBe(true);
   });
 
+  it("accepts structured clarification without treating it as a failed attempt", () => {
+    expect(supportAgentCommandSchema.safeParse({
+      action: "REPORT_CLARIFICATION",
+      executorId: "codex-runner",
+      leaseId: crypto.randomUUID(),
+      summary: "As mensagens do histórico são contraditórias.",
+      clarification: {
+        introduction: "Confirme o estado atual antes de uma nova correção.",
+        questions: [{
+          id: "q1",
+          question: "O problema ainda ocorre ao repetir a operação?",
+          options: ["Sim, continua ocorrendo", "Não, foi resolvido"],
+        }],
+      },
+    }).success).toBe(true);
+  });
+
   it("returns a failed first attempt to the autonomous queue", () => {
     expect(supportAgentFailureOutcome(1)).toEqual({ attempts: 1, exhausted: false, status: "TRIAGED" });
   });

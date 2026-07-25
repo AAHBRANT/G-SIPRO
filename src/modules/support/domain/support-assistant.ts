@@ -15,12 +15,12 @@ export function supportAssistantDisposition(status: string, isOwner: boolean, ex
     case "OPEN":
       return {
         nextStatus: "TRIAGED",
-        response: "Entendi. Registrei sua orientação e coloquei o chamado na fila automática da IA. A execução costuma iniciar em até 5 minutos.",
+        response: "Entendi. Registrei sua orientação e coloquei o chamado na fila automática da IA. A previsão, a próxima ação e o responsável ficam atualizados no painel do chamado.",
       };
     case "TRIAGED":
     case "APPROVED":
       return {
-        response: "Entendi. Sua orientação foi anexada ao chamado, que já está na fila automática da IA. A execução costuma iniciar em até 5 minutos.",
+        response: "Entendi. Sua orientação foi anexada ao chamado, que já está na fila automática da IA. A previsão, a próxima ação e o responsável ficam atualizados no painel do chamado.",
       };
     case "IN_PROGRESS":
       return isOwner && executorId === "proprietario"

@@ -17,6 +17,13 @@ export type TeamsProvisioningResult = {
   message: string;
 };
 
+export type EntraIdentityResolution = {
+  status: "RESOLVED" | "NOT_FOUND" | "FAILED" | "NOT_CONFIGURED";
+  objectId: string | null;
+  errorCode: string | null;
+  message: string;
+};
+
 type TokenCache = { accessToken: string; expiresAt: number };
 let tokenCache: TokenCache | null = null;
 const catalogIdCache = new Map<string, string>();
@@ -131,6 +138,86 @@ function safeProvisioningMessage(errorCode: string): string {
   return messages[errorCode] ?? "A instalação no Microsoft Teams não foi concluída. Consulte o código seguro apresentado.";
 }
 
+export async function resolveEntraIdentityByEmail(email: string): Promise<EntraIdentityResolution> {
+  const configuration = getGraphConfiguration();
+  if (!configuration) {
+    return {
+      status: "NOT_CONFIGURED",
+      objectId: null,
+      errorCode: "GRAPH_NOT_CONFIGURED",
+      message: "Acesso interno liberado. A vinculação automática ao Microsoft Entra ainda não está configurada.",
+    };
+  }
+  try {
+    const accessToken = await getApplicationToken(configuration);
+    const query = new URLSearchParams({ "$select": "id,mail,userPrincipalName,accountEnabled" });
+    const response = await graphFetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}?${query.toString()}`,
+      { method: "GET", headers: { authorization: `Bearer ${accessToken}` } },
+      configuration.timeoutMs,
+    );
+    if (response.status === 404) {
+      return {
+        status: "NOT_FOUND",
+        objectId: null,
+        errorCode: "ENTRA_USER_NOT_FOUND",
+        message: "A conta ainda não existe no Microsoft Entra ID. Crie ou confirme a conta corporativa e tente novamente.",
+      };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return {
+        status: "FAILED",
+        objectId: null,
+        errorCode: "GRAPH_USER_READ_PERMISSION_REQUIRED",
+        message: "Acesso interno liberado. Para vincular automaticamente a identidade, conceda User.Read.All ao aplicativo no Microsoft Graph com consentimento administrativo.",
+      };
+    }
+    if (!response.ok) {
+      return {
+        status: "FAILED",
+        objectId: null,
+        errorCode: classifyGraphFailure(response.status),
+        message: "Acesso interno liberado. O Microsoft Entra não respondeu à vinculação automática; ela será repetida no primeiro acesso.",
+      };
+    }
+    const payload = await response.json() as { id?: string; accountEnabled?: boolean };
+    if (!payload.id) {
+      return {
+        status: "FAILED",
+        objectId: null,
+        errorCode: "ENTRA_OBJECT_ID_MISSING",
+        message: "Acesso interno liberado. O Microsoft Entra não retornou o identificador da conta.",
+      };
+    }
+    if (payload.accountEnabled === false) {
+      return {
+        status: "FAILED",
+        objectId: null,
+        errorCode: "ENTRA_USER_DISABLED",
+        message: "A conta existe no Microsoft Entra, mas está desabilitada. Ative-a antes de acessar o G-SIPRO.",
+      };
+    }
+    return {
+      status: "RESOLVED",
+      objectId: payload.id,
+      errorCode: null,
+      message: "Identidade corporativa vinculada automaticamente.",
+    };
+  } catch (error) {
+    const errorCode = error instanceof GraphProvisioningError
+      ? error.safeCode
+      : error instanceof DOMException && error.name === "AbortError"
+        ? "GRAPH_TIMEOUT"
+        : "GRAPH_UNAVAILABLE";
+    return {
+      status: "FAILED",
+      objectId: null,
+      errorCode,
+      message: "Acesso interno liberado. A vinculação ao Microsoft Entra será repetida no primeiro acesso.",
+    };
+  }
+}
+
 export async function installTeamsAppForUser(email: string): Promise<TeamsProvisioningResult> {
   const configuration = getGraphConfiguration();
   if (!configuration) return { status: "NOT_CONFIGURED", errorCode: "GRAPH_NOT_CONFIGURED", message: "Integração do Microsoft Teams ainda não configurada." };
@@ -172,6 +259,13 @@ export async function provisionTeamsAppForManagedUser(input: {
 }): Promise<TeamsProvisioningResult> {
   const database = getDatabase();
   const attemptedAt = new Date();
+  const identity = await resolveEntraIdentityByEmail(input.email);
+  if (identity.status === "RESOLVED" && identity.objectId) {
+    await database.user.update({
+      where: { id: input.userId },
+      data: { entraObjectId: identity.objectId, updatedBy: input.actorId },
+    });
+  }
   await database.user.update({
     where: { id: input.userId },
     data: {
@@ -202,10 +296,21 @@ export async function provisionTeamsAppForManagedUser(input: {
         correlationId: input.correlationId,
         outcome: result.status === "INSTALLED" ? "SUCCESS" : "FAILURE",
         origin: "microsoft-graph-user-provisioning",
-        metadata: { errorCode: result.errorCode, attemptedAt: attemptedAt.toISOString() },
+        metadata: {
+          errorCode: result.errorCode,
+          attemptedAt: attemptedAt.toISOString(),
+          identityStatus: identity.status,
+          identityErrorCode: identity.errorCode,
+        },
       },
     }),
   ]);
+  if (result.status === "INSTALLED" && identity.status !== "RESOLVED") {
+    return {
+      ...result,
+      message: `${result.message} ${identity.message}`,
+    };
+  }
   return result;
 }
 

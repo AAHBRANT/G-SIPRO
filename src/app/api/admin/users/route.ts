@@ -7,7 +7,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { ConflictError, ValidationError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
-import { provisionTeamsAppForManagedUser } from "@/modules/admin/microsoft-graph-teams-provisioner";
+import { provisionTeamsAppForManagedUser, resolveEntraIdentityByEmail } from "@/modules/admin/microsoft-graph-teams-provisioner";
 import { userAccessDisposition } from "@/modules/admin/user-access-authority";
 import { userAccessSchema } from "@/modules/admin/user-access-schema";
 
@@ -37,18 +37,19 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const userId = randomUUID();
       const profileId = randomUUID();
+      const entraIdentity = await resolveEntraIdentityByEmail(input.email);
       await database.$transaction(async (transaction) => {
-        await transaction.user.create({ data: { id: userId, entraObjectId: randomUUID(), displayName: input.displayName, email: input.email, status: input.status, isMaster: input.isMaster, isOwner: input.isOwner, departmentId: input.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
+        await transaction.user.create({ data: { id: userId, entraObjectId: entraIdentity.objectId ?? userId, displayName: input.displayName, email: input.email, status: input.status, isMaster: input.isMaster, isOwner: input.isOwner, departmentId: input.departmentId ?? null, createdBy: authorization.actorId, updatedBy: authorization.actorId } });
         await transaction.profile.create({ data: { id: profileId, code: `USER_ACCESS_${userId.replaceAll("-", "")}`, name: `Acesso individual — ${input.displayName}`, description: "Perfil individual administrado pelo painel de usuários.", createdBy: authorization.actorId, updatedBy: authorization.actorId } });
         if (input.permissionIds.length) await transaction.profilePermission.createMany({ data: [...new Set(input.permissionIds)].map((permissionId) => ({ profileId, permissionId, grantedBy: authorization.actorId })) });
         await transaction.userProfile.create({ data: { userId, profileId, grantedBy: authorization.actorId, reason: "Provisionamento pelo painel administrativo" } });
-        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_PROVISIONED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, isMaster: input.isMaster, isOwner: input.isOwner, permissionCount: input.permissionIds.length } } });
+        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "USER_PROVISIONED", entityType: "USER", entityId: userId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "admin-user-management", metadata: { email: input.email, isMaster: input.isMaster, isOwner: input.isOwner, permissionCount: input.permissionIds.length, entraIdentityStatus: entraIdentity.status, entraIdentityErrorCode: entraIdentity.errorCode } } });
       });
       const teamsProvisioning = input.status === "ACTIVE"
         ? await provisionTeamsAppForManagedUser({ userId, email: input.email, actorId: authorization.actorId, correlationId: context.correlationId })
         : null;
       revalidatePath("/admin");
-      return NextResponse.json({ data: { id: userId, teamsProvisioning }, correlationId: context.correlationId }, { status: 201 });
+      return NextResponse.json({ data: { id: userId, entraIdentity, teamsProvisioning }, correlationId: context.correlationId }, { status: 201 });
     } catch (error) {
       return toApiError(error);
     }

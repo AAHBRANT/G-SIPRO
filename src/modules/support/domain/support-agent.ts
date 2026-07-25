@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { supportClarificationSchema } from "./support-ticket";
 
 const executorId = z.string().trim().min(3).max(160);
 const leaseId = z.uuid();
@@ -16,6 +17,11 @@ export const supportAgentCommandSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("REPORT_FAILURE"), executorId, leaseId,
     summary: z.string().trim().min(3).max(2_000),
+  }),
+  z.object({
+    action: z.literal("REPORT_CLARIFICATION"), executorId, leaseId,
+    summary: z.string().trim().min(3).max(2_000),
+    clarification: supportClarificationSchema,
   }),
   z.object({
     action: z.literal("REPORT_OWNER_ACTION"), executorId, leaseId,

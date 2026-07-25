@@ -4,6 +4,7 @@ import { resetEnvironmentCache } from "@/core/config/env";
 import {
   classifyGraphFailure,
   installTeamsAppForUser,
+  resolveEntraIdentityByEmail,
   resetMicrosoftGraphTokenCache,
 } from "@/modules/admin/microsoft-graph-teams-provisioner";
 
@@ -59,6 +60,35 @@ describe("Microsoft Graph Teams provisioner", () => {
       .mockResolvedValueOnce(new Response(null, { status: 409 })));
 
     await expect(installTeamsAppForUser("usuario@aahbrant.com")).resolves.toMatchObject({ status: "INSTALLED" });
+  });
+
+  it("resolve o identificador real do usuário no Microsoft Entra", async () => {
+    configureEnvironment();
+    const objectId = "a9cbdad7-7ab0-4dc5-876f-38d05a5a4f38";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token-seguro", expires_in: 3_600 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: objectId, accountEnabled: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resolveEntraIdentityByEmail("usuario@aahbrant.com")).resolves.toMatchObject({
+      status: "RESOLVED",
+      objectId,
+      errorCode: null,
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("users/usuario%40aahbrant.com");
+  });
+
+  it("mantém o acesso interno com orientação segura quando falta permissão de leitura", async () => {
+    configureEnvironment();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token-seguro", expires_in: 3_600 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 })));
+
+    await expect(resolveEntraIdentityByEmail("usuario@aahbrant.com")).resolves.toMatchObject({
+      status: "FAILED",
+      objectId: null,
+      errorCode: "GRAPH_USER_READ_PERMISSION_REQUIRED",
+    });
   });
 
   it("resolve o id interno do catálogo quando a configuração contém o id do manifesto", async () => {
