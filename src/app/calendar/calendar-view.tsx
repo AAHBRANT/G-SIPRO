@@ -122,6 +122,24 @@ function buildMonthGrid(monthAnchor: Date) {
   });
 }
 
+function buildWeekGrid(anchor: Date) {
+  const weekStart = new Date(anchor);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + index);
+    return day;
+  });
+}
+
+function weekRangeLabel(anchor: Date) {
+  const week = buildWeekGrid(anchor);
+  const [start, end] = [week[0], week[6]];
+  const sameMonth = start.getMonth() === end.getMonth();
+  const startLabel = sameMonth ? `${start.getDate()}` : `${start.getDate()} de ${monthLabels[start.getMonth()].toLowerCase()}`;
+  return `${startLabel} – ${end.getDate()} de ${monthLabels[end.getMonth()].toLowerCase()} de ${end.getFullYear()}`;
+}
+
 export function CalendarView({ users, canManage, currentUserId }: { users: readonly { id: string; name: string }[]; canManage: boolean; currentUserId: string }) {
   const [entries, setEntries] = useState<readonly Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +156,8 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const today = useMemo(() => new Date(), []);
-  const [monthAnchor, setMonthAnchor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
+  const [anchorDate, setAnchorDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   async function load() {
@@ -194,17 +213,35 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
     MEETING: entries.filter((entry) => entry.type === "MEETING").length,
   };
 
-  const monthGrid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
+  const monthGrid = useMemo(() => buildMonthGrid(anchorDate), [anchorDate]);
+  const weekGrid = useMemo(() => buildWeekGrid(anchorDate), [anchorDate]);
+  const yearMonths = useMemo(
+    () => Array.from({ length: 12 }, (_, month) => ({ month, days: buildMonthGrid(new Date(anchorDate.getFullYear(), month, 1)) })),
+    [anchorDate],
+  );
   const selectedDayEntries = selectedDate ? entriesByDay.get(dateKey(selectedDate)) ?? [] : [];
 
   function goToToday() {
     const now = new Date();
-    setMonthAnchor(new Date(now.getFullYear(), now.getMonth(), 1));
+    setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
     setSelectedDate(now);
   }
 
-  function shiftMonth(offset: number) {
-    setMonthAnchor((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  function shiftPeriod(offset: number) {
+    setAnchorDate((current) => {
+      if (viewMode === "week") {
+        const next = new Date(current);
+        next.setDate(next.getDate() + offset * 7);
+        return next;
+      }
+      if (viewMode === "year") return new Date(current.getFullYear() + offset, current.getMonth(), 1);
+      return new Date(current.getFullYear(), current.getMonth() + offset, 1);
+    });
+  }
+
+  function goToMonth(month: number) {
+    setAnchorDate(new Date(anchorDate.getFullYear(), month, 1));
+    setViewMode("month");
   }
 
   function openCreateForDay(day: Date) {
@@ -265,6 +302,54 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
     }
   }
 
+  function renderDayCell(day: Date, options: { inMonth: boolean; maxVisible: number; minHeightClass: string }) {
+    const isToday = isSameDay(day, today);
+    const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+    const dayEntries = entriesByDay.get(dateKey(day)) ?? [];
+    const visible = dayEntries.slice(0, options.maxVisible);
+    const overflow = dayEntries.length - visible.length;
+    return (
+      <div
+        className={`group relative ${options.minHeightClass} cursor-pointer border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${options.inMonth ? "bg-white" : "bg-slate-50/60"} ${isSelected ? "ring-2 ring-inset ring-brand" : ""}`}
+        key={day.toISOString()}
+        onClick={() => setSelectedDate(day)}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(day); } }}
+        role="button"
+        tabIndex={0}
+      >
+        <div className="flex items-center justify-between">
+          <span className={`inline-grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${isToday ? "bg-brand text-white" : options.inMonth ? "text-slate-700" : "text-slate-400"}`}>{day.getDate()}</span>
+          {canManage && (
+            <button
+              aria-label={`Novo compromisso em ${day.getDate()}/${day.getMonth() + 1}`}
+              className="grid h-5 w-5 place-items-center rounded text-slate-400 opacity-0 transition hover:bg-brand hover:text-white group-hover:opacity-100"
+              onClick={(event) => { event.stopPropagation(); openCreateForDay(day); }}
+              title="Novo compromisso neste dia"
+              type="button"
+            >
+              +
+            </button>
+          )}
+        </div>
+        <div className="mt-1 space-y-1">
+          {visible.map((entry) => (
+            <button
+              className={`flex w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:brightness-95 ${entryTone(entry)}`}
+              key={`${entry.type}-${entry.id}`}
+              onClick={(clickEvent) => { clickEvent.stopPropagation(); setViewingEntry(entry); }}
+              title={`${entry.title} · ${entry.responsibleName ?? "Não atribuído"}`}
+              type="button"
+            >
+              <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-white/70 text-[8px] font-black">{initials(entry.responsibleName)}</span>
+              <span className="truncate">{timeLabel(entry.startAt)} {entry.title}</span>
+            </button>
+          ))}
+          {overflow > 0 && <span className="block px-1.5 text-[10px] font-bold text-slate-500">+{overflow} mais</span>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <section aria-label="Indicadores do calendário" className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -275,17 +360,34 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
 
       <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center">
-          <div className="mr-auto flex items-center gap-3">
+          <div className="mr-auto flex flex-wrap items-center gap-3">
             <button className={controlClass} onClick={goToToday} type="button">Hoje</button>
             <div className="flex items-center gap-1">
-              <button aria-label="Mês anterior" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50" onClick={() => shiftMonth(-1)} type="button">
+              <button aria-label="Período anterior" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50" onClick={() => shiftPeriod(-1)} type="button">
                 <GsIcon className="h-4 w-4 rotate-180" name="arrow" />
               </button>
-              <button aria-label="Próximo mês" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50" onClick={() => shiftMonth(1)} type="button">
+              <button aria-label="Próximo período" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50" onClick={() => shiftPeriod(1)} type="button">
                 <GsIcon className="h-4 w-4" name="arrow" />
               </button>
             </div>
-            <h2 className="text-lg font-black text-slate-900">{monthLabels[monthAnchor.getMonth()]} {monthAnchor.getFullYear()}</h2>
+            <h2 className="text-lg font-black text-slate-900">
+              {viewMode === "month" && `${monthLabels[anchorDate.getMonth()]} ${anchorDate.getFullYear()}`}
+              {viewMode === "week" && weekRangeLabel(anchorDate)}
+              {viewMode === "year" && anchorDate.getFullYear()}
+            </h2>
+            <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              {([["month", "Mês"], ["week", "Semana"], ["year", "Ano"]] as const).map(([mode, label]) => (
+                <button
+                  aria-pressed={viewMode === mode}
+                  className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === mode ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -345,61 +447,49 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
         {message && <p className="border-b border-slate-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-900" role="status">{message}</p>}
         {loading && <p className="border-b border-slate-200 px-4 py-3 text-center text-xs text-slate-500">Consultando calendário…</p>}
 
-        <div className="overflow-x-auto">
-          <div className="grid min-w-[900px] grid-cols-7 border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
-            {weekdayLabels.map((label) => <div className="px-3 py-2 text-center" key={label}>{label.slice(0, 3)}</div>)}
+        {(viewMode === "month" || viewMode === "week") && (
+          <div className="overflow-x-auto">
+            <div className="grid min-w-[900px] grid-cols-7 border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
+              {weekdayLabels.map((label) => <div className="px-3 py-2 text-center" key={label}>{label.slice(0, 3)}</div>)}
+            </div>
+            <div className="grid min-w-[900px] grid-cols-7">
+              {viewMode === "month"
+                ? monthGrid.map((day) => renderDayCell(day, { inMonth: day.getMonth() === anchorDate.getMonth(), maxVisible: 3, minHeightClass: "min-h-28" }))
+                : weekGrid.map((day) => renderDayCell(day, { inMonth: true, maxVisible: 8, minHeightClass: "min-h-64" }))}
+            </div>
           </div>
-          <div className="grid min-w-[900px] grid-cols-7">
-            {monthGrid.map((day) => {
-              const inMonth = day.getMonth() === monthAnchor.getMonth();
-              const isToday = isSameDay(day, today);
-              const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-              const dayEntries = entriesByDay.get(dateKey(day)) ?? [];
-              const visible = dayEntries.slice(0, 3);
-              const overflow = dayEntries.length - visible.length;
-              return (
-                <div
-                  className={`group relative min-h-28 cursor-pointer border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${inMonth ? "bg-white" : "bg-slate-50/60"} ${isSelected ? "ring-2 ring-inset ring-brand" : ""}`}
-                  key={day.toISOString()}
-                  onClick={() => setSelectedDate(day)}
-                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(day); } }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`inline-grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${isToday ? "bg-brand text-white" : inMonth ? "text-slate-700" : "text-slate-400"}`}>{day.getDate()}</span>
-                    {canManage && (
+        )}
+
+        {viewMode === "year" && (
+          <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {yearMonths.map(({ month, days }) => (
+              <div className="rounded-lg border border-slate-200 p-2" key={month}>
+                <button className="mb-1 w-full rounded px-1 py-0.5 text-center text-xs font-black text-slate-800 transition hover:bg-blue-50 hover:text-brand" onClick={() => goToMonth(month)} type="button">
+                  {monthLabels[month]}
+                </button>
+                <div className="grid grid-cols-7 gap-y-0.5 text-center text-[9px] text-slate-400">
+                  {weekdayLabels.map((label) => <span key={label}>{label.slice(0, 1)}</span>)}
+                  {days.map((day) => {
+                    const inMonth = day.getMonth() === month;
+                    const hasEntries = (entriesByDay.get(dateKey(day)) ?? []).length > 0;
+                    const isToday = isSameDay(day, today);
+                    return (
                       <button
-                        aria-label={`Novo compromisso em ${day.getDate()}/${day.getMonth() + 1}`}
-                        className="grid h-5 w-5 place-items-center rounded text-slate-400 opacity-0 transition hover:bg-brand hover:text-white group-hover:opacity-100"
-                        onClick={(event) => { event.stopPropagation(); openCreateForDay(day); }}
-                        title="Novo compromisso neste dia"
+                        className={`relative grid h-5 w-5 place-items-center justify-self-center rounded-full text-[9px] font-bold transition hover:bg-blue-50 ${isToday ? "bg-brand text-white" : inMonth ? "text-slate-600" : "text-slate-300"}`}
+                        key={day.toISOString()}
+                        onClick={() => { setAnchorDate(new Date(day.getFullYear(), day.getMonth(), 1)); setSelectedDate(day); setViewMode("month"); }}
                         type="button"
                       >
-                        +
+                        {day.getDate()}
+                        {hasEntries && <span className="absolute bottom-0 h-1 w-1 rounded-full bg-brand" />}
                       </button>
-                    )}
-                  </div>
-                  <div className="mt-1 space-y-1">
-                    {visible.map((entry) => (
-                      <button
-                        className={`flex w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:brightness-95 ${entryTone(entry)}`}
-                        key={`${entry.type}-${entry.id}`}
-                        onClick={(clickEvent) => { clickEvent.stopPropagation(); setViewingEntry(entry); }}
-                        title={`${entry.title} · ${entry.responsibleName ?? "Não atribuído"}`}
-                        type="button"
-                      >
-                        <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-white/70 text-[8px] font-black">{initials(entry.responsibleName)}</span>
-                        <span className="truncate">{timeLabel(entry.startAt)} {entry.title}</span>
-                      </button>
-                    ))}
-                    {overflow > 0 && <span className="block px-1.5 text-[10px] font-bold text-slate-500">+{overflow} mais</span>}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </section>
 
       {selectedDate && (
