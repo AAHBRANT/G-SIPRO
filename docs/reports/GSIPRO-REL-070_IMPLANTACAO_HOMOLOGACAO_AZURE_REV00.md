@@ -79,4 +79,4 @@ A implantação de homologação do G-SIPRO está tecnicamente concluída e disp
 
 ## Nota de recuperação
 
-Este relatório foi produzido em 19/07/2026 mas nunca havia sido salvo no controle de versão — sobrevivia apenas como cópia dentro de uma pasta de build local (`019_DESENVOLVIMENTO/gsipro/.next/standalone/docs/`), que foi removida durante a reorganização do repositório. Recuperado e commitado em 26/07/2026 para não se perder.
+Este relatório foi produzido em 19/07/2026 mas nunca havia sido salvo no controle de versão — sobrevivia apenas como cópia dentro de uma pasta de build local (`019_DESENVOLVIMENTO/gsipro/.next/standalone/docs/`), que foi removida durante a reorganização do repositório. Recuperado e commitado em 25/07/2026 para não se perder.
