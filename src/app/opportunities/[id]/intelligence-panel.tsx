@@ -126,14 +126,14 @@ export type OperationalBaseOption = Readonly<{
   locality: string;
 }>;
 
-const perspectiveLabels: Record<Perspective, string> = {
+export const perspectiveLabels: Record<Perspective, string> = {
   ALL: "Visão consolidada",
   COMMERCIAL: "Comercial",
   TECHNICAL: "Capacidade técnica",
   STUDIES: "Estudos e praticabilidade",
 };
 
-const recommendationLabels: Record<string, string> = {
+export const recommendationLabels: Record<string, string> = {
   RECOMMENDED: "Recomendado",
   RECOMMENDED_WITH_RESERVATIONS: "Recomendado com ressalvas",
   NOT_RECOMMENDED: "Não recomendado",
@@ -141,7 +141,7 @@ const recommendationLabels: Record<string, string> = {
   WAITING_OWNER_DECISION: "Aguardando decisão",
 };
 
-const recommendationTone: Record<string, string> = {
+export const recommendationTone: Record<string, string> = {
   RECOMMENDED: "border-emerald-200 bg-emerald-50 text-emerald-800",
   RECOMMENDED_WITH_RESERVATIONS: "border-amber-200 bg-amber-50 text-amber-800",
   NOT_RECOMMENDED: "border-red-200 bg-red-50 text-red-800",
@@ -151,18 +151,18 @@ const recommendationTone: Record<string, string> = {
 
 const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function formatPercent(value: number | null) {
+export function formatPercent(value: number | null) {
   return value === null ? "—" : `${Math.round(value)}%`;
 }
 
-function humanize(value: string) {
+export function humanize(value: string) {
   return value
     .toLowerCase()
     .replaceAll("_", " ")
     .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
-function scoreTone(value: number | null) {
+export function scoreTone(value: number | null) {
   if (value === null) return "text-slate-500";
   if (value >= 75) return "text-emerald-700";
   if (value >= 50) return "text-amber-700";

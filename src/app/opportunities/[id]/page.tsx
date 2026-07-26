@@ -342,7 +342,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 <h2 className="mt-1 text-xl font-bold">Arquivos e análises do contexto</h2>
                 <p className="mt-1 text-sm text-muted">Somente os documentos desta oportunidade são considerados. Novos arquivos, revisões e retificações podem ser adicionados durante a análise.</p>
               </div>
-              {record.proposals[0] && <Link className="rounded-lg border border-brand px-4 py-2 text-xs font-bold text-brand" href={`/proposals?code=${encodeURIComponent(record.proposals[0].code)}`}>Abrir {record.proposals[0].code}</Link>}
+              {record.proposals[0] && <Link className="rounded-lg border border-brand px-4 py-2 text-xs font-bold text-brand" href={`/proposals/${record.proposals[0].id}`}>Abrir {record.proposals[0].code}</Link>}
             </div>
             {authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed && (
               <div className="mt-4">

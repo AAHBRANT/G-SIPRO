@@ -114,7 +114,6 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
         users={users.map((user) => ({ id: user.id, label: user.displayName }))}
         extractionDefinitions={extractionDefinitions}
         canCreate={canCreate}
-        canUploadDocuments={authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed}
         canManageStatus={authorize(authorization, { permission: "proposals.manage-status" }).allowed}
         canDelete={authorize(authorization, { permission: "proposals.delete" }).allowed}
       />
