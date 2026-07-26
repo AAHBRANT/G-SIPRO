@@ -1,13 +1,6 @@
 import { GsIcon } from "@/components/ui/gs-icon";
-import {
-  formatPercent,
-  humanize,
-  perspectiveLabels,
-  recommendationLabels,
-  recommendationTone,
-  scoreTone,
-  type IntelligenceAnalysisView,
-} from "@/app/opportunities/[id]/intelligence-panel";
+import type { IntelligenceAnalysisView } from "@/app/opportunities/[id]/intelligence-panel";
+import { humanize, perspectiveLabels } from "@/app/opportunities/[id]/intelligence-view-helpers";
 
 const perspectiveIcon: Record<"COMMERCIAL" | "TECHNICAL" | "STUDIES", "money" | "target" | "chart"> = {
   COMMERCIAL: "money",
@@ -40,38 +33,18 @@ export function InheritedAnalysis({ analysis, opportunityCode }: { analysis: Int
         <p className="mt-1 text-sm text-muted">Calculada na fase de oportunidade e preservada aqui só para consulta — a proposta não recalcula nada.</p>
       </header>
 
-      <div className="border-b border-slate-100 px-5 py-5">
-        <div className={`inline-flex w-fit items-center rounded-full border px-3 py-1.5 text-xs font-black ${recommendationTone[analysis.recommendation ?? ""] ?? "border-slate-200 bg-slate-50 text-slate-700"}`}>
-          {recommendationLabels[analysis.recommendation ?? ""] ?? humanize(analysis.recommendation ?? analysis.status)}
+      {analysis.executiveSummary && (
+        <div className="border-b border-slate-100 px-5 py-5">
+          <p className="max-w-4xl text-sm leading-6 text-slate-600">{analysis.executiveSummary}</p>
         </div>
-        {analysis.executiveSummary && <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">{analysis.executiveSummary}</p>}
-        <p className="mt-2 text-[10px] text-slate-400">Versão {analysis.version} · Política {analysis.policy.name} v{analysis.policy.version}</p>
-      </div>
-
-      <div className="grid gap-3 border-b border-slate-100 bg-slate-50/60 p-5 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Pontuação</p>
-          <p className={`mt-1 text-2xl font-black ${scoreTone(analysis.score)}`}>{analysis.score === null ? "—" : analysis.score.toFixed(0)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Cobertura</p>
-          <p className="mt-1 text-2xl font-black text-slate-800">{formatPercent(analysis.coverage)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Confiança</p>
-          <p className="mt-1 text-2xl font-black text-slate-800">{formatPercent(analysis.confidence)}</p>
-        </div>
-      </div>
+      )}
 
       <div className="grid gap-4 p-5 lg:grid-cols-3">
         {analysis.dimensions.map((dimension) => (
           <article className="rounded-xl border border-slate-200 bg-white p-5" key={dimension.id}>
-            <div className="flex items-start justify-between gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700">
-                <GsIcon className="h-4 w-4" name={perspectiveIcon[dimension.perspective]} />
-              </span>
-              <span className={`text-2xl font-black ${scoreTone(dimension.score)}`}>{dimension.score === null ? "—" : dimension.score.toFixed(0)}</span>
-            </div>
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700">
+              <GsIcon className="h-4 w-4" name={perspectiveIcon[dimension.perspective]} />
+            </span>
             <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{perspectiveLabels[dimension.perspective]}</p>
             <h3 className="mt-1 font-black text-slate-900">{humanize(dimension.code)}</h3>
             <p className="mt-2 text-xs leading-5 text-slate-500">{dimension.summary}</p>

@@ -10,8 +10,12 @@ import {
   FinancialAssessmentManager,
   type FinancialSubject,
 } from "./financial-assessment-manager";
+import {
+  humanize,
+  perspectiveLabels,
+  type Perspective,
+} from "./intelligence-view-helpers";
 
-type Perspective = "ALL" | "COMMERCIAL" | "TECHNICAL" | "STUDIES";
 type DrawerKind = "COMMERCIAL" | "TECHNICAL" | "CLIMATE" | "LOGISTICS" | "FINANCIAL" | "PENDING" | "DECISION" | null;
 
 export type IntelligenceDimensionView = Readonly<{
@@ -126,48 +130,7 @@ export type OperationalBaseOption = Readonly<{
   locality: string;
 }>;
 
-export const perspectiveLabels: Record<Perspective, string> = {
-  ALL: "Visão consolidada",
-  COMMERCIAL: "Comercial",
-  TECHNICAL: "Capacidade técnica",
-  STUDIES: "Estudos e praticabilidade",
-};
-
-export const recommendationLabels: Record<string, string> = {
-  RECOMMENDED: "Recomendado",
-  RECOMMENDED_WITH_RESERVATIONS: "Recomendado com ressalvas",
-  NOT_RECOMMENDED: "Não recomendado",
-  WAITING_INFORMATION: "Aguardando informações",
-  WAITING_OWNER_DECISION: "Aguardando decisão",
-};
-
-export const recommendationTone: Record<string, string> = {
-  RECOMMENDED: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  RECOMMENDED_WITH_RESERVATIONS: "border-amber-200 bg-amber-50 text-amber-800",
-  NOT_RECOMMENDED: "border-red-200 bg-red-50 text-red-800",
-  WAITING_INFORMATION: "border-blue-200 bg-blue-50 text-blue-800",
-  WAITING_OWNER_DECISION: "border-violet-200 bg-violet-50 text-violet-800",
-};
-
 const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-export function formatPercent(value: number | null) {
-  return value === null ? "—" : `${Math.round(value)}%`;
-}
-
-export function humanize(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
-}
-
-export function scoreTone(value: number | null) {
-  if (value === null) return "text-slate-500";
-  if (value >= 75) return "text-emerald-700";
-  if (value >= 50) return "text-amber-700";
-  return "text-red-700";
-}
 
 function buildMapsUrl(route: RouteView, alternative?: RouteAlternativeView) {
   if (!alternative) return "";
@@ -357,22 +320,7 @@ export function IntelligencePanel({
         </div>
       ) : (
         <>
-          <div className="border-b border-slate-100 px-5 py-5 sm:px-7">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-              <div className={`inline-flex w-fit items-center rounded-full border px-3 py-1.5 text-xs font-black ${recommendationTone[analysis.recommendation ?? ""] ?? "border-slate-200 bg-slate-50 text-slate-700"}`}>
-                {recommendationLabels[analysis.recommendation ?? ""] ?? humanize(analysis.recommendation ?? analysis.status)}
-              </div>
-              <p className="max-w-4xl text-sm leading-6 text-slate-600">{analysis.executiveSummary ?? "A versão atual ainda não possui resumo executivo."}</p>
-              <div className="ml-auto whitespace-nowrap text-[10px] text-slate-400">
-                Versão {analysis.version} · Política {analysis.policy.name} v{analysis.policy.version}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 border-b border-slate-100 bg-slate-50/60 p-5 sm:grid-cols-2 lg:grid-cols-5 sm:px-7">
-            <ExecutiveMetric label="Pontuação" value={analysis.score === null ? "—" : analysis.score.toFixed(0)} detail="Resultado ponderado" tone={scoreTone(analysis.score)}/>
-            <ExecutiveMetric label="Cobertura" value={formatPercent(analysis.coverage)} detail="Dados calculáveis"/>
-            <ExecutiveMetric label="Confiança" value={formatPercent(analysis.confidence)} detail="Qualidade das evidências"/>
+          <div className="grid gap-3 border-b border-slate-100 bg-slate-50/60 p-5 sm:grid-cols-2 sm:px-7">
             <button className="text-left" onClick={() => setDrawer("PENDING")} type="button"><ExecutiveMetric label="Pendências" value={analysis.pendingItems.filter((item) => item.status === "OPEN").length.toString()} detail="Informações necessárias" interactive/></button>
             <ExecutiveMetric label="Impedimentos" value={analysis.impediments.filter((item) => item.status === "OPEN").length.toString()} detail="Exigem atenção crítica" tone={analysis.impediments.some((item) => item.status === "OPEN") ? "text-red-700" : "text-emerald-700"}/>
           </div>
@@ -388,10 +336,7 @@ export function IntelligencePanel({
           <div className="grid gap-4 p-5 lg:grid-cols-3 sm:p-7">
             {visibleDimensions.map((dimension) => (
               <button className="group rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" key={dimension.id} onClick={() => setDrawer(dimension.perspective === "COMMERCIAL" ? "COMMERCIAL" : dimension.perspective === "TECHNICAL" ? "TECHNICAL" : "CLIMATE")} type="button">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700"><GsIcon className="h-4 w-4" name={dimension.perspective === "COMMERCIAL" ? "money" : dimension.perspective === "TECHNICAL" ? "target" : "chart"}/></span>
-                  <span className={`text-2xl font-black ${scoreTone(dimension.score)}`}>{dimension.score === null ? "—" : dimension.score.toFixed(0)}</span>
-                </div>
+                <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700"><GsIcon className="h-4 w-4" name={dimension.perspective === "COMMERCIAL" ? "money" : dimension.perspective === "TECHNICAL" ? "target" : "chart"}/></span>
                 <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{perspectiveLabels[dimension.perspective]}</p>
                 <h3 className="mt-1 font-black text-slate-900">{humanize(dimension.code)}</h3>
                 <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{dimension.summary}</p>
@@ -527,7 +472,7 @@ function IntelligenceDrawer({ title, children, onClose, closeButtonRef }: { titl
 function DimensionDetail({ analysis, perspective }: { analysis: IntelligenceAnalysisView | null; perspective: "COMMERCIAL" | "TECHNICAL" }) {
   const dimensions = analysis?.dimensions.filter((item) => item.perspective === perspective) ?? [];
   if (!dimensions.length) return <EmptyDetail text="Esta perspectiva ainda não possui resultado. Execute a etapa correspondente para gerar a avaliação."/>;
-  return <div className="space-y-4">{dimensions.map((item) => <article className="rounded-xl border border-slate-200 p-5" key={item.id}><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{humanize(item.status)}</p><h3 className="mt-1 font-black text-slate-900">{humanize(item.code)}</h3></div><span className={`text-3xl font-black ${scoreTone(item.score)}`}>{item.score === null ? "—" : item.score.toFixed(0)}</span></div><p className="mt-3 text-sm leading-6 text-slate-600">{item.summary}</p><div className="mt-4 grid grid-cols-3 gap-2 text-center"><MiniMetric label="Confiança" value={formatPercent(item.confidence)}/><MiniMetric label="Evidências" value={String(item.evidenceCount)}/><MiniMetric label="Pendências" value={String(item.pendingCount)}/></div>{item.risks.length > 0 && <div className="mt-4 rounded-lg bg-amber-50 p-3"><p className="text-[10px] font-black uppercase text-amber-800">Pontos de atenção</p><ul className="mt-2 space-y-1 text-xs leading-5 text-amber-900">{item.risks.map((risk) => <li key={risk}>• {risk}</li>)}</ul></div>}</article>)}</div>;
+  return <div className="space-y-4">{dimensions.map((item) => <article className="rounded-xl border border-slate-200 p-5" key={item.id}><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{humanize(item.status)}</p><h3 className="mt-1 font-black text-slate-900">{humanize(item.code)}</h3><p className="mt-3 text-sm leading-6 text-slate-600">{item.summary}</p><div className="mt-4 grid grid-cols-2 gap-2 text-center"><MiniMetric label="Evidências" value={String(item.evidenceCount)}/><MiniMetric label="Pendências" value={String(item.pendingCount)}/></div>{item.risks.length > 0 && <div className="mt-4 rounded-lg bg-amber-50 p-3"><p className="text-[10px] font-black uppercase text-amber-800">Pontos de atenção</p><ul className="mt-2 space-y-1 text-xs leading-5 text-amber-900">{item.risks.map((risk) => <li key={risk}>• {risk}</li>)}</ul></div>}</article>)}</div>;
 }
 
 function ClimateDetail({ analysis, canCalculate, busy, contextDefaults, onSubmit }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
