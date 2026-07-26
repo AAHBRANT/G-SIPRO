@@ -70,10 +70,25 @@ export class OpportunityRuleError extends Error {
   }
 }
 
+const activationFieldLabels: Readonly<Record<string, string>> = {
+  subject: "objeto",
+  ownerId: "responsável",
+  customerId: "cliente/órgão",
+  estimatedValue: "valor estimado",
+  currency: "moeda",
+  valueSource: "fonte do valor",
+  deliveryAt: "data de entrega",
+  datesSource: "fonte das datas",
+  datesTimeZone: "fuso horário das datas",
+};
+
 export function validateActivation(snapshot: OpportunityLifecycleSnapshot): void {
   const missing = [
     !snapshot.subject && "subject",
     !snapshot.ownerId && "ownerId",
+    !(snapshot.customerId || snapshot.contractingAuthorityId) && "customerId",
+    snapshot.estimatedValue === undefined && "estimatedValue",
+    !snapshot.deliveryAt && "deliveryAt",
     snapshot.estimatedValue !== undefined && !snapshot.currency && "currency",
     snapshot.estimatedValue !== undefined && !snapshot.valueSource && "valueSource",
     (snapshot.publishedAt || snapshot.deliveryAt) && !snapshot.datesSource && "datesSource",
@@ -81,7 +96,11 @@ export function validateActivation(snapshot: OpportunityLifecycleSnapshot): void
   ].filter((field): field is string => Boolean(field));
 
   if (missing.length > 0) {
-    throw new OpportunityRuleError("A oportunidade não possui os dados mínimos para ativação.", missing);
+    const labels = missing.map((field) => activationFieldLabels[field] ?? field);
+    throw new OpportunityRuleError(
+      `A oportunidade não possui os dados mínimos para ativação: ${labels.join(", ")}.`,
+      missing,
+    );
   }
 }
 

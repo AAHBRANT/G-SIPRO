@@ -36,6 +36,7 @@ export function CreateOpportunityForm({ users = [] }: { users?: readonly { id: s
         }),
       });
       const payload = (await response.json()) as {
+        warning?: string;
         error?: {
           message?: string;
           details?: { code?: string; candidates?: readonly { code: string; reasons: readonly string[] }[] };
@@ -51,9 +52,13 @@ export function CreateOpportunityForm({ users = [] }: { users?: readonly { id: s
       }
       formElement.reset();
       setDuplicateCandidates([]);
-      setMessage("");
-      setOpen(false);
       router.refresh();
+      if (payload.warning) {
+        setMessage(payload.warning);
+      } else {
+        setMessage("");
+        setOpen(false);
+      }
     } catch {
       setSubmitting(false);
       setMessage("Falha de conexão. Verifique sua rede e tente novamente.");

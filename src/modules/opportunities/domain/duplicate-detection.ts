@@ -1,4 +1,11 @@
+import { z } from "zod";
+
 import type { OpportunityDraft } from "@/modules/opportunities/domain/opportunity";
+
+export const duplicateDecisionSchema = z.object({
+  duplicateDecision: z.literal("CREATE_SEPARATE").optional(),
+  duplicateJustification: z.string().trim().min(10).max(1000).optional(),
+});
 
 export type DuplicateCandidateSource = Readonly<{
   id: string;
@@ -59,4 +66,23 @@ export function detectDuplicateCandidates(
     .filter((candidate) => candidate.reasons.length > 0 && candidate.score >= 0.7)
     .sort((left, right) => right.score - left.score)
     .slice(0, 5);
+}
+
+export type CompletenessInput = Readonly<{
+  subject?: string;
+  customerId?: string;
+  contractingAuthorityId?: string;
+  estimatedValue?: number;
+  deliveryAt?: Date;
+}>;
+
+const importantFields = ["subject", "customerId", "contractingAuthorityId", "estimatedValue", "deliveryAt"] as const;
+
+/**
+ * Sinaliza (sem bloquear) uma oportunidade com poucos dados preenchidos —
+ * ex.: só o objeto informado, sem cliente, valor ou data de entrega.
+ */
+export function isNearEmptyDraft(input: CompletenessInput): boolean {
+  const filled = importantFields.filter((field) => input[field] !== undefined && input[field] !== null).length;
+  return filled <= 1;
 }

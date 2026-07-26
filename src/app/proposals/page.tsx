@@ -11,7 +11,7 @@ const originLabels: Record<string, string> = {
   DIRECT: "Proposta direta",
 };
 
-export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
+export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ new?: string; code?: string }> }) {
   const params = await searchParams;
   const authorization = await getCurrentAuthorizationContext();
 
@@ -108,6 +108,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
       <ProposalPanel
         items={panelItems}
         initialCreateOpen={params.new === "1"}
+        initialQuery={params.code ?? ""}
         opportunities={options}
         users={users.map((user) => ({ id: user.id, label: user.displayName }))}
         extractionDefinitions={extractionDefinitions}

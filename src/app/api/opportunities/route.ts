@@ -8,7 +8,7 @@ import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
 import { opportunityDraftSchema, opportunityStatuses } from "@/modules/opportunities/domain/opportunity";
-import { detectDuplicateCandidates } from "@/modules/opportunities/domain/duplicate-detection";
+import { detectDuplicateCandidates, duplicateDecisionSchema, isNearEmptyDraft } from "@/modules/opportunities/domain/duplicate-detection";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
 import { mapOpportunityApiError } from "@/modules/opportunities/presentation/opportunity-api";
 
@@ -21,11 +21,6 @@ const filtersSchema = z.object({
   minValue: z.coerce.number().nonnegative().optional(),
   maxValue: z.coerce.number().nonnegative().optional(),
   query: z.string().trim().max(100).optional(),
-});
-
-const duplicateDecisionSchema = z.object({
-  duplicateDecision: z.literal("CREATE_SEPARATE").optional(),
-  duplicateJustification: z.string().trim().min(10).max(1000).optional(),
 });
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -122,7 +117,8 @@ export async function POST(request: Request): Promise<NextResponse> {
             }
           : undefined,
       );
-      return NextResponse.json({ data: opportunity, correlationId: context.correlationId }, { status: 201 });
+      const warning = isNearEmptyDraft(draft) ? "Esta oportunidade está com poucos dados preenchidos — considere completar cliente, valor estimado e data de entrega." : undefined;
+      return NextResponse.json({ data: opportunity, ...(warning && { warning }), correlationId: context.correlationId }, { status: 201 });
     } catch (error) {
       try {
         mapOpportunityApiError(error);

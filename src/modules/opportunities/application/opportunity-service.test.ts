@@ -14,6 +14,13 @@ const record: OpportunityRecord = Object.freeze({
   origin: "PORTAL",
   subject: "Aquisição de solução",
   ownerId: actorId,
+  customerId: "44444444-4444-4444-8444-444444444444",
+  estimatedValue: 50_000,
+  currency: "BRL",
+  valueSource: "Estimativa interna",
+  deliveryAt: new Date("2026-12-01T00:00:00.000Z"),
+  datesSource: "Edital de referência",
+  datesTimeZone: "America/Sao_Paulo",
   status: "QUALIFICATION",
   version: 1,
 });

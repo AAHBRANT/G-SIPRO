@@ -15,6 +15,13 @@ const completeOpportunity: OpportunityLifecycleSnapshot = {
   origin: "PORTAL",
   subject: "Execução de obra sintética para teste",
   ownerId: "46949ef2-c787-4a84-bcd1-9606295fbeb6",
+  customerId: "8f14e45f-ceea-467e-adc0-8cbe4917c9dd",
+  estimatedValue: 100_000,
+  currency: "BRL",
+  valueSource: "Estimativa interna",
+  deliveryAt: new Date("2026-12-01T00:00:00.000Z"),
+  datesSource: "Edital de referência",
+  datesTimeZone: "America/Sao_Paulo",
   status: "QUALIFICATION",
 };
 
@@ -37,6 +44,24 @@ describe("regras de oportunidade", () => {
 
   it("permite ativação com dados mínimos", () => {
     expect(() => assertOpportunityTransition(completeOpportunity, "ACTIVE")).not.toThrow();
+  });
+
+  it("bloqueia ativação sem cliente/órgão vinculado", () => {
+    const withoutCustomer: OpportunityLifecycleSnapshot = { ...completeOpportunity, customerId: undefined, contractingAuthorityId: undefined };
+    expect(() => assertOpportunityTransition(withoutCustomer, "ACTIVE")).toThrow(OpportunityRuleError);
+  });
+
+  it("permite ativação com órgão contratante vinculado, mesmo sem cliente cadastrado", () => {
+    const withAuthorityOnly: OpportunityLifecycleSnapshot = { ...completeOpportunity, customerId: undefined, contractingAuthorityId: "b6f1c2ab-df2a-4a2d-9e3d-3c1c9a1e8b9a" };
+    expect(() => assertOpportunityTransition(withAuthorityOnly, "ACTIVE")).not.toThrow();
+  });
+
+  it("bloqueia ativação sem valor estimado ou data de entrega", () => {
+    const withoutValue: OpportunityLifecycleSnapshot = { ...completeOpportunity, estimatedValue: undefined, currency: undefined, valueSource: undefined };
+    expect(() => assertOpportunityTransition(withoutValue, "ACTIVE")).toThrow(OpportunityRuleError);
+
+    const withoutDelivery: OpportunityLifecycleSnapshot = { ...completeOpportunity, deliveryAt: undefined, datesSource: undefined, datesTimeZone: undefined };
+    expect(() => assertOpportunityTransition(withoutDelivery, "ACTIVE")).toThrow(OpportunityRuleError);
   });
 
   it("converte apenas quando a oportunidade validada entra no estado ativo", () => {

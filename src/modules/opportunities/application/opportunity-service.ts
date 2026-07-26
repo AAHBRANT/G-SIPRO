@@ -71,6 +71,7 @@ export class OpportunityService {
     input: unknown,
     actorId: string,
     correlationId: string = randomUUID(),
+    duplicateReview?: DuplicateReview,
   ): Promise<OpportunityRecord> {
     const before = await this.requireOpportunity(id);
     const patch = opportunityPatchSchema.parse(input);
@@ -81,7 +82,10 @@ export class OpportunityService {
       before,
       after,
       action: "UPDATED",
-      changes: collectCriticalChanges(before, after),
+      changes: {
+        ...collectCriticalChanges(before, after),
+        ...(duplicateReview && { duplicateReview }),
+      },
       actorId,
       correlationId,
     });

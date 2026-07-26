@@ -49,6 +49,7 @@ export function OpportunityEditor({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState<Status>(transitions[opportunity.status][0]?.target ?? opportunity.status);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<readonly { code: string; reasons: readonly string[] }[]>([]);
 
   function openTransitionDrawer() {
     setTarget(transitions[opportunity.status][0]?.target ?? opportunity.status);
@@ -60,24 +61,41 @@ export function OpportunityEditor({
     const form = new FormData(event.currentTarget);
     setBusy(true);
     setMessage("");
-    const payload = Object.fromEntries(
-      ["origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"]
-        .map((field) => [field, form.get(field)?.toString().trim()])
-        .filter(([, value]) => value),
-    );
+    const payload = {
+      ...Object.fromEntries(
+        ["origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"]
+          .map((field) => [field, form.get(field)?.toString().trim()])
+          .filter(([, value]) => value),
+      ),
+      ...(duplicateCandidates.length > 0 && {
+        duplicateDecision: "CREATE_SEPARATE",
+        duplicateJustification: form.get("duplicateJustification"),
+      }),
+    };
     try {
       const response = await fetch(`/api/opportunities/${opportunity.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: { message?: string } };
+      const result = (await response.json()) as {
+        warning?: string;
+        error?: { message?: string; details?: { code?: string; candidates?: readonly { code: string; reasons: readonly string[] }[] } };
+      };
       setBusy(false);
       if (response.ok) {
-        setMessage("Oportunidade atualizada.");
-        setDrawer(null);
+        setDuplicateCandidates([]);
         router.refresh();
+        if (result.warning) {
+          setMessage(result.warning);
+        } else {
+          setMessage("Oportunidade atualizada.");
+          setDrawer(null);
+        }
         return;
+      }
+      if (result.error?.details?.code === "POSSIBLE_DUPLICATE" && result.error.details.candidates) {
+        setDuplicateCandidates(result.error.details.candidates);
       }
       setMessage(result.error?.message ?? "Falha ao salvar.");
     } catch {
@@ -152,8 +170,22 @@ export function OpportunityEditor({
               {drawer === "edit" ? (
                 <form className="grid gap-5" onSubmit={save}>
                   <OpportunityFormFields values={opportunity} users={users} />
+                  {duplicateCandidates.length > 0 && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+                      <p className="font-bold">Possível duplicidade — decisão humana obrigatória</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                        {duplicateCandidates.map((candidate) => (
+                          <li key={candidate.code}><strong>{candidate.code}</strong>: {candidate.reasons.join("; ")}</li>
+                        ))}
+                      </ul>
+                      <label className="mt-4 grid gap-1 text-sm font-semibold">
+                        Justificativa para manter registros separados
+                        <textarea className="min-h-20 rounded-xl border border-amber-300 bg-white px-3 py-2 font-normal" name="duplicateJustification" minLength={10} maxLength={1000} required />
+                      </label>
+                    </div>
+                  )}
                   <button className="w-fit rounded-xl bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={busy}>
-                    {busy ? "Salvando…" : "Salvar alterações"}
+                    {busy ? "Salvando…" : duplicateCandidates.length > 0 ? "Confirmar registros distintos" : "Salvar alterações"}
                   </button>
                 </form>
               ) : (

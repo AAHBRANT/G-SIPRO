@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectDuplicateCandidates, subjectSimilarity } from "./duplicate-detection";
+import { detectDuplicateCandidates, isNearEmptyDraft, subjectSimilarity } from "./duplicate-detection";
 
 describe("detecção explicável de duplicidades", () => {
   it("normaliza acentos e ordem semântica simples", () => {
@@ -34,5 +34,25 @@ describe("detecção explicável de duplicidades", () => {
         [{ id: "1", code: "OP-1", subject: "Licença de software contábil" }],
       ),
     ).toEqual([]);
+  });
+});
+
+describe("sinalização de registros quase vazios", () => {
+  it("marca como quase vazio quando só o objeto está preenchido", () => {
+    expect(isNearEmptyDraft({ subject: "Aquisição de solução técnica" })).toBe(true);
+  });
+
+  it("marca como quase vazio quando nenhum campo importante está preenchido", () => {
+    expect(isNearEmptyDraft({})).toBe(true);
+  });
+
+  it("não marca como quase vazio quando há cliente e valor estimado além do objeto", () => {
+    expect(
+      isNearEmptyDraft({
+        subject: "Aquisição de solução técnica",
+        customerId: "11111111-1111-4111-8111-111111111111",
+        estimatedValue: 50_000,
+      }),
+    ).toBe(false);
   });
 });
