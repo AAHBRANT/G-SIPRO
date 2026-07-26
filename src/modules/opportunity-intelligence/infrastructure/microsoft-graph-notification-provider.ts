@@ -1,4 +1,8 @@
 import { getEnvironment } from "@/core/config/env";
+import {
+  prismaNotificationSenderSettingsReader,
+  type NotificationSenderSettingsReader,
+} from "@/modules/admin/notification-settings-service";
 
 export type NotificationDeliveryResult = {
   status: "ACCEPTED" | "SKIPPED" | "RETRY" | "FAILED";
@@ -30,17 +34,18 @@ export function resetMicrosoftGraphNotificationTokenCache() {
   tokenCache = null;
 }
 
-const configuration = (): GraphConfiguration | null => {
+const configuration = async (settingsReader: NotificationSenderSettingsReader): Promise<GraphConfiguration | null> => {
   const environment = getEnvironment();
   if (!environment.ENTRA_TENANT_ID || !environment.ENTRA_CLIENT_ID || !environment.ENTRA_CLIENT_SECRET) return null;
   if (!environment.AUTH_URL) return null;
+  const configuredSender = await settingsReader.getEmailSender();
   return {
     tenantId: environment.ENTRA_TENANT_ID,
     clientId: environment.ENTRA_CLIENT_ID,
     clientSecret: environment.ENTRA_CLIENT_SECRET,
     timeoutMs: environment.MICROSOFT_GRAPH_TIMEOUT_MS,
     appBaseUrl: environment.AUTH_URL.replace(/\/$/, ""),
-    emailSender: environment.NOTIFICATION_EMAIL_SENDER || null,
+    emailSender: configuredSender || environment.NOTIFICATION_EMAIL_SENDER || null,
   };
 };
 
@@ -101,8 +106,10 @@ const escapeHtml = (value: string) => value
   .replaceAll("'", "&#039;");
 
 export class MicrosoftGraphNotificationProvider {
+  constructor(private readonly settingsReader: NotificationSenderSettingsReader = prismaNotificationSenderSettingsReader) {}
+
   async sendTeams(message: NotificationMessage): Promise<NotificationDeliveryResult> {
-    const config = configuration();
+    const config = await configuration(this.settingsReader);
     if (!config) return { status: "SKIPPED", errorCode: "GRAPH_NOT_CONFIGURED", providerReference: null };
     if (message.recipientTeamsStatus !== "INSTALLED") {
       return { status: "SKIPPED", errorCode: "TEAMS_APP_NOT_INSTALLED", providerReference: null };
@@ -140,7 +147,7 @@ export class MicrosoftGraphNotificationProvider {
   }
 
   async sendEmail(message: NotificationMessage): Promise<NotificationDeliveryResult> {
-    const config = configuration();
+    const config = await configuration(this.settingsReader);
     if (!config) return { status: "SKIPPED", errorCode: "GRAPH_NOT_CONFIGURED", providerReference: null };
     if (!config.emailSender) {
       return { status: "SKIPPED", errorCode: "EMAIL_SENDER_NOT_CONFIGURED", providerReference: null };

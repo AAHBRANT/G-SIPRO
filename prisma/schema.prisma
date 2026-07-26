@@ -869,6 +869,17 @@ model OpportunityFinancialStudy {
   @@map("opportunity_financial_studies")
 }
 
+model NotificationSettings {
+  id          String   @id @default(uuid()) @db.Uuid
+  emailSender String?  @db.VarChar(320)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  updatedBy   String   @db.Uuid
+
+  @@map("notification_settings")
+}
+
 model NotificationOutboxEvent {
   id            String                       @id @default(uuid()) @db.Uuid
   eventKey      String                       @unique @db.VarChar(200)

@@ -6,7 +6,9 @@ import { getCurrentAuthorizationContext } from "@/core/authorization/authorizati
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import { AdminUserManager } from "./admin-user-manager";
+import { NotificationSettingsManager } from "./notification-settings-manager";
 import { OperationalBaseManager } from "./operational-base-manager";
+import { NotificationSettingsService } from "@/modules/admin/notification-settings-service";
 
 function auditWindowStart() { return new Date(Date.now() - 24 * 60 * 60 * 1000); }
 
@@ -30,6 +32,7 @@ export default async function AdminPage() {
     }),
     database.operationalBase.findMany({ where: { active: true }, orderBy: [{ name: "asc" }, { code: "asc" }] }),
   ]);
+  const notificationSettings = await new NotificationSettingsService().get();
   const activeUsers = users.filter((user) => user.status === "ACTIVE").length;
   const masterUsers = users.filter((user) => user.isMaster && user.status === "ACTIVE").length;
   const ownerUsers = users.filter((user) => user.isOwner && user.status === "ACTIVE").length;
@@ -40,5 +43,6 @@ export default async function AdminPage() {
 
     <div className="mt-6"><AdminUserManager accessRequests={accessRequests.map(request => { const payload = request.payload as { displayName?: string; email?: string; isMaster?: boolean; isOwner?: boolean }; return { id: request.id, action: request.action, status: request.status, requestedBy: request.requestedBy.displayName, displayName: payload.displayName ?? "Usuário não informado", email: payload.email ?? "E-mail não informado", requestedRole: payload.isOwner ? "Proprietário" : payload.isMaster ? "Usuário mestre" : "Usuário comum", createdAt: request.createdAt.toISOString(), decisionNote: request.decisionNote }; })} canApprovePrivilegedAccess={Boolean(authorization.isOwner)} canManageOwners={Boolean(authorization.isOwner)} currentActorId={authorization.actorId} departments={departments.map((department) => ({ id: department.id, name: department.name }))} permissions={permissions.map((permission) => ({ id: permission.id, code: permission.code, module: permission.module, action: permission.action, description: permission.description }))} users={users.map((user) => ({ id: user.id, displayName: user.displayName, email: user.email, status: user.status, teamsProvisioningStatus: user.teamsProvisioningStatus, teamsProvisioningAttempts: user.teamsProvisioningAttempts, teamsProvisioningErrorCode: user.teamsProvisioningErrorCode, isMaster: user.isMaster, isOwner: user.isOwner, departmentId: user.departmentId, departmentName: user.department?.name ?? null, profileNames: user.profileMemberships.map((membership) => membership.profile.name), permissionIds: [...new Set(user.profileMemberships.flatMap((membership) => membership.profile.permissions.map((item) => item.permissionId)))] }))}/></div>
     <OperationalBaseManager bases={operationalBases.map((base) => ({ id: base.id, code: base.code, name: base.name, locality: base.locality, latitude: Number(base.latitude), longitude: Number(base.longitude), source: base.source, version: base.version }))} canConfigure={authorize(authorization, { permission: "analytics.configure" }).allowed}/>
+    <NotificationSettingsManager canConfigure={Boolean(authorization.isOwner)} settings={notificationSettings}/>
   </main>;
 }

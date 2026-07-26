@@ -27,6 +27,8 @@ const configure = () => {
   for (const [key, value] of Object.entries(baseEnvironment)) vi.stubEnv(key, value);
 };
 
+const noStoredSender = { getEmailSender: async () => null };
+
 describe("Microsoft Graph notification provider", () => {
   afterEach(() => {
     resetEnvironmentCache();
@@ -39,7 +41,7 @@ describe("Microsoft Graph notification provider", () => {
     vi.stubEnv("DATABASE_URL", baseEnvironment.DATABASE_URL);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const result = await new MicrosoftGraphNotificationProvider().sendTeams(message);
+    const result = await new MicrosoftGraphNotificationProvider(noStoredSender).sendTeams(message);
     expect(result).toMatchObject({ status: "SKIPPED", errorCode: "GRAPH_NOT_CONFIGURED" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -50,7 +52,7 @@ describe("Microsoft Graph notification provider", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token", expires_in: 3600 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
-    const result = await new MicrosoftGraphNotificationProvider().sendTeams(message);
+    const result = await new MicrosoftGraphNotificationProvider(noStoredSender).sendTeams(message);
     expect(result.status).toBe("ACCEPTED");
     expect(fetchMock.mock.calls[1]?.[0]).toContain("usuario%2Bteste%40example.com/teamwork/sendActivityNotification");
     const body = String(fetchMock.mock.calls[1]?.[1]?.body);
@@ -64,16 +66,28 @@ describe("Microsoft Graph notification provider", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token", expires_in: 3600 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
-    const result = await new MicrosoftGraphNotificationProvider().sendEmail(message);
+    const result = await new MicrosoftGraphNotificationProvider(noStoredSender).sendEmail(message);
     expect(result).toMatchObject({ status: "ACCEPTED" });
     expect(fetchMock.mock.calls[1]?.[0]).toContain("gsipro%40example.com/sendMail");
+  });
+
+  it("usa o remetente configurado no banco em vez da variável de ambiente, quando presente", async () => {
+    configure();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token", expires_in: 3600 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const storedSender = { getEmailSender: async () => "notificacoes@aahbrant.com" };
+    const result = await new MicrosoftGraphNotificationProvider(storedSender).sendEmail(message);
+    expect(result).toMatchObject({ status: "ACCEPTED" });
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("notificacoes%40aahbrant.com/sendMail");
   });
 
   it("does not attempt Teams delivery before app installation", async () => {
     configure();
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const result = await new MicrosoftGraphNotificationProvider().sendTeams({
+    const result = await new MicrosoftGraphNotificationProvider(noStoredSender).sendTeams({
       ...message,
       recipientTeamsStatus: "PENDING",
     });
