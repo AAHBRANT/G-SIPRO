@@ -101,6 +101,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     deliveryAt: item.opportunity.deliveryAt?.toISOString() ?? null,
     status: item.status,
     responsible: item.opportunity.owner?.displayName ?? "Não atribuído",
+    createdAt: item.createdAt.toISOString(),
   }));
 
   return (
