@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requirePermission } from "@/core/authorization/authorization-context";
+import { getEnvironment } from "@/core/config/env";
 import { toApiError } from "@/core/errors/api-error";
+import { createLogger } from "@/core/observability/logger";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { AzureMapsClient } from "@/modules/opportunity-intelligence/infrastructure/azure-maps-client";
 import { AzureMapsRoutesApi } from "@/modules/opportunity-intelligence/infrastructure/azure-maps-routes-api";
+
+const mapsRouteLogger = createLogger(getEnvironment());
 
 const querySchema = z.object({
   originLat: z.coerce.number().min(-90).max(90),
@@ -82,6 +86,12 @@ export async function GET(request: Request): Promise<NextResponse> {
         },
       });
     } catch (error) {
+      mapsRouteLogger.error({
+        errorType: error instanceof Error ? error.name : "UNKNOWN",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        details: error instanceof Error && "details" in error ? (error as { details?: unknown }).details : undefined,
+        causeMessage: error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined,
+      }, "Falha ao gerar a imagem estática de rota do Azure Maps.");
       return toApiError(error);
     }
   });

@@ -30,11 +30,39 @@ const typeTone: Record<EntryType, string> = {
   MEETING: "bg-violet-50 text-violet-700",
 };
 
+const typeDot: Record<EntryType, string> = {
+  DEADLINE: "bg-amber-500",
+  DELIVERY: "bg-blue-500",
+  MEETING: "bg-violet-500",
+};
+
+const weekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+const monthLabels = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 const controlClass = "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
 const fieldClass = "rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal text-slate-800";
 
-function dateTimeLabel(value: string) {
-  return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+function timeLabel(value: string) {
+  return new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function dateKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
+function isSameDay(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
+}
+
+function buildMonthGrid(monthAnchor: Date) {
+  const firstOfMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+  const gridStart = new Date(firstOfMonth);
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + index);
+    return day;
+  });
 }
 
 export function CalendarView({ users, canManage }: { users: readonly { id: string; name: string }[]; canManage: boolean }) {
@@ -48,13 +76,16 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
   const [createOpen, setCreateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const today = useMemo(() => new Date(), []);
+  const [monthAnchor, setMonthAnchor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   async function load() {
     setLoading(true);
     try {
       const response = await fetch("/api/calendar", { cache: "no-store" });
       const payload = (await response.json()) as { data?: Entry[]; error?: { message?: string } };
-      if (!response.ok) throw new Error(payload.error?.message ?? "Não foi possível consultar a agenda.");
+      if (!response.ok) throw new Error(payload.error?.message ?? "Não foi possível consultar o calendário.");
       setEntries(payload.data ?? []);
       setMessage("");
     } catch (error) {
@@ -82,11 +113,36 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
     [entries, query, type, responsible],
   );
 
+  const entriesByDay = useMemo(() => {
+    const map = new Map<string, Entry[]>();
+    for (const entry of filtered) {
+      const key = dateKey(new Date(entry.startAt));
+      const bucket = map.get(key) ?? [];
+      bucket.push(entry);
+      map.set(key, bucket);
+    }
+    for (const bucket of map.values()) bucket.sort((left, right) => left.startAt.localeCompare(right.startAt));
+    return map;
+  }, [filtered]);
+
   const counts = {
     DEADLINE: entries.filter((entry) => entry.type === "DEADLINE").length,
     DELIVERY: entries.filter((entry) => entry.type === "DELIVERY").length,
     MEETING: entries.filter((entry) => entry.type === "MEETING").length,
   };
+
+  const monthGrid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
+  const selectedDayEntries = selectedDate ? entriesByDay.get(dateKey(selectedDate)) ?? [] : [];
+
+  function goToToday() {
+    const now = new Date();
+    setMonthAnchor(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(now);
+  }
+
+  function shiftMonth(offset: number) {
+    setMonthAnchor((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  }
 
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -141,7 +197,7 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
 
   return (
     <>
-      <section aria-label="Indicadores da agenda" className="mt-6 grid gap-3 sm:grid-cols-3">
+      <section aria-label="Indicadores do calendário" className="mt-6 grid gap-3 sm:grid-cols-3">
         <MetricCard description="Vencimentos de editais em acompanhamento" icon="clock" title="Prazos de editais" tone="amber" value={counts.DEADLINE} variant="executive" />
         <MetricCard description="Datas-limite de propostas em aberto" icon="send" title="Entregas de proposta" tone="blue" value={counts.DELIVERY} variant="executive" />
         <MetricCard description="Reuniões e compromissos cadastrados pela equipe" icon="calendar" title="Compromissos de equipe" tone="violet" value={counts.MEETING} variant="executive" />
@@ -149,9 +205,18 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
 
       <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center">
-          <h2 className="mr-auto flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-800">
-            <GsIcon className="h-4 w-4 text-brand" name="table" /> Agenda consolidada
-          </h2>
+          <div className="mr-auto flex items-center gap-3">
+            <button className={controlClass} onClick={goToToday} type="button">Hoje</button>
+            <div className="flex items-center gap-1">
+              <button aria-label="Mês anterior" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50" onClick={() => shiftMonth(-1)} type="button">
+                <GsIcon className="h-4 w-4 rotate-180" name="arrow" />
+              </button>
+              <button aria-label="Próximo mês" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50" onClick={() => shiftMonth(1)} type="button">
+                <GsIcon className="h-4 w-4" name="arrow" />
+              </button>
+            </div>
+            <h2 className="text-lg font-black text-slate-900">{monthLabels[monthAnchor.getMonth()]} {monthAnchor.getFullYear()}</h2>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <GsIcon className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" name="search" />
@@ -162,7 +227,7 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
             </button>
             {canManage && (
               <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--brand-strong)]" onClick={() => setCreateOpen(true)} type="button">
-                <span className="text-base font-normal">＋</span> Novo compromisso
+                <span className="text-base font-normal">＋</span> Novo
               </button>
             )}
           </div>
@@ -189,42 +254,71 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
         )}
 
         {message && <p className="border-b border-slate-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-900" role="status">{message}</p>}
+        {loading && <p className="border-b border-slate-200 px-4 py-3 text-center text-xs text-slate-500">Consultando calendário…</p>}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-xs">
-            <thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3">Título</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Responsável</th>
-                <th className="px-3 py-3 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={5}>Consultando agenda…</td></tr>}
-              {!loading && filtered.map((entry) => (
-                <tr className="h-14 transition hover:bg-blue-50/30" key={`${entry.type}-${entry.id}`}>
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{dateTimeLabel(entry.startAt)}</td>
-                  <td className="px-4 py-3">
-                    {entry.href ? <Link className="block truncate font-bold text-brand hover:underline" href={entry.href}>{entry.title}</Link> : <span className="block truncate font-semibold text-slate-800">{entry.title}</span>}
-                  </td>
-                  <td className="px-4 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${typeTone[entry.type]}`}>{typeLabels[entry.type]}</span></td>
-                  <td className="px-4 py-3"><span className="block truncate text-slate-600">{entry.responsibleName ?? "Não atribuído"}</span></td>
-                  <td className="px-3 py-3 text-center">
-                    {entry.editable && canManage && (
-                      <button className="rounded-md p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50" disabled={cancellingId === entry.id} onClick={() => cancelEntry(entry.id)} title="Cancelar compromisso" type="button">
-                        <GsIcon className="h-4 w-4" name="ban" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!loading && filtered.length === 0 && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={5}>Nenhum item encontrado para os filtros aplicados.</td></tr>}
-            </tbody>
-          </table>
+          <div className="grid min-w-[900px] grid-cols-7 border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
+            {weekdayLabels.map((label) => <div className="px-3 py-2 text-center" key={label}>{label.slice(0, 3)}</div>)}
+          </div>
+          <div className="grid min-w-[900px] grid-cols-7">
+            {monthGrid.map((day) => {
+              const inMonth = day.getMonth() === monthAnchor.getMonth();
+              const isToday = isSameDay(day, today);
+              const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+              const dayEntries = entriesByDay.get(dateKey(day)) ?? [];
+              const visible = dayEntries.slice(0, 3);
+              const overflow = dayEntries.length - visible.length;
+              return (
+                <button
+                  className={`min-h-28 border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${inMonth ? "bg-white" : "bg-slate-50/60"} ${isSelected ? "ring-2 ring-inset ring-brand" : ""}`}
+                  key={day.toISOString()}
+                  onClick={() => setSelectedDate(day)}
+                  type="button"
+                >
+                  <span className={`inline-grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${isToday ? "bg-brand text-white" : inMonth ? "text-slate-700" : "text-slate-400"}`}>{day.getDate()}</span>
+                  <div className="mt-1 space-y-1">
+                    {visible.map((entry) => (
+                      <span className={`block truncate rounded px-1.5 py-0.5 text-[10px] font-semibold ${typeTone[entry.type]}`} key={`${entry.type}-${entry.id}`} title={entry.title}>
+                        {timeLabel(entry.startAt)} {entry.title}
+                      </span>
+                    ))}
+                    {overflow > 0 && <span className="block px-1.5 text-[10px] font-bold text-slate-500">+{overflow} mais</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
+
+      {selectedDate && (
+        <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
+          <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+            <h3 className="text-sm font-black text-slate-900">
+              {weekdayLabels[selectedDate.getDay()]}, {selectedDate.getDate()} de {monthLabels[selectedDate.getMonth()].toLowerCase()}
+            </h3>
+            <button aria-label="Fechar detalhes do dia" className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-50" onClick={() => setSelectedDate(null)} type="button">×</button>
+          </header>
+          <div className="divide-y divide-slate-100">
+            {selectedDayEntries.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-500">Nenhum item neste dia.</p>}
+            {selectedDayEntries.map((entry) => (
+              <div className="flex flex-wrap items-center gap-3 px-4 py-3" key={`${entry.type}-${entry.id}`}>
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${typeDot[entry.type]}`} />
+                <span className="w-16 shrink-0 text-xs font-bold text-slate-600">{timeLabel(entry.startAt)}</span>
+                <div className="min-w-0 flex-1">
+                  {entry.href ? <Link className="block truncate font-bold text-brand hover:underline" href={entry.href}>{entry.title}</Link> : <span className="block truncate font-semibold text-slate-800">{entry.title}</span>}
+                  <span className="text-xs text-slate-500">{typeLabels[entry.type]} · {entry.responsibleName ?? "Não atribuído"}</span>
+                </div>
+                {entry.editable && canManage && (
+                  <button className="rounded-md p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50" disabled={cancellingId === entry.id} onClick={() => cancelEntry(entry.id)} title="Cancelar compromisso" type="button">
+                    <GsIcon className="h-4 w-4" name="ban" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {createOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label="Novo compromisso">

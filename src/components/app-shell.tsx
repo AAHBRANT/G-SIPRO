@@ -37,7 +37,7 @@ const navigation: ReadonlyArray<NavigationItem> = [
   { href: "/proposals", label: "Propostas", icon: icons.proposal, permission: "proposals.read" },
   { href: "/technical-archive", label: "Acervo técnico", icon: icons.archive, permission: "technical-archive.read" },
   { href: "/indicators", label: "Inteligência e KPIs", icon: icons.indicators, permission: "indicators.read" },
-  { href: "/calendar", label: "Agenda", icon: icons.calendar, permission: "calendar.read" },
+  { href: "/calendar", label: "Calendário", icon: icons.calendar, permission: "calendar.read" },
 ];
 
 function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals = 0, unreadNotifications = 0, permissions }: { close?: () => void; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; unreadNotifications?: number; permissions: ReadonlyArray<string> }) {

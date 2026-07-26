@@ -8,7 +8,7 @@ import { createRequestContext, runWithRequestContext } from "@/core/observabilit
 import { OpportunityAnalysisService } from "@/modules/opportunity-intelligence/application/opportunity-analysis-service";
 import { ClimateStudyService } from "@/modules/opportunity-intelligence/application/climate-study-service";
 import { PrismaOpportunityAnalysisRepository } from "@/modules/opportunity-intelligence/infrastructure/prisma-opportunity-analysis-repository";
-import { HttpClimateApi } from "@/modules/opportunity-intelligence/infrastructure/http-climate-api";
+import { OpenMeteoClimateApi } from "@/modules/opportunity-intelligence/infrastructure/open-meteo-climate-api";
 import { mapOpportunityAnalysisApiError } from "@/modules/opportunity-intelligence/presentation/opportunity-analysis-api";
 import { climateStudyContextSchema } from "@/modules/opportunity-intelligence/domain/climate-study";
 import { routeDestinationSchema } from "@/modules/opportunity-intelligence/domain/route-study";
@@ -62,7 +62,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       const repository = new PrismaOpportunityAnalysisRepository();
       let data: unknown;
       if (command.stage === "CLIMATE") {
-        data = await new ClimateStudyService(repository, new HttpClimateApi()).run(
+        data = await new ClimateStudyService(repository, new OpenMeteoClimateApi()).run(
           opportunityId,
           command.climateContext,
           authorization.actorId,

@@ -53,7 +53,11 @@ export class AzureMapsClient {
         cache: "no-store",
       });
       if (!response.ok) {
-        throw new ValidationError(`O Azure Maps respondeu com status ${response.status}.`);
+        const body = await response.text().catch(() => undefined);
+        throw new ValidationError(`O Azure Maps respondeu com status ${response.status}.`, {
+          status: response.status,
+          ...(body && { body: body.slice(0, 2000) }),
+        });
       }
       return response;
     } catch (error) {
