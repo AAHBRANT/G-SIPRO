@@ -45,4 +45,25 @@ describe("AzureMapsRoutesApi", () => {
     expect(result.routes[0]?.durationSeconds).toBe(28_800);
     expect(result.provider).toBe("Azure Maps");
   });
+
+  it("calcula a rota mesmo quando a resposta mistura marcadores Point com a geometria da rota", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", geometry: { type: "Point", coordinates: [base.longitude, base.latitude] }, properties: { type: "Waypoint", pointIndex: 0 } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [destination.longitude, destination.latitude] }, properties: { type: "Waypoint", pointIndex: 1 } },
+        {
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: [[base.longitude, base.latitude], [destination.longitude, destination.latitude]] },
+          properties: { type: "RoutePath", distanceInMeters: 586_400, durationInSeconds: 28_800 },
+        },
+      ],
+    }), { status: 200 }));
+    const result = await new AzureMapsRoutesApi(
+      { subscriptionKey: "secret", timeoutMs: 5_000 },
+      fetcher,
+    ).computeRoute(base, destination);
+    expect(result.distanceMeters).toBe(586_400);
+    expect(JSON.parse(result.encodedPolyline)).toEqual([[base.longitude, base.latitude], [destination.longitude, destination.latitude]]);
+  });
 });

@@ -25,15 +25,19 @@ const matrixResponseSchema = z.object({
 });
 
 const coordinateSchema = z.tuple([z.number(), z.number()]);
+const lineGeometrySchema = z.object({
+  type: z.enum(["LineString", "MultiLineString"]),
+  coordinates: z.union([
+    z.array(coordinateSchema),
+    z.array(z.array(coordinateSchema)),
+  ]),
+});
 const directionsResponseSchema = z.object({
+  // A resposta do Azure Maps mistura a rota (LineString/MultiLineString) com os
+  // marcadores de origem/destino (Point) enviados na requisição — só validamos
+  // a geometria estritamente na feature "RoutePath" que de fato usamos.
   features: z.array(z.object({
-    geometry: z.object({
-      type: z.enum(["LineString", "MultiLineString"]),
-      coordinates: z.union([
-        z.array(coordinateSchema),
-        z.array(z.array(coordinateSchema)),
-      ]),
-    }),
+    geometry: z.object({ type: z.string(), coordinates: z.unknown() }),
     properties: z.object({
       type: z.string(),
       distanceInMeters: z.number().int().nonnegative().optional(),
@@ -142,6 +146,7 @@ export class AzureMapsRoutesApi implements RouteApi {
       if (!route || route.properties.distanceInMeters === undefined) {
         throw new RouteApiUnavailableError("O Azure Maps não retornou uma rota válida.");
       }
+      const geometry = lineGeometrySchema.parse(route.geometry);
       return {
         provider: "Azure Maps",
         retrievedAt: new Date().toISOString(),
@@ -150,7 +155,7 @@ export class AzureMapsRoutesApi implements RouteApi {
         durationSeconds: route.properties.durationTrafficInSeconds
           ?? route.properties.durationInSeconds
           ?? 0,
-        encodedPolyline: JSON.stringify(route.geometry.coordinates),
+        encodedPolyline: JSON.stringify(geometry.coordinates),
         tolls: [],
       };
     } catch (error) {
