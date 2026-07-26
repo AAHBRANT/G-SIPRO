@@ -36,6 +36,47 @@ function samplePositions(positions: Position[], limit = 100): Position[] {
   return sampled;
 }
 
+const MAP_WIDTH = 800;
+const MAP_HEIGHT = 500;
+
+// O Azure Maps não calcula o zoom sozinho a partir de um bbox — sem um "zoom"
+// explícito ele assume um valor padrão (nível 12) e rejeita qualquer bbox que
+// não caiba nele. Como bases e obras costumam ficar a centenas de km de
+// distância, calculamos aqui o zoom "mais afastado" que ainda enquadra a
+// rota inteira na imagem, do mesmo jeito que Google/Mapbox fazem para
+// enquadrar (fit bounds).
+function centerAndZoomForBounds(
+  west: number,
+  south: number,
+  east: number,
+  north: number,
+  widthPx: number,
+  heightPx: number,
+  maxZoom = 16,
+): { center: [number, number]; zoom: number } {
+  const WORLD_DIM = 256;
+  const latRadians = (lat: number) => {
+    const sin = Math.sin((lat * Math.PI) / 180);
+    const radians = Math.log((1 + sin) / (1 - sin)) / 2;
+    return Math.max(Math.min(radians, Math.PI), -Math.PI) / 2;
+  };
+  const zoomForFraction = (mapPx: number, fraction: number) => (
+    fraction > 0 ? Math.floor(Math.log2(mapPx / WORLD_DIM / fraction)) : maxZoom
+  );
+
+  const latFraction = (latRadians(north) - latRadians(south)) / Math.PI;
+  const lngDiff = east - west;
+  const lngFraction = (lngDiff < 0 ? lngDiff + 360 : lngDiff) / 360;
+
+  const zoom = Math.max(0, Math.min(
+    zoomForFraction(heightPx, latFraction),
+    zoomForFraction(widthPx, lngFraction),
+    maxZoom,
+  ));
+
+  return { center: [(west + east) / 2, (south + north) / 2], zoom };
+}
+
 export async function GET(request: Request): Promise<NextResponse> {
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
   return runWithRequestContext(context, async () => {
@@ -63,16 +104,22 @@ export async function GET(request: Request): Promise<NextResponse> {
       const longitudes = positions.map(position => position[0]);
       const latitudes = positions.map(position => position[1]);
       const padding = 0.03;
-      const mapUrl = new URL("https://atlas.microsoft.com/map/static");
-      mapUrl.searchParams.set("api-version", "2024-04-01");
-      mapUrl.searchParams.set("tilesetId", "microsoft.base.road");
-      mapUrl.searchParams.set("language", "pt-BR");
-      mapUrl.searchParams.set("bbox", [
+      const { center, zoom } = centerAndZoomForBounds(
         Math.min(...longitudes) - padding,
         Math.min(...latitudes) - padding,
         Math.max(...longitudes) + padding,
         Math.max(...latitudes) + padding,
-      ].join(","));
+        MAP_WIDTH,
+        MAP_HEIGHT,
+      );
+      const mapUrl = new URL("https://atlas.microsoft.com/map/static");
+      mapUrl.searchParams.set("api-version", "2024-04-01");
+      mapUrl.searchParams.set("tilesetId", "microsoft.base.road");
+      mapUrl.searchParams.set("language", "pt-BR");
+      mapUrl.searchParams.set("width", String(MAP_WIDTH));
+      mapUrl.searchParams.set("height", String(MAP_HEIGHT));
+      mapUrl.searchParams.set("center", center.join(","));
+      mapUrl.searchParams.set("zoom", String(zoom));
       mapUrl.searchParams.set(
         "path",
         `lcB91C1C|lw4||${positions.map(([longitude, latitude]) => `${longitude} ${latitude}`).join("|")}`,
