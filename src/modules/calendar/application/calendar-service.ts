@@ -63,6 +63,7 @@ export class CalendarService {
       title: record.title,
       startAt: record.startAt,
       allDay: record.allDay,
+      category: record.category,
       responsibleId: record.responsibleId,
       ...(record.description && { description: record.description }),
       ...(record.endAt && { endAt: record.endAt }),

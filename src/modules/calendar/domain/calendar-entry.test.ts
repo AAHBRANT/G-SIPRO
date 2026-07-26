@@ -30,13 +30,14 @@ describe("mergeCalendarEntries", () => {
         endAt: null,
         responsibleId: "user-3",
         responsible: { displayName: "Carla" },
+        category: "MEETING",
         opportunityId: null,
         tenderId: null,
       }],
     });
 
     expect(entries.map((entry) => entry.type)).toEqual(["MEETING", "DELIVERY", "DEADLINE"]);
-    expect(entries[0]).toMatchObject({ id: "meeting-1", editable: true, href: undefined });
+    expect(entries[0]).toMatchObject({ id: "meeting-1", editable: true, href: undefined, category: "MEETING" });
     expect(entries[1]).toMatchObject({ id: "proposal-1", editable: false, href: "/opportunities/opportunity-1" });
     expect(entries[2]).toMatchObject({ id: "deadline-1", editable: false, href: "/tenders/tender-1" });
   });
@@ -66,11 +67,12 @@ describe("mergeCalendarEntries", () => {
         endAt: new Date("2026-08-01T14:00:00Z"),
         responsibleId: "user-4",
         responsible: { displayName: "Diana" },
+        category: "TRAVEL",
         opportunityId: "opportunity-3",
         tenderId: null,
       }],
     });
 
-    expect(entries[0]).toMatchObject({ href: "/opportunities/opportunity-3", endAt: "2026-08-01T14:00:00.000Z" });
+    expect(entries[0]).toMatchObject({ href: "/opportunities/opportunity-3", endAt: "2026-08-01T14:00:00.000Z", category: "TRAVEL" });
   });
 });

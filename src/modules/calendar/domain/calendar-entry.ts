@@ -1,4 +1,5 @@
 export type CalendarEntryType = "DEADLINE" | "DELIVERY" | "MEETING";
+export type CalendarEventCategory = "MEETING" | "TRAVEL" | "INTERNAL_DEADLINE" | "PERSONAL" | "OTHER";
 
 export type CalendarEntry = {
   id: string;
@@ -8,6 +9,7 @@ export type CalendarEntry = {
   endAt?: string;
   responsibleId?: string;
   responsibleName?: string;
+  category?: CalendarEventCategory;
   editable: boolean;
   href?: string;
 };
@@ -39,6 +41,7 @@ export type MeetingSource = {
   endAt: Date | null;
   responsibleId: string;
   responsible: { displayName: string };
+  category: CalendarEventCategory;
   opportunityId: string | null;
   tenderId: string | null;
 };
@@ -80,6 +83,7 @@ export function mergeCalendarEntries(sources: Readonly<{
       ...(item.endAt && { endAt: item.endAt.toISOString() }),
       responsibleId: item.responsibleId,
       responsibleName: item.responsible.displayName,
+      category: item.category,
       editable: true,
       href: item.opportunityId ? `/opportunities/${item.opportunityId}` : item.tenderId ? `/tenders/${item.tenderId}` : undefined,
     })),

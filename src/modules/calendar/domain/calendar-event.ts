@@ -3,6 +3,9 @@ import { z } from "zod";
 export const calendarEventStatuses = ["SCHEDULED", "CANCELLED"] as const;
 export type CalendarEventStatus = (typeof calendarEventStatuses)[number];
 
+export const calendarEventCategories = ["MEETING", "TRAVEL", "INTERNAL_DEADLINE", "PERSONAL", "OTHER"] as const;
+export type CalendarEventCategory = (typeof calendarEventCategories)[number];
+
 const linkFields = ["opportunityId", "proposalId", "tenderId"] as const;
 
 const calendarEventBaseSchema = z.object({
@@ -11,6 +14,7 @@ const calendarEventBaseSchema = z.object({
   startAt: z.coerce.date(),
   endAt: z.coerce.date().optional(),
   allDay: z.boolean().default(false),
+  category: z.enum(calendarEventCategories).default("MEETING"),
   responsibleId: z.uuid(),
   opportunityId: z.uuid().optional(),
   proposalId: z.uuid().optional(),

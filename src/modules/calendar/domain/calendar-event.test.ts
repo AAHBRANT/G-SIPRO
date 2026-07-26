@@ -11,7 +11,15 @@ const responsibleId = "11111111-1111-4111-8111-111111111111";
 describe("calendarEventSchema", () => {
   it("aceita um compromisso mínimo válido", () => {
     const result = calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T10:00:00Z", responsibleId });
-    expect(result).toMatchObject({ title: "Reunião", allDay: false });
+    expect(result).toMatchObject({ title: "Reunião", allDay: false, category: "MEETING" });
+  });
+
+  it("aceita categorias válidas e rejeita categoria desconhecida", () => {
+    const result = calendarEventSchema.parse({ title: "Viagem", startAt: "2026-08-01T10:00:00Z", responsibleId, category: "TRAVEL" });
+    expect(result.category).toBe("TRAVEL");
+    expect(() =>
+      calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T10:00:00Z", responsibleId, category: "INVALIDA" }),
+    ).toThrow();
   });
 
   it("rejeita término anterior ao início", () => {

@@ -14,6 +14,7 @@ const record: CalendarEventRecord = Object.freeze({
   title: "Reunião de alinhamento",
   startAt: new Date("2026-08-01T10:00:00Z"),
   allDay: false,
+  category: "MEETING",
   responsibleId,
   status: "SCHEDULED",
   version: 1,

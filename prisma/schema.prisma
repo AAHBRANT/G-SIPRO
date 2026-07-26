@@ -158,6 +158,14 @@ enum CalendarEventStatus {
   CANCELLED
 }
 
+enum CalendarEventCategory {
+  MEETING
+  TRAVEL
+  INTERNAL_DEADLINE
+  PERSONAL
+  OTHER
+}
+
 enum DeadlineAlertStatus {
   SCHEDULED
   ACKNOWLEDGED
@@ -498,6 +506,7 @@ model CalendarEvent {
   tenderId       String?             @db.Uuid
   tender         Tender?             @relation(fields: [tenderId], references: [id], onDelete: Restrict)
   status         CalendarEventStatus @default(SCHEDULED)
+  category       CalendarEventCategory @default(MEETING)
   externalId     String?             @db.VarChar(200)
   externalSource String?             @db.VarChar(40)
   version        Int                 @default(1)

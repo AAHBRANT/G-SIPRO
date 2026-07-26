@@ -6,6 +6,7 @@ import { GsIcon } from "@/components/ui/gs-icon";
 import { MetricCard } from "@/components/ui/metric-card";
 
 type EntryType = "DEADLINE" | "DELIVERY" | "MEETING";
+type EventCategory = "MEETING" | "TRAVEL" | "INTERNAL_DEADLINE" | "PERSONAL" | "OTHER";
 type Entry = {
   id: string;
   type: EntryType;
@@ -14,6 +15,7 @@ type Entry = {
   endAt?: string;
   responsibleId?: string;
   responsibleName?: string;
+  category?: EventCategory;
   editable: boolean;
   href?: string;
 };
@@ -36,6 +38,49 @@ const typeDot: Record<EntryType, string> = {
   MEETING: "bg-violet-500",
 };
 
+// Compromissos de equipe (MEETING) ganham cor por assunto, em vez do violeta único —
+// prazos de edital e entregas de proposta continuam com a cor fixa por tipo acima.
+const categoryLabels: Record<EventCategory, string> = {
+  MEETING: "Reunião",
+  TRAVEL: "Viagem / visita técnica",
+  INTERNAL_DEADLINE: "Prazo interno",
+  PERSONAL: "Compromisso pessoal",
+  OTHER: "Outro",
+};
+
+const categoryTone: Record<EventCategory, string> = {
+  MEETING: "bg-violet-50 text-violet-700",
+  TRAVEL: "bg-cyan-50 text-cyan-700",
+  INTERNAL_DEADLINE: "bg-rose-50 text-rose-700",
+  PERSONAL: "bg-slate-100 text-slate-700",
+  OTHER: "bg-fuchsia-50 text-fuchsia-700",
+};
+
+const categoryDot: Record<EventCategory, string> = {
+  MEETING: "bg-violet-500",
+  TRAVEL: "bg-cyan-500",
+  INTERNAL_DEADLINE: "bg-rose-500",
+  PERSONAL: "bg-slate-500",
+  OTHER: "bg-fuchsia-500",
+};
+
+function entryTone(entry: Entry): string {
+  return entry.type === "MEETING" ? categoryTone[entry.category ?? "MEETING"] : typeTone[entry.type];
+}
+
+function entryDot(entry: Entry): string {
+  return entry.type === "MEETING" ? categoryDot[entry.category ?? "MEETING"] : typeDot[entry.type];
+}
+
+function initials(name?: string): string {
+  if (!name) return "?";
+  // Ignora anotações entre parênteses (ex.: "(fictício)") para não virar iniciais erradas.
+  const parts = name.trim().split(/\s+/).filter((part) => /^\p{L}/u.test(part));
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
 const weekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 const monthLabels = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -54,6 +99,13 @@ function isSameDay(left: Date, right: Date) {
   return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
 }
 
+function toDateTimeLocalValue(day: Date, hour = 9) {
+  const value = new Date(day);
+  value.setHours(hour, 0, 0, 0);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
 function buildMonthGrid(monthAnchor: Date) {
   const firstOfMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
   const gridStart = new Date(firstOfMonth);
@@ -65,15 +117,18 @@ function buildMonthGrid(monthAnchor: Date) {
   });
 }
 
-export function CalendarView({ users, canManage }: { users: readonly { id: string; name: string }[]; canManage: boolean }) {
+export function CalendarView({ users, canManage, currentUserId }: { users: readonly { id: string; name: string }[]; canManage: boolean; currentUserId: string }) {
   const [entries, setEntries] = useState<readonly Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
   const [type, setType] = useState<EntryType | "">("");
+  const [category, setCategory] = useState<EventCategory | "">("");
   const [responsible, setResponsible] = useState("");
+  const [onlyMine, setOnlyMine] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createDefaultStart, setCreateDefaultStart] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const today = useMemo(() => new Date(), []);
@@ -107,10 +162,12 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
         return (
           (!query || haystack.includes(query.toLocaleLowerCase("pt-BR"))) &&
           (!type || entry.type === type) &&
-          (!responsible || entry.responsibleId === responsible)
+          (!category || entry.category === category) &&
+          (!responsible || entry.responsibleId === responsible) &&
+          (!onlyMine || entry.responsibleId === currentUserId)
         );
       }),
-    [entries, query, type, responsible],
+    [entries, query, type, category, responsible, onlyMine, currentUserId],
   );
 
   const entriesByDay = useMemo(() => {
@@ -144,6 +201,11 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
     setMonthAnchor((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
   }
 
+  function openCreateForDay(day: Date) {
+    setCreateDefaultStart(toDateTimeLocalValue(day));
+    setCreateOpen(true);
+  }
+
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -156,6 +218,7 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
       startAt: form.get("startAt"),
       endAt: form.get("endAt") || undefined,
       responsibleId: form.get("responsibleId"),
+      category: form.get("category"),
     };
     try {
       const response = await fetch("/api/calendar", {
@@ -171,6 +234,7 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
       }
       formElement.reset();
       setCreateOpen(false);
+      setCreateDefaultStart("");
       await load();
     } catch {
       setSubmitting(false);
@@ -225,8 +289,20 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
             <button className={`${controlClass} inline-flex items-center gap-2`} onClick={() => setShowFilters((value) => !value)} type="button">
               <GsIcon className="h-4 w-4" name="filter" /> Filtros
             </button>
+            <button
+              aria-pressed={onlyMine}
+              className={`${controlClass} inline-flex items-center gap-2 ${onlyMine ? "border-brand bg-blue-50 text-brand" : ""}`}
+              onClick={() => setOnlyMine((value) => !value)}
+              type="button"
+            >
+              Meus compromissos
+            </button>
             {canManage && (
-              <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--brand-strong)]" onClick={() => setCreateOpen(true)} type="button">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--brand-strong)]"
+                onClick={() => { setCreateDefaultStart(""); setCreateOpen(true); }}
+                type="button"
+              >
                 <span className="text-base font-normal">＋</span> Novo
               </button>
             )}
@@ -234,12 +310,19 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
         </div>
 
         {showFilters && (
-          <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-3">
+          <div className="grid gap-3 border-b border-slate-200 bg-slate-50/80 p-4 sm:grid-cols-4">
             <label className="grid gap-1 text-[10px] font-bold uppercase text-slate-500">
               Tipo
               <select className={controlClass} onChange={(event) => setType(event.target.value as EntryType | "")} value={type}>
                 <option value="">Todos os tipos</option>
                 {(Object.keys(typeLabels) as EntryType[]).map((value) => <option key={value} value={value}>{typeLabels[value]}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1 text-[10px] font-bold uppercase text-slate-500">
+              Assunto
+              <select className={controlClass} onChange={(event) => setCategory(event.target.value as EventCategory | "")} value={category}>
+                <option value="">Todos os assuntos</option>
+                {(Object.keys(categoryLabels) as EventCategory[]).map((value) => <option key={value} value={value}>{categoryLabels[value]}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-[10px] font-bold uppercase text-slate-500">
@@ -249,7 +332,7 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
                 {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
               </select>
             </label>
-            <button className={`${controlClass} self-end`} onClick={() => { setType(""); setResponsible(""); setQuery(""); }} type="button">Limpar filtros</button>
+            <button className={`${controlClass} self-end`} onClick={() => { setType(""); setCategory(""); setResponsible(""); setQuery(""); setOnlyMine(false); }} type="button">Limpar filtros</button>
           </div>
         )}
 
@@ -269,22 +352,38 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
               const visible = dayEntries.slice(0, 3);
               const overflow = dayEntries.length - visible.length;
               return (
-                <button
-                  className={`min-h-28 border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${inMonth ? "bg-white" : "bg-slate-50/60"} ${isSelected ? "ring-2 ring-inset ring-brand" : ""}`}
+                <div
+                  className={`group relative min-h-28 cursor-pointer border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${inMonth ? "bg-white" : "bg-slate-50/60"} ${isSelected ? "ring-2 ring-inset ring-brand" : ""}`}
                   key={day.toISOString()}
                   onClick={() => setSelectedDate(day)}
-                  type="button"
+                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(day); } }}
+                  role="button"
+                  tabIndex={0}
                 >
-                  <span className={`inline-grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${isToday ? "bg-brand text-white" : inMonth ? "text-slate-700" : "text-slate-400"}`}>{day.getDate()}</span>
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${isToday ? "bg-brand text-white" : inMonth ? "text-slate-700" : "text-slate-400"}`}>{day.getDate()}</span>
+                    {canManage && (
+                      <button
+                        aria-label={`Novo compromisso em ${day.getDate()}/${day.getMonth() + 1}`}
+                        className="grid h-5 w-5 place-items-center rounded text-slate-400 opacity-0 transition hover:bg-brand hover:text-white group-hover:opacity-100"
+                        onClick={(event) => { event.stopPropagation(); openCreateForDay(day); }}
+                        title="Novo compromisso neste dia"
+                        type="button"
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
                   <div className="mt-1 space-y-1">
                     {visible.map((entry) => (
-                      <span className={`block truncate rounded px-1.5 py-0.5 text-[10px] font-semibold ${typeTone[entry.type]}`} key={`${entry.type}-${entry.id}`} title={entry.title}>
-                        {timeLabel(entry.startAt)} {entry.title}
+                      <span className={`flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-semibold ${entryTone(entry)}`} key={`${entry.type}-${entry.id}`} title={`${entry.title} · ${entry.responsibleName ?? "Não atribuído"}`}>
+                        <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-white/70 text-[8px] font-black">{initials(entry.responsibleName)}</span>
+                        <span className="truncate">{timeLabel(entry.startAt)} {entry.title}</span>
                       </span>
                     ))}
                     {overflow > 0 && <span className="block px-1.5 text-[10px] font-bold text-slate-500">+{overflow} mais</span>}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -303,11 +402,12 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
             {selectedDayEntries.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-500">Nenhum item neste dia.</p>}
             {selectedDayEntries.map((entry) => (
               <div className="flex flex-wrap items-center gap-3 px-4 py-3" key={`${entry.type}-${entry.id}`}>
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${typeDot[entry.type]}`} />
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${entryDot(entry)}`} />
                 <span className="w-16 shrink-0 text-xs font-bold text-slate-600">{timeLabel(entry.startAt)}</span>
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-black text-slate-700" title={entry.responsibleName ?? "Não atribuído"}>{initials(entry.responsibleName)}</span>
                 <div className="min-w-0 flex-1">
                   {entry.href ? <Link className="block truncate font-bold text-brand hover:underline" href={entry.href}>{entry.title}</Link> : <span className="block truncate font-semibold text-slate-800">{entry.title}</span>}
-                  <span className="text-xs text-slate-500">{typeLabels[entry.type]} · {entry.responsibleName ?? "Não atribuído"}</span>
+                  <span className="text-xs text-slate-500">{entry.type === "MEETING" ? categoryLabels[entry.category ?? "MEETING"] : typeLabels[entry.type]} · {entry.responsibleName ?? "Não atribuído"}</span>
                 </div>
                 {entry.editable && canManage && (
                   <button className="rounded-md p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50" disabled={cancellingId === entry.id} onClick={() => cancelEntry(entry.id)} title="Cancelar compromisso" type="button">
@@ -335,15 +435,22 @@ export function CalendarView({ users, canManage }: { users: readonly { id: strin
               <label className="grid gap-1 text-sm font-semibold">Título<input className={fieldClass} maxLength={200} name="title" required /></label>
               <label className="grid gap-1 text-sm font-semibold">Descrição<textarea className={`${fieldClass} min-h-20`} maxLength={2000} name="description" /></label>
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-1 text-sm font-semibold">Início<input className={fieldClass} name="startAt" required type="datetime-local" /></label>
+                <label className="grid gap-1 text-sm font-semibold">Início<input className={fieldClass} defaultValue={createDefaultStart} name="startAt" required type="datetime-local" /></label>
                 <label className="grid gap-1 text-sm font-semibold">Término<input className={fieldClass} name="endAt" type="datetime-local" /></label>
               </div>
               <label className="grid gap-1 text-sm font-semibold">
-                Responsável
-                <select className={fieldClass} name="responsibleId" required>
-                  <option value="">Selecione o responsável</option>
-                  {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                Assunto
+                <select className={fieldClass} defaultValue="MEETING" name="category">
+                  {(Object.keys(categoryLabels) as EventCategory[]).map((value) => <option key={value} value={value}>{categoryLabels[value]}</option>)}
                 </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold">
+                Responsável
+                <select className={fieldClass} defaultValue={currentUserId} name="responsibleId" required>
+                  <option value="">Selecione o responsável</option>
+                  {users.map((user) => <option key={user.id} value={user.id}>{user.id === currentUserId ? `${user.name} (eu)` : user.name}</option>)}
+                </select>
+                <span className="text-xs font-normal text-slate-500">Deixe seu nome selecionado para criar na sua própria agenda, ou escolha outra pessoa para delegar o compromisso.</span>
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <button className="rounded-lg bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={submitting}>{submitting ? "Salvando…" : "Salvar compromisso"}</button>

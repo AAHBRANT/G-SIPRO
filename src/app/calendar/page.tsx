@@ -28,7 +28,7 @@ export default async function CalendarPage() {
   return (
     <main className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
       <PageHeader eyebrow="Comercial" icon="calendar" subtitle="Prazos de editais, entregas de proposta e compromissos de equipe em um único lugar." title="Calendário" variant="executive" />
-      <CalendarView canManage={canManage} users={users.map((user) => ({ id: user.id, name: user.displayName }))} />
+      <CalendarView canManage={canManage} currentUserId={authorization!.actorId} users={users.map((user) => ({ id: user.id, name: user.displayName }))} />
     </main>
   );
 }
