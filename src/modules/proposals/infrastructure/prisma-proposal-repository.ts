@@ -18,6 +18,8 @@ export class PrismaProposalRepository implements ProposalRepository {
     return getDatabase().$transaction(async transaction => {
       const opportunity = await transaction.opportunity.findUnique({ where: { id: draft.opportunityId }, include: { tenders: { select: { id: true } } } });
       if (!opportunity) throw new ProposalOpportunityNotFoundError();
+      if (opportunity.status !== "ACTIVE" || !opportunity.ownerId) throw new ProposalOriginRuleError("A proposta só pode ser criada após a validação e delegação da oportunidade.");
+      if (await transaction.proposal.findFirst({ where: { opportunityId: opportunity.id, deletedAt: null }, select: { id: true } })) throw new ProposalOriginRuleError("Esta oportunidade já foi convertida em proposta.");
       const originType = draft.originType ?? (opportunity.tenders.length > 0 ? "PUBLIC_TENDER" : "DIRECT");
       const requiresTender = originType === "PUBLIC_TENDER";
       if (!requiresTender && (draft.tenderVersionId || draft.tenderLotId)) throw new ProposalOriginRuleError("A oportunidade não possui edital vinculado.");
@@ -34,6 +36,8 @@ export class PrismaProposalRepository implements ProposalRepository {
       await transaction.proposalComponent.createMany({data:[{id:randomUUID(),proposalVersionId:versionId,type:"TECHNICAL",status:"DRAFT",createdBy:actorId},{id:randomUUID(),proposalVersionId:versionId,type:"COMMERCIAL",status:"DRAFT",createdBy:actorId}]});
       const snapshot = { code: proposal.code, version: 1, status: "PREPARATION", opportunityId: opportunity.id, opportunityCode: opportunity.code, opportunityVersion: opportunity.version, tenderVersionId: proposal.tenderVersionId, tenderVersion: proposal.tenderVersionNumber, tenderFileHash: proposal.tenderFileHash, tenderLotId: proposal.tenderLotId, tenderLotCode: proposal.tenderLotCode };
       await transaction.proposalHistory.create({ data: { id: randomUUID(), proposalId: proposal.id, version: 1, action: "CREATED", snapshot, changedById: actorId, correlationId } });
+      const inheritedLinks = await transaction.managedDocumentLink.findMany({ where: { entityType: "OPPORTUNITY", entityId: opportunity.id, role: "SOURCE_DOCUMENT" }, select: { documentId: true } });
+      if (inheritedLinks.length) await transaction.managedDocumentLink.createMany({ data: inheritedLinks.map(link => ({ id: randomUUID(), documentId: link.documentId, entityType: "PROPOSAL", entityId: proposal.id, role: "SOURCE_DOCUMENT", createdBy: actorId })), skipDuplicates: true });
       await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId, action: "PROPOSAL_CREATED", entityType: "PROPOSAL", entityId: proposal.id, correlationId, outcome: "SUCCESS", origin: "proposal-service", metadata: snapshot } });
       return this.findRecord(transaction, proposal.id);
     });

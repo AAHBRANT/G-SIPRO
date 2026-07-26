@@ -32,6 +32,25 @@
     }
   ],
   "permissions": ["identity"],
+  "activities": {
+    "activityTypes": [
+      {
+        "type": "gsiproOpportunityNotification",
+        "description": "Atualização de oportunidade no G-SIPRO",
+        "templateText": "{actor} informa: {summary}"
+      }
+    ]
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "type": "Application",
+          "name": "TeamsActivity.Send.User"
+        }
+      ]
+    }
+  },
   "validDomains": [
     "ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io"
   ],

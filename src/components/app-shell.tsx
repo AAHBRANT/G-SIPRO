@@ -27,6 +27,7 @@ const icons = {
   ai: <Icon><path d="M8 4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z"/><path d="M9 9h.01M15 9h.01M9 15c2 1.5 4 1.5 6 0"/></Icon>,
   document: <Icon><path d="M6 3h9l4 4v14H6zM15 3v5h5M9 12h7M9 16h7"/></Icon>,
   support: <Icon><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M9 9h6M9 13h4"/></Icon>,
+  notification: <Icon><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></Icon>,
 };
 
 const navigation: ReadonlyArray<NavigationItem> = [
@@ -37,12 +38,13 @@ const navigation: ReadonlyArray<NavigationItem> = [
   { href: "/indicators", label: "Inteligência e KPIs", icon: icons.indicators, permission: "indicators.read" },
 ];
 
-function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals = 0, permissions }: { close?: () => void; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; permissions: ReadonlyArray<string> }) {
+function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals = 0, unreadNotifications = 0, permissions }: { close?: () => void; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; unreadNotifications?: number; permissions: ReadonlyArray<string> }) {
   const pathname = usePathname();
   const granted = new Set(permissions);
   const mainItems = navigation.filter((item) => isMaster || !item.permission || granted.has(item.permission));
   if (isMaster) mainItems.push({ href: "/admin", label: "Administrador", icon: icons.admin, exact: true });
   const bottomItems: ReadonlyArray<NavigationItem> = [
+    ...(granted.has("notifications.read") || isMaster ? [{ href: "/notifications", label: "Notificações", icon: icons.notification, badge: unreadNotifications }] : []),
     { href: "/support", label: "Suporte", icon: icons.support },
     ...(isOwner ? [{ href: "/admin/support#approvals", label: "Aprovações", icon: icons.support, badge: pendingApprovals }] : []),
   ];
@@ -56,7 +58,7 @@ function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals
   </nav>;
 }
 
-export function AppShell({ children, userLabel, isMaster = false, isOwner = false, pendingApprovals = 0, permissions = [], signOutAction }: { children: ReactNode; userLabel: string; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; permissions?: ReadonlyArray<string>; signOutAction: () => Promise<void> }) {
+export function AppShell({ children, userLabel, isMaster = false, isOwner = false, pendingApprovals = 0, unreadNotifications = 0, permissions = [], signOutAction }: { children: ReactNode; userLabel: string; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; unreadNotifications?: number; permissions?: ReadonlyArray<string>; signOutAction: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const initials = userLabel.split(/[\s.@]+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "GS";
@@ -67,7 +69,7 @@ export function AppShell({ children, userLabel, isMaster = false, isOwner = fals
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white shadow-md shadow-black/20">GS</div>
         <div><p className="text-lg font-black leading-none text-white">G-SIPRO</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gestão de propostas</p></div>
       </div>
-      <Navigation isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/>
+      <Navigation isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions} unreadNotifications={unreadNotifications}/>
       <div className="border-t border-white/10 p-3">
         <div className="flex items-center gap-3 rounded-xl bg-white/[0.06] p-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-xs font-bold text-white">{initials}</span>
@@ -81,7 +83,7 @@ export function AppShell({ children, userLabel, isMaster = false, isOwner = fals
       <div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-xs font-black text-white">GS</div><strong>G-SIPRO</strong></div>
       <button aria-label="Abrir menu" className="rounded-lg border border-white/15 p-2 text-slate-200" onClick={() => setOpen(true)}><Icon><path d="M4 7h16M4 12h16M4 17h16"/></Icon></button>
     </header>
-    {open && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Fechar menu" className="absolute inset-0 bg-slate-950/50" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[86%] max-w-80 flex-col bg-[#1d1e21] text-white shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-white/10 px-5"><strong>G-SIPRO</strong><button className="p-2 text-slate-300" onClick={() => setOpen(false)}><Icon><path d="m6 6 12 12M18 6 6 18"/></Icon></button></div><Navigation close={() => setOpen(false)} isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions}/></aside></div>}
+    {open && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Fechar menu" className="absolute inset-0 bg-slate-950/50" onClick={() => setOpen(false)}/><aside className="relative flex h-full w-[86%] max-w-80 flex-col bg-[#1d1e21] text-white shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-white/10 px-5"><strong>G-SIPRO</strong><button className="p-2 text-slate-300" onClick={() => setOpen(false)}><Icon><path d="m6 6 12 12M18 6 6 18"/></Icon></button></div><Navigation close={() => setOpen(false)} isMaster={isMaster} isOwner={isOwner} pendingApprovals={pendingApprovals} permissions={permissions} unreadNotifications={unreadNotifications}/></aside></div>}
     <div className="md:pl-64">{isOwner && pendingApprovals > 0 && <Link className="flex items-center justify-between gap-4 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:px-6" href="/admin/support#approvals"><span><strong>{pendingApprovals} solicitação(ões) requerem sua ação.</strong> Aprove mudanças, execute orientações administrativas protegidas ou assuma exceções diretamente no G-SIPRO.</span><span className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 text-xs font-black text-white">Abrir pendências</span></Link>}<main className="min-h-screen">{children}</main></div>
     <Link aria-label="Abrir suporte" className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-3 text-sm font-bold text-white shadow-lg shadow-red-950/15 transition hover:-translate-y-0.5 hover:bg-[var(--brand-strong)]" href={`/support?from=${encodeURIComponent(pathname)}`}>{icons.support}<span className="hidden sm:inline">Suporte</span></Link>
   </div>;

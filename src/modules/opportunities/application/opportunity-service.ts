@@ -91,15 +91,16 @@ export class OpportunityService {
     id: string,
     target: OpportunityStatus,
     actorId: string,
-    options: Readonly<{ closureReasonCode?: string; closureJustification?: string; reason?: string }> = {},
+    options: Readonly<{ closureReasonCode?: string; closureJustification?: string; reason?: string; ownerId?: string }> = {},
     correlationId: string = randomUUID(),
   ): Promise<OpportunityRecord> {
     const before = await this.requireOpportunity(id);
-    assertOpportunityTransition(before, target, options.closureReasonCode, options.reason);
+    const delegated = options.ownerId ? Object.freeze({ ...before, ownerId: options.ownerId }) : before;
+    assertOpportunityTransition(delegated, target, options.closureReasonCode, options.reason);
 
     const closing = target === "CLOSED";
     const after = Object.freeze({
-      ...before,
+      ...delegated,
       status: target,
       version: before.version + 1,
       closureReasonCode: closing ? options.closureReasonCode : undefined,

@@ -15,4 +15,11 @@ describe("moduleCatalog", () => {
   it("mantém auditoria sem dependências funcionais", () => {
     expect(moduleCatalog.find((entry) => entry.id === "audit")?.dependencies).toEqual([]);
   });
+
+  it("registra o modo analítico com as dependências governadas", () => {
+    const moduleEntry = moduleCatalog.find((entry) => entry.id === "opportunity-intelligence");
+    expect(moduleEntry?.dependencies).toContain("opportunities");
+    expect(moduleEntry?.dependencies).toContain("ai");
+    expect(moduleEntry?.dependencies).toContain("audit");
+  });
 });

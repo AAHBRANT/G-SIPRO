@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/core/authorization/authorization-context";
+import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import { toApiError } from "@/core/errors/api-error";
 
@@ -9,7 +11,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const authorization = await requirePermission("proposals.read");
     const id = z.uuid().parse((await params).id);
     const database = getDatabase();
-    const proposal = await database.proposal.findFirst({ where: { id, deletedAt: null }, select: { id: true } });
+    const proposal = await database.proposal.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        opportunity: { select: { ownerId: true } },
+        tenderVersionId: true,
+        tenderVersion: { select: { tenderId: true, fileHash: true } },
+      },
+    });
     if (!proposal) return NextResponse.json({ error: { message: "Proposta não encontrada." } }, { status: 404 });
 
     const documents = await database.managedDocument.findMany({
@@ -60,7 +70,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     });
     const keywords = [...new Set(requirementTexts.flatMap((text) => text.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((word) => word.length >= 4 && !stopWords.has(word))))].slice(0, 12);
     let archiveMatches: Array<Record<string, unknown>> = [];
-    if (authorization.permissions.has("technical-archive.search") && keywords.length > 0) {
+    if (authorize(authorization, { permission: "technical-archive.search" }).allowed && keywords.length > 0) {
       const services = await database.executedService.findMany({
         where: {
           contract: { status: "VALIDATED" },
@@ -94,9 +104,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       }).sort((left, right) => Number(right.score) - Number(left.score)).slice(0, 8);
       await database.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "PROPOSAL_ARCHIVE_MATCHES_VIEWED", entityType: "PROPOSAL", entityId: id, correlationId: randomUUID(), outcome: "SUCCESS", origin: "proposal-analysis", metadata: { keywordCount: keywords.length, results: archiveMatches.length, rawTermsStored: false, automaticDecision: false } } });
     }
-    return NextResponse.json({ data: { documents: serializedDocuments, archiveMatches } });
+    return NextResponse.json({
+      data: {
+        documents: serializedDocuments,
+        archiveMatches,
+        tender: proposal.tenderVersion
+          ? {
+              id: proposal.tenderVersion.tenderId,
+              versionId: proposal.tenderVersionId,
+              fileHash: proposal.tenderVersion.fileHash,
+            }
+          : null,
+        canPromoteTender: authorize(authorization, { permission: "proposals.create" }).allowed,
+        ownerId: proposal.opportunity.ownerId,
+      },
+    });
   } catch (error) {
     return toApiError(error);
   }
 }
-import { randomUUID } from "node:crypto";

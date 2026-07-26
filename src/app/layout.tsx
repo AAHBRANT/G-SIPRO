@@ -19,7 +19,15 @@ export default async function RootLayout({
   const authorization = await getCurrentAuthorizationContext();
   const userLabel = session?.user?.name ?? session?.user?.email ?? "Usuário corporativo";
   const permissions = [...(authorization?.permissions ?? [])];
-  const pendingApprovals = authorization?.isOwner ? await getDatabase().supportTicket.count({ where: { status: { in: ["WAITING_APPROVAL", "OWNER_ACTION_REQUIRED", "ESCALATED"] } } }) : 0;
+  const pendingApprovals = authorization?.isOwner
+    ? (await Promise.all([
+        getDatabase().supportTicket.count({ where: { status: { in: ["WAITING_APPROVAL", "OWNER_ACTION_REQUIRED", "ESCALATED"] } } }),
+        getDatabase().intelligencePolicy.count({ where: { approval: null } }),
+      ])).reduce((total, count) => total + count, 0)
+    : 0;
+  const unreadNotifications = authorization?.permissions.has("notifications.read")
+    ? await getDatabase().userNotification.count({ where: { recipientId: authorization.actorId, readAt: null } })
+    : 0;
   async function signOutAction() {
     "use server";
     await signOut({ redirectTo: "/" });
@@ -27,7 +35,7 @@ export default async function RootLayout({
 
   return (
     <html lang="pt-BR" className="h-full antialiased">
-      <body className="min-h-full"><AppShell isMaster={authorization?.isMaster} isOwner={authorization?.isOwner} pendingApprovals={pendingApprovals} permissions={permissions} userLabel={userLabel} signOutAction={signOutAction}>{children}</AppShell></body>
+      <body className="min-h-full"><AppShell isMaster={authorization?.isMaster} isOwner={authorization?.isOwner} pendingApprovals={pendingApprovals} permissions={permissions} unreadNotifications={unreadNotifications} userLabel={userLabel} signOutAction={signOutAction}>{children}</AppShell></body>
     </html>
   );
 }

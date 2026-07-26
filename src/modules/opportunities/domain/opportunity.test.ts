@@ -5,6 +5,7 @@ import {
   collectCriticalChanges,
   opportunityDraftSchema,
   OpportunityRuleError,
+  shouldConvertOpportunityToProposal,
   type OpportunityLifecycleSnapshot,
 } from "@/modules/opportunities/domain/opportunity";
 
@@ -36,6 +37,11 @@ describe("regras de oportunidade", () => {
 
   it("permite ativação com dados mínimos", () => {
     expect(() => assertOpportunityTransition(completeOpportunity, "ACTIVE")).not.toThrow();
+  });
+
+  it("converte apenas quando a oportunidade validada entra no estado ativo", () => {
+    expect(shouldConvertOpportunityToProposal("QUALIFICATION", "ACTIVE")).toBe(true);
+    expect(shouldConvertOpportunityToProposal("ACTIVE", "SUSPENDED")).toBe(false);
   });
 
   it("exige motivo para encerramento", () => {
@@ -70,6 +76,9 @@ describe("regras de oportunidade", () => {
         { subject: "A", ownerId: "1", currency: "BRL", customerId: "cliente-1" },
         { subject: "B", ownerId: "1", currency: "BRL", customerId: "cliente-2" },
       ),
-    ).toEqual({ subject: { from: "A", to: "B" } });
+    ).toEqual({
+      subject: { from: "A", to: "B" },
+      customerId: { from: "cliente-1", to: "cliente-2" },
+    });
   });
 });

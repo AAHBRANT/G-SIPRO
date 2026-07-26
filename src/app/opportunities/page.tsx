@@ -11,7 +11,7 @@ import { CreateOpportunityForm } from "./create-opportunity-form";
 import { OpportunityPageSizeSelect, OpportunityTableControls } from "./opportunity-table-controls";
 
 type Filters = { query?: string; status?: string; page?: string; pageSize?: string };
-const statusLabels: Record<OpportunityStatus, string> = { DRAFT: "Rascunho", QUALIFICATION: "Qualificação", ACTIVE: "Ativa", SUSPENDED: "Suspensa", CLOSED: "Encerrada" };
+const statusLabels: Record<OpportunityStatus, string> = { DRAFT: "Rascunho", QUALIFICATION: "Em análise", ACTIVE: "Validada / em proposta", SUSPENDED: "Suspensa", CLOSED: "Encerrada" };
 const statusTone: Record<OpportunityStatus, string> = { DRAFT: "bg-slate-100 text-slate-600", QUALIFICATION: "bg-violet-50 text-violet-700", ACTIVE: "bg-emerald-50 text-emerald-700", SUSPENDED: "bg-amber-50 text-amber-700", CLOSED: "bg-slate-200 text-slate-700" };
 const currency = (value: Prisma.Decimal | null, code: string | null) => value === null ? "—" : Number(value).toLocaleString("pt-BR", { style: "currency", currency: code ?? "BRL", maximumFractionDigits: 0 });
 
@@ -37,11 +37,12 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   };
   const database = getDatabase();
   const now = new Date(); const nextThirtyDays = new Date(now.getTime() + 30 * 86400000);
-  const [opportunities, totalFiltered, total, active, qualification, upcoming, closed] = await Promise.all([
+  const [opportunities, totalFiltered, total, active, qualification, upcoming, closed, users] = await Promise.all([
     database.opportunity.findMany({ where, include: { customer: true, contractingAuthority: true, owner: true }, orderBy: [{ deliveryAt: "asc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize }),
     database.opportunity.count({ where }),
     database.opportunity.count(), database.opportunity.count({ where: { status: "ACTIVE" } }), database.opportunity.count({ where: { status: "QUALIFICATION" } }),
     database.opportunity.count({ where: { status: { not: "CLOSED" }, deliveryAt: { gte: now, lte: nextThirtyDays } } }), database.opportunity.count({ where: { status: "CLOSED" } }),
+    database.user.findMany({ where: { status: "ACTIVE" }, select: { id: true, displayName: true }, orderBy: { displayName: "asc" } }),
   ]);
   const canCreate = authorize(authorization, { permission: "opportunities.create" }).allowed;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize)); const safePage = Math.min(page, totalPages);
@@ -59,7 +60,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
     </section>
 
     <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
-      <OpportunityTableControls action={canCreate ? <CreateOpportunityForm/> : undefined} pageSize={pageSize} query={query ?? ""} status={status ?? ""}/>
+      <OpportunityTableControls action={canCreate ? <CreateOpportunityForm users={users.map((user) => ({ id: user.id, name: user.displayName }))}/> : undefined} pageSize={pageSize} query={query ?? ""} status={status ?? ""}/>
 
       <div className="overflow-x-auto"><table className="w-full min-w-[1050px] table-fixed text-left text-xs"><colgroup><col className="w-[13%]"/><col className="w-[25%]"/><col className="w-[16%]"/><col className="w-[14%]"/><col className="w-[11%]"/><col className="w-[10%]"/><col className="w-[8%]"/><col className="w-[6%]"/></colgroup><thead className="bg-slate-50 text-[9px] font-black uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Código <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Objeto <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Cliente/órgão <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Responsável</th><th className="px-4 py-3">Prazo <span className="ml-1 text-[8px]">↕</span></th><th className="px-4 py-3">Valor</th><th className="px-4 py-3">Status <span className="ml-1 text-[8px]">↕</span></th><th className="px-3 py-3 text-center">Ações</th></tr></thead><tbody className="divide-y divide-slate-100">{opportunities.map((entry) => <tr className="h-14 transition hover:bg-blue-50/30" key={entry.id}><td className="px-4 py-3"><Link className="block truncate font-bold text-brand hover:underline" href={`/opportunities/${entry.id}`}>{entry.code}</Link></td><td className="px-4 py-3"><span className="block truncate text-slate-700" title={entry.subject ?? ""}>{entry.subject ?? "—"}</span></td><td className="px-4 py-3"><span className="block truncate text-slate-600">{entry.customer?.name ?? entry.contractingAuthority?.name ?? "—"}</span></td><td className="px-4 py-3"><span className="block truncate text-slate-600">{entry.owner?.displayName ?? "Não atribuído"}</span></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.deliveryAt ? entry.deliveryAt.toLocaleDateString("pt-BR") : "—"}</td><td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">{currency(entry.estimatedValue, entry.currency)}</td><td className="px-4 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone[entry.status]}`}>{statusLabels[entry.status]}</span></td><td className="px-3 py-3 text-center"><Link aria-label={`Visualizar ${entry.code}`} className="inline-grid rounded-md p-1.5 text-blue-700 transition hover:bg-blue-100" href={`/opportunities/${entry.id}`} title="Visualizar"><GsIcon className="h-4 w-4" name="eye"/></Link></td></tr>)}{opportunities.length === 0 && <tr><td className="px-4 py-10 text-center text-slate-500" colSpan={8}>Nenhuma oportunidade encontrada.</td></tr>}</tbody></table></div>
 

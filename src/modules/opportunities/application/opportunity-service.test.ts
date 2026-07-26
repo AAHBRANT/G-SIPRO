@@ -42,6 +42,15 @@ describe("OpportunityService", () => {
     expect(activated).toMatchObject({ status: "ACTIVE", version: 2 });
   });
 
+  it("valida e delega a oportunidade na mesma transação lógica", async () => {
+    const responsibleId = "33333333-3333-4333-8333-333333333333";
+    const activated = await service.transition(record.id, "ACTIVE", actorId, { ownerId: responsibleId });
+    expect(activated).toMatchObject({ status: "ACTIVE", ownerId: responsibleId, version: 2 });
+    expect(repository.revise).toHaveBeenCalledWith(expect.objectContaining({
+      after: expect.objectContaining({ ownerId: responsibleId }),
+    }));
+  });
+
   it("registra motivo na reabertura controlada", async () => {
     const closed: OpportunityRecord = { ...record, status: "CLOSED" };
     repository.findById = vi.fn(async () => closed);

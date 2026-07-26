@@ -13,6 +13,8 @@ const environmentSchema = z.object({
   ENTRA_CLIENT_SECRET: z.string().min(16).optional().or(z.literal("")),
   TEAMS_CATALOG_APP_ID: z.string().uuid().optional().or(z.literal("")),
   MICROSOFT_GRAPH_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(60_000).default(20_000),
+  NOTIFICATION_DISPATCH_TOKEN: z.string().min(32).optional().or(z.literal("")),
+  NOTIFICATION_EMAIL_SENDER: z.email().optional().or(z.literal("")),
   AUTH_SECRET: z.string().min(32).optional().or(z.literal("")),
   AUTH_URL: z.url().optional().or(z.literal("")),
   OPENAI_API_KEY: z.string().min(20).optional().or(z.literal("")),

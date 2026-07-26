@@ -1,6 +1,7 @@
 export const moduleCatalog = [
   { id: "identity", name: "Identidade e Administração", purpose: "Usuários, perfis, departamentos, alçadas e configurações.", dependencies: ["audit"] },
   { id: "opportunities", name: "Oportunidades", purpose: "Entrada e qualificação do pipeline comercial.", dependencies: ["documents", "workflow", "audit"] },
+  { id: "opportunity-intelligence", name: "Modo Analítico Inteligente", purpose: "Análises comerciais, técnicas e de praticabilidade para apoiar decisões sobre oportunidades.", dependencies: ["opportunities", "proposals", "tenders", "technical-collection", "compliance-matrix", "analytics", "ai", "workflow", "identity", "audit"] },
   { id: "tenders", name: "Editais e Requisitos", purpose: "Editais, prazos, requisitos, riscos e evidências.", dependencies: ["documents", "ai", "workflow", "technical-collection", "audit"] },
   { id: "technical-collection", name: "Acervo Técnico", purpose: "Atestados, CATs, ARTs, contratos, obras e profissionais.", dependencies: ["documents", "audit"] },
   { id: "compliance-matrix", name: "Matriz de Atendimento", purpose: "Relação entre requisitos e evidências do acervo.", dependencies: ["tenders", "technical-collection", "ai", "workflow", "audit"] },

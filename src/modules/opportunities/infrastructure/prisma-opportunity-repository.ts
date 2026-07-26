@@ -9,6 +9,7 @@ import type {
   DuplicateReview,
 } from "@/modules/opportunities/application/opportunity-service";
 import type { OpportunityDraft } from "@/modules/opportunities/domain/opportunity";
+import { shouldConvertOpportunityToProposal } from "@/modules/opportunities/domain/opportunity";
 
 export class OpportunityConcurrencyError extends Error {
   constructor(id: string) {
@@ -127,6 +128,107 @@ export class PrismaOpportunityRepository implements OpportunityRepository {
           metadata: this.jsonValue({ version: revision.after.version, changes: revision.changes }),
         },
       });
+
+      if (revision.action === "STATUS_CHANGED" && shouldConvertOpportunityToProposal(revision.before.status, revision.after.status)) {
+        const existingProposal = await transaction.proposal.findFirst({
+          where: { opportunityId: revision.before.id, deletedAt: null },
+          select: { id: true },
+        });
+        if (!existingProposal) {
+          const [tender, sourceLinks] = await Promise.all([
+            transaction.tender.findFirst({ where: { opportunityId: revision.before.id }, select: { id: true } }),
+            transaction.managedDocumentLink.findMany({
+              where: { entityType: "OPPORTUNITY", entityId: revision.before.id, role: "SOURCE_DOCUMENT" },
+              select: { documentId: true },
+            }),
+          ]);
+          const proposalId = randomUUID();
+          const proposalVersionId = randomUUID();
+          const normalizedCode = `PROP-${revision.after.code}`.slice(0, 50);
+          const duplicateCode = await transaction.proposal.findUnique({ where: { code: normalizedCode }, select: { id: true } });
+          const code = duplicateCode ? `${normalizedCode.slice(0, 41)}-${proposalId.slice(0, 8).toUpperCase()}` : normalizedCode;
+          await transaction.proposal.create({
+            data: {
+              id: proposalId,
+              code,
+              title: revision.after.subject ?? revision.after.code,
+              opportunityId: revision.before.id,
+              opportunityVersion: revision.after.version,
+              originType: tender ? "PUBLIC_TENDER" : "DIRECT",
+              version: 1,
+              status: "PREPARATION",
+              createdBy: revision.actorId,
+              updatedBy: revision.actorId,
+            },
+          });
+          await transaction.proposalVersion.create({
+            data: {
+              id: proposalVersionId,
+              proposalId,
+              version: 1,
+              reason: "Proposta criada automaticamente após validação e delegação da oportunidade.",
+              createdBy: revision.actorId,
+              correlationId: revision.correlationId,
+            },
+          });
+          await transaction.proposalComponent.createMany({
+            data: [
+              { id: randomUUID(), proposalVersionId, type: "TECHNICAL", status: "DRAFT", createdBy: revision.actorId },
+              { id: randomUUID(), proposalVersionId, type: "COMMERCIAL", status: "DRAFT", createdBy: revision.actorId },
+            ],
+          });
+          await transaction.proposalHistory.create({
+            data: {
+              id: randomUUID(),
+              proposalId,
+              version: 1,
+              action: "CREATED_FROM_VALIDATED_OPPORTUNITY",
+              snapshot: {
+                code,
+                status: "PREPARATION",
+                opportunityId: revision.before.id,
+                opportunityCode: revision.after.code,
+                opportunityVersion: revision.after.version,
+                responsibleId: revision.after.ownerId,
+              },
+              changedById: revision.actorId,
+              correlationId: revision.correlationId,
+            },
+          });
+          if (sourceLinks.length > 0) {
+            await transaction.managedDocumentLink.createMany({
+              data: sourceLinks.map((link) => ({
+                id: randomUUID(),
+                documentId: link.documentId,
+                entityType: "PROPOSAL",
+                entityId: proposalId,
+                role: "SOURCE_DOCUMENT",
+                createdBy: revision.actorId,
+              })),
+              skipDuplicates: true,
+            });
+          }
+          await transaction.auditEvent.create({
+            data: {
+              id: randomUUID(),
+              actorType: "USER",
+              actorId: revision.actorId,
+              action: "OPPORTUNITY_CONVERTED_TO_PROPOSAL",
+              entityType: "PROPOSAL",
+              entityId: proposalId,
+              correlationId: revision.correlationId,
+              outcome: "SUCCESS",
+              origin: "opportunity-service",
+              metadata: {
+                opportunityId: revision.before.id,
+                opportunityVersion: revision.after.version,
+                responsibleId: revision.after.ownerId,
+                inheritedDocuments: sourceLinks.length,
+              },
+            },
+          });
+        }
+      }
 
       const saved = await transaction.opportunity.findUniqueOrThrow({ where: { id: revision.before.id } });
       return this.toRecord(saved);
