@@ -24,17 +24,24 @@ describe("OpportunityService", () => {
 
   beforeEach(() => {
     repository = {
-      create: vi.fn(async (draft) => ({ ...draft, id: record.id, status: "DRAFT", version: 1 })),
+      create: vi.fn(async (draft) => ({ ...draft, id: record.id, code: "PPB-010-26", status: "DRAFT", version: 1 })),
       findById: vi.fn(async () => record),
       revise: vi.fn(async ({ after }) => after),
     };
     service = new OpportunityService(repository);
   });
 
-  it("cria sempre em rascunho", async () => {
-    const created = await service.create({ code: "OP-0002", origin: "CHANNEL" }, actorId);
+  it("cria sempre em rascunho, sem aceitar código informado pelo chamador", async () => {
+    const created = await service.create({ origin: "CHANNEL" }, actorId);
     expect(created.status).toBe("DRAFT");
+    expect(created.code).toBe("PPB-010-26");
     expect(repository.create).toHaveBeenCalledOnce();
+    expect(repository.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ code: expect.anything() }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("ativa quando os dados mínimos existem", async () => {

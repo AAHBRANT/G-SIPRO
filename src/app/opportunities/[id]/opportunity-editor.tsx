@@ -48,6 +48,12 @@ export function OpportunityEditor({
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [target, setTarget] = useState<Status>(transitions[opportunity.status][0]?.target ?? opportunity.status);
+
+  function openTransitionDrawer() {
+    setTarget(transitions[opportunity.status][0]?.target ?? opportunity.status);
+    setDrawer("transition");
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,24 +61,29 @@ export function OpportunityEditor({
     setBusy(true);
     setMessage("");
     const payload = Object.fromEntries(
-      ["code", "origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"]
+      ["origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"]
         .map((field) => [field, form.get(field)?.toString().trim()])
         .filter(([, value]) => value),
     );
-    const response = await fetch(`/api/opportunities/${opportunity.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = (await response.json()) as { error?: { message?: string } };
-    setBusy(false);
-    if (response.ok) {
-      setMessage("Oportunidade atualizada.");
-      setDrawer(null);
-      router.refresh();
-      return;
+    try {
+      const response = await fetch(`/api/opportunities/${opportunity.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json()) as { error?: { message?: string } };
+      setBusy(false);
+      if (response.ok) {
+        setMessage("Oportunidade atualizada.");
+        setDrawer(null);
+        router.refresh();
+        return;
+      }
+      setMessage(result.error?.message ?? "Falha ao salvar.");
+    } catch {
+      setBusy(false);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
-    setMessage(result.error?.message ?? "Falha ao salvar.");
   }
 
   async function transition(event: FormEvent<HTMLFormElement>) {
@@ -80,27 +91,32 @@ export function OpportunityEditor({
     const form = new FormData(event.currentTarget);
     setBusy(true);
     setMessage("");
-    const target = form.get("target");
-    const response = await fetch(`/api/opportunities/${opportunity.id}/transition`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        target,
-        closureReasonCode: form.get("closureReasonCode") || undefined,
-        closureJustification: form.get("closureJustification") || undefined,
-        reason: form.get("reason") || undefined,
-        ownerId: form.get("ownerId") || undefined,
-      }),
-    });
-    const result = (await response.json()) as { error?: { message?: string } };
-    setBusy(false);
-    if (response.ok) {
-      setMessage(target === "ACTIVE" ? "Oportunidade validada, delegada e convertida em proposta." : "Situação atualizada.");
-      setDrawer(null);
-      router.refresh();
-      return;
+    const targetStatus = form.get("target");
+    try {
+      const response = await fetch(`/api/opportunities/${opportunity.id}/transition`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          target: targetStatus,
+          closureReasonCode: form.get("closureReasonCode") || undefined,
+          closureJustification: form.get("closureJustification") || undefined,
+          reason: form.get("reason") || undefined,
+          ownerId: form.get("ownerId") || undefined,
+        }),
+      });
+      const result = (await response.json()) as { error?: { message?: string } };
+      setBusy(false);
+      if (response.ok) {
+        setMessage(targetStatus === "ACTIVE" ? "Oportunidade validada, delegada e convertida em proposta." : "Situação atualizada.");
+        setDrawer(null);
+        router.refresh();
+        return;
+      }
+      setMessage(result.error?.message ?? "Falha na movimentação.");
+    } catch {
+      setBusy(false);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
-    setMessage(result.error?.message ?? "Falha na movimentação.");
   }
 
   return (
@@ -113,7 +129,7 @@ export function OpportunityEditor({
           </button>
         )}
         {canTransition && (
-          <button className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[var(--brand-strong)]" onClick={() => setDrawer("transition")} type="button">
+          <button className="rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[var(--brand-strong)]" onClick={openTransitionDrawer} type="button">
             Validar e avançar
           </button>
         )}
@@ -154,25 +170,31 @@ export function OpportunityEditor({
                   )}
                   <label className="grid gap-1 text-sm font-semibold">
                     Próxima situação
-                    <select className="rounded-xl border border-border px-3 py-2 font-normal" name="target">
+                    <select className="rounded-xl border border-border px-3 py-2 font-normal" name="target" onChange={(event) => setTarget(event.target.value as Status)} value={target}>
                       {transitions[opportunity.status].map((entry) => <option key={entry.target} value={entry.target}>{entry.label}</option>)}
                     </select>
                   </label>
-                  <label className="grid gap-1 text-sm font-semibold">
-                    Motivo padronizado de encerramento
-                    <select className="rounded-xl border border-border px-3 py-2 font-normal" name="closureReasonCode" defaultValue="">
-                      <option value="">Não aplicável</option><option value="WON">Ganha</option><option value="LOST">Perdida</option>
-                      <option value="NO_GO">Não participar</option><option value="CANCELLED">Cancelada pelo demandante</option><option value="OTHER">Outro</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-1 text-sm font-semibold">
-                    Justificativa de encerramento
-                    <textarea className="min-h-20 rounded-xl border border-border px-3 py-2 font-normal" name="closureJustification" />
-                  </label>
-                  <label className="grid gap-1 text-sm font-semibold">
-                    Motivo da movimentação/reabertura
-                    <textarea className="min-h-20 rounded-xl border border-border px-3 py-2 font-normal" name="reason" />
-                  </label>
+                  {target === "CLOSED" && (
+                    <>
+                      <label className="grid gap-1 text-sm font-semibold">
+                        Motivo padronizado de encerramento
+                        <select className="rounded-xl border border-border px-3 py-2 font-normal" name="closureReasonCode" defaultValue="">
+                          <option value="">Não aplicável</option><option value="WON">Ganha</option><option value="LOST">Perdida</option>
+                          <option value="NO_GO">Não participar</option><option value="CANCELLED">Cancelada pelo demandante</option><option value="OTHER">Outro</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-sm font-semibold">
+                        Justificativa de encerramento
+                        <textarea className="min-h-20 rounded-xl border border-border px-3 py-2 font-normal" name="closureJustification" />
+                      </label>
+                    </>
+                  )}
+                  {opportunity.status === "CLOSED" && (
+                    <label className="grid gap-1 text-sm font-semibold">
+                      Motivo da reabertura
+                      <textarea className="min-h-20 rounded-xl border border-border px-3 py-2 font-normal" name="reason" />
+                    </label>
+                  )}
                   <button className="w-fit rounded-xl bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={busy}>
                     {busy ? "Processando…" : "Confirmar movimentação"}
                   </button>

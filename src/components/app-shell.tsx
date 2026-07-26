@@ -28,6 +28,7 @@ const icons = {
   document: <Icon><path d="M6 3h9l4 4v14H6zM15 3v5h5M9 12h7M9 16h7"/></Icon>,
   support: <Icon><path d="M4 5h16v12H8l-4 4V5Z"/><path d="M9 9h6M9 13h4"/></Icon>,
   notification: <Icon><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></Icon>,
+  calendar: <Icon><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></Icon>,
 };
 
 const navigation: ReadonlyArray<NavigationItem> = [
@@ -36,6 +37,7 @@ const navigation: ReadonlyArray<NavigationItem> = [
   { href: "/proposals", label: "Propostas", icon: icons.proposal, permission: "proposals.read" },
   { href: "/technical-archive", label: "Acervo técnico", icon: icons.archive, permission: "technical-archive.read" },
   { href: "/indicators", label: "Inteligência e KPIs", icon: icons.indicators, permission: "indicators.read" },
+  { href: "/calendar", label: "Agenda", icon: icons.calendar, permission: "calendar.read" },
 ];
 
 function Navigation({ close, isMaster = false, isOwner = false, pendingApprovals = 0, unreadNotifications = 0, permissions }: { close?: () => void; isMaster?: boolean; isOwner?: boolean; pendingApprovals?: number; unreadNotifications?: number; permissions: ReadonlyArray<string> }) {

@@ -63,21 +63,26 @@ export function FinancialAssessmentManager({
   const load = useCallback(async () => {
     if (!canRead) return;
     setBusy("loading");
-    const financialRequest = fetch(`/api/opportunities/${opportunityId}/financial-assessments`);
-    const paymentRequest = subject
-      ? fetch(`/api/payment-assessments?${subject.type === "customer" ? "customerId" : "authorityId"}=${subject.id}`)
-      : Promise.resolve(null);
-    const [financialResponse, paymentResponse] = await Promise.all([financialRequest, paymentRequest]);
-    const financialResult = await financialResponse.json().catch(() => ({})) as ApiResult<FinancialRecord[]>;
-    const paymentResult = paymentResponse
-      ? await paymentResponse.json().catch(() => ({})) as ApiResult<PaymentRecord[]>
-      : {};
-    setFinancial(financialResponse.ok ? financialResult.data ?? [] : []);
-    setPayment(paymentResponse?.ok ? paymentResult.data ?? [] : []);
-    if (!financialResponse.ok || (paymentResponse && !paymentResponse.ok)) {
-      setMessage(financialResult.error?.message ?? paymentResult.error?.message ?? "Não foi possível consultar as avaliações formais.");
+    try {
+      const financialRequest = fetch(`/api/opportunities/${opportunityId}/financial-assessments`);
+      const paymentRequest = subject
+        ? fetch(`/api/payment-assessments?${subject.type === "customer" ? "customerId" : "authorityId"}=${subject.id}`)
+        : Promise.resolve(null);
+      const [financialResponse, paymentResponse] = await Promise.all([financialRequest, paymentRequest]);
+      const financialResult = await financialResponse.json().catch(() => ({})) as ApiResult<FinancialRecord[]>;
+      const paymentResult = paymentResponse
+        ? await paymentResponse.json().catch(() => ({})) as ApiResult<PaymentRecord[]>
+        : {};
+      setFinancial(financialResponse.ok ? financialResult.data ?? [] : []);
+      setPayment(paymentResponse?.ok ? paymentResult.data ?? [] : []);
+      if (!financialResponse.ok || (paymentResponse && !paymentResponse.ok)) {
+        setMessage(financialResult.error?.message ?? paymentResult.error?.message ?? "Não foi possível consultar as avaliações formais.");
+      }
+      setBusy(null);
+    } catch {
+      setBusy(null);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
-    setBusy(null);
   }, [canRead, opportunityId, subject]);
 
   useEffect(() => {
@@ -115,17 +120,22 @@ export function FinancialAssessmentManager({
     };
     setBusy("financial");
     setMessage("Registrando avaliação financeira formal…");
-    const response = await fetch(`/api/opportunities/${opportunityId}/financial-assessments`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json().catch(() => ({})) as ApiResult<FinancialRecord>;
-    setBusy(null);
-    setMessage(response.ok ? "Avaliação financeira registrada. Agora consolide a análise." : result.error?.message ?? "Não foi possível registrar a avaliação.");
-    if (response.ok) {
-      formElement.reset();
-      await load();
+    try {
+      const response = await fetch(`/api/opportunities/${opportunityId}/financial-assessments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({})) as ApiResult<FinancialRecord>;
+      setBusy(null);
+      setMessage(response.ok ? "Avaliação financeira registrada. Agora consolide a análise." : result.error?.message ?? "Não foi possível registrar a avaliação.");
+      if (response.ok) {
+        formElement.reset();
+        await load();
+      }
+    } catch {
+      setBusy(null);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
   }
 
@@ -156,17 +166,22 @@ export function FinancialAssessmentManager({
     };
     setBusy("payment");
     setMessage("Registrando desempenho formal de pagamento…");
-    const response = await fetch("/api/payment-assessments", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json().catch(() => ({})) as ApiResult<PaymentRecord>;
-    setBusy(null);
-    setMessage(response.ok ? "Desempenho de pagamento registrado. Agora consolide a análise." : result.error?.message ?? "Não foi possível registrar a avaliação.");
-    if (response.ok) {
-      formElement.reset();
-      await load();
+    try {
+      const response = await fetch("/api/payment-assessments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({})) as ApiResult<PaymentRecord>;
+      setBusy(null);
+      setMessage(response.ok ? "Desempenho de pagamento registrado. Agora consolide a análise." : result.error?.message ?? "Não foi possível registrar a avaliação.");
+      if (response.ok) {
+        formElement.reset();
+        await load();
+      }
+    } catch {
+      setBusy(null);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
   }
 

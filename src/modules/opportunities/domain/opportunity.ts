@@ -7,7 +7,6 @@ export type OpportunityOrigin = (typeof opportunityOrigins)[number];
 export type OpportunityStatus = (typeof opportunityStatuses)[number];
 
 const opportunityDraftBaseSchema = z.object({
-    code: z.string().trim().min(1).max(50),
     origin: z.enum(opportunityOrigins),
     subject: z.string().trim().min(1).max(10_000).optional(),
     customerId: z.uuid().optional(),
@@ -39,9 +38,19 @@ export type OpportunityPatch = z.infer<typeof opportunityPatchSchema>;
 
 export type OpportunityLifecycleSnapshot = Readonly<
   OpportunityDraft & {
+    code: string;
     status: OpportunityStatus;
   }
 >;
+
+/**
+ * Código sequencial imutável gerado no cadastro (nunca digitado pelo usuário).
+ * Reinicia a cada ano; a contagem de 2026 começa em 10 (continuando os 9
+ * registros PPB_001..PPB_009 já cadastrados manualmente antes desta função existir).
+ */
+export function formatOpportunityCode(sequence: number, year: number): string {
+  return `PPB-${String(sequence).padStart(3, "0")}-${String(year % 100).padStart(2, "0")}`;
+}
 
 const allowedTransitions: Readonly<Record<OpportunityStatus, ReadonlySet<OpportunityStatus>>> = {
   DRAFT: new Set(["QUALIFICATION"]),

@@ -10,7 +10,6 @@ describe("detecção explicável de duplicidades", () => {
   it("sinaliza objeto semelhante e mesmo órgão", () => {
     const candidates = detectDuplicateCandidates(
       {
-        code: "OP-2",
         origin: "PORTAL",
         subject: "Aquisição de solução técnica",
         contractingAuthorityId: "11111111-1111-4111-8111-111111111111",
@@ -31,7 +30,7 @@ describe("detecção explicável de duplicidades", () => {
   it("não sinaliza objetos materialmente diferentes", () => {
     expect(
       detectDuplicateCandidates(
-        { code: "OP-2", origin: "PORTAL", subject: "Construção de ponte" },
+        { origin: "PORTAL", subject: "Construção de ponte" },
         [{ id: "1", code: "OP-1", subject: "Licença de software contábil" }],
       ),
     ).toEqual([]);

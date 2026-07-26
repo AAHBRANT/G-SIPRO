@@ -1,5 +1,4 @@
 export type OpportunityFormValues = Readonly<{
-  code?: string;
   origin?: string;
   subject?: string;
   estimatedValue?: string;
@@ -25,10 +24,6 @@ export function OpportunityFormFields({
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="grid gap-1 text-sm font-semibold">
-          Código controlado
-          <input className="rounded-xl border border-border px-3 py-2 font-normal" defaultValue={values.code} disabled={disabled} maxLength={50} name="code" required />
-        </label>
         <label className="grid gap-1 text-sm font-semibold">
           Origem
           <select className="rounded-xl border border-border px-3 py-2 font-normal" defaultValue={values.origin ?? "PORTAL"} disabled={disabled} name="origin">

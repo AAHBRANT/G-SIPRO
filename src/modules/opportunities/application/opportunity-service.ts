@@ -126,7 +126,6 @@ export class OpportunityService {
 
   private toDraft(record: OpportunityRecord): OpportunityDraft {
     return {
-      code: record.code,
       origin: record.origin,
       ...(record.subject && { subject: record.subject }),
       ...(record.customerId && { customerId: record.customerId }),

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProposalService, type ProposalRepository } from "./proposal-service";
 
 describe("ProposalService", () => {
-  it("encaminha criação validada com ator e correlação", async () => {
+  it("encaminha criação validada com ator e correlação (caminho manual sem rota ativa hoje — a criação real de propostas herda o código da oportunidade via OpportunityRepository.revise)", async () => {
     const repository: ProposalRepository = { create: vi.fn().mockResolvedValue({ id: "proposal" }), createVersion: vi.fn(), list: vi.fn() };
     await new ProposalService(repository).create({ code: "PROP-001", opportunityId: "00000000-0000-4000-8000-000000000001" }, "actor", "00000000-0000-4000-8000-000000000002");
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ code: "PROP-001" }), "actor", "00000000-0000-4000-8000-000000000002");

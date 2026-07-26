@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertOpportunityTransition,
   collectCriticalChanges,
+  formatOpportunityCode,
   opportunityDraftSchema,
   OpportunityRuleError,
   shouldConvertOpportunityToProposal,
@@ -19,14 +20,13 @@ const completeOpportunity: OpportunityLifecycleSnapshot = {
 
 describe("regras de oportunidade", () => {
   it("aceita rascunho mínimo sem inventar valor ou data", () => {
-    expect(opportunityDraftSchema.parse({ code: "OP-TESTE-001", origin: "PORTAL" })).toEqual({
-      code: "OP-TESTE-001",
+    expect(opportunityDraftSchema.parse({ origin: "PORTAL" })).toEqual({
       origin: "PORTAL",
     });
   });
 
   it("exige moeda e fonte quando há valor estimado", () => {
-    expect(() => opportunityDraftSchema.parse({ code: "OP-1", origin: "CUSTOMER", estimatedValue: 100 })).toThrow();
+    expect(() => opportunityDraftSchema.parse({ origin: "CUSTOMER", estimatedValue: 100 })).toThrow();
   });
 
   it("bloqueia ativação sem objeto e responsável", () => {
@@ -68,6 +68,19 @@ describe("regras de oportunidade", () => {
     expect(() =>
       assertOpportunityTransition({ ...completeOpportunity, status: "CLOSED" }, "QUALIFICATION"),
     ).toThrow(OpportunityRuleError);
+  });
+
+  it("formata o código sequencial com prefixo e ano de 2 dígitos", () => {
+    expect(formatOpportunityCode(10, 2026)).toBe("PPB-010-26");
+  });
+
+  it("reinicia visualmente a cada ano, mesmo com sequencial baixo", () => {
+    expect(formatOpportunityCode(1, 2027)).toBe("PPB-001-27");
+  });
+
+  it("preserva 3 dígitos mínimos e permite crescer além disso", () => {
+    expect(formatOpportunityCode(999, 2026)).toBe("PPB-999-26");
+    expect(formatOpportunityCode(1000, 2026)).toBe("PPB-1000-26");
   });
 
   it("registra somente campos críticos alterados", () => {

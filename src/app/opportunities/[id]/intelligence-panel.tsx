@@ -247,18 +247,23 @@ export function IntelligencePanel({
     setBusyStage(stage);
     const stageLabel = stage === "FINANCIAL" ? "avaliação financeira" : perspectiveLabels[stage];
     setMessage(`Executando ${stageLabel}…`);
-    const response = await fetch(`/api/opportunities/${opportunityId}/intelligence/run`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": `${stage.toLowerCase()}-${opportunityId}-${Date.now()}`,
-      },
-      body: JSON.stringify({ stage, ...payload }),
-    });
-    const result = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-    setBusyStage(null);
-    setMessage(response.ok ? "Análise concluída e versionada." : result.error?.message ?? "Não foi possível executar a análise.");
-    if (response.ok) router.refresh();
+    try {
+      const response = await fetch(`/api/opportunities/${opportunityId}/intelligence/run`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `${stage.toLowerCase()}-${opportunityId}-${Date.now()}`,
+        },
+        body: JSON.stringify({ stage, ...payload }),
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+      setBusyStage(null);
+      setMessage(response.ok ? "Análise concluída e versionada." : result.error?.message ?? "Não foi possível executar a análise.");
+      if (response.ok) router.refresh();
+    } catch {
+      setBusyStage(null);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
+    }
   }
 
   async function runContextualStage(
@@ -294,20 +299,25 @@ export function IntelligencePanel({
         };
     setBusyStage(stage);
     setMessage(stage === "CLIMATE" ? "Consultando dados climáticos autorizados…" : "Calculando rotas das bases operacionais…");
-    const response = await fetch(`/api/opportunities/${opportunityId}/intelligence/run`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": `${stage.toLowerCase()}-${opportunityId}-${Date.now()}`,
-      },
-      body: JSON.stringify({ stage, ...payload }),
-    });
-    const result = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-    setBusyStage(null);
-    setMessage(response.ok ? "Estudo concluído e incorporado à nova versão." : result.error?.message ?? "Não foi possível concluir o estudo.");
-    if (response.ok) {
-      setDrawer(null);
-      router.refresh();
+    try {
+      const response = await fetch(`/api/opportunities/${opportunityId}/intelligence/run`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `${stage.toLowerCase()}-${opportunityId}-${Date.now()}`,
+        },
+        body: JSON.stringify({ stage, ...payload }),
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+      setBusyStage(null);
+      setMessage(response.ok ? "Estudo concluído e incorporado à nova versão." : result.error?.message ?? "Não foi possível concluir o estudo.");
+      if (response.ok) {
+        setDrawer(null);
+        router.refresh();
+      }
+    } catch {
+      setBusyStage(null);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
   }
 

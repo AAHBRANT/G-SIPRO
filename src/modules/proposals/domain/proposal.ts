@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// NOTE: nenhuma rota ativa cria propostas por este caminho hoje (não existe
+// src/app/api/proposals/route.ts); a única criação real de proposta é
+// automática, em OpportunityRepository.revise(), que herda o código da
+// oportunidade de origem em vez de aceitar um `code` informado.
 export const proposalDraftSchema = z.object({
   code: z.string().trim().min(1).max(50).transform(value => value.toUpperCase()),
   title: z.string().trim().min(3).max(255).optional(),

@@ -17,8 +17,8 @@ import { collectAnalysisContextDefaults } from "./analysis-context-defaults";
 import { OpportunityEditor, type OpportunityEditorData } from "./opportunity-editor";
 import { OpportunityTabs } from "./opportunity-tabs";
 import { collectRequestedServices } from "./requested-services";
+import { originLabels, statusLabels } from "../opportunity-labels";
 
-const statusLabels = { DRAFT: "Rascunho", QUALIFICATION: "Em análise", ACTIVE: "Validada / em proposta", SUSPENDED: "Suspensa", CLOSED: "Encerrada" } as const;
 const climateMonthlySchema = z.array(z.object({
   month: z.number().int().min(1).max(12),
   precipitationMm: z.number().nonnegative(),
@@ -283,10 +283,10 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               </header>
               <div className="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
                 {[
-                  ["Cliente/órgão", record.contractingAuthority?.name ?? "Não identificado"],
+                  ["Cliente/órgão", record.customer?.name ?? record.contractingAuthority?.name ?? "Não identificado"],
                   ["Responsável", record.owner?.displayName ?? "Não atribuído"],
                   ["Valor estimado", estimatedValue],
-                  ["Origem", record.origin],
+                  ["Origem", originLabels[record.origin]],
                   ["Publicação", record.publishedAt?.toLocaleDateString("pt-BR") ?? "Não informada"],
                   ["Entrega", record.deliveryAt?.toLocaleDateString("pt-BR") ?? "Não informada"],
                   ["Documentos", String(documents.length)],

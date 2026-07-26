@@ -3,15 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { GsIcon } from "@/components/ui/gs-icon";
+import { statusLabels } from "./opportunity-labels";
 
 const controlClass = "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50";
 const statusOptions = [
   ["", "Todos os status"],
-  ["DRAFT", "Rascunho"],
-  ["QUALIFICATION", "Qualificação"],
-  ["ACTIVE", "Ativa"],
-  ["SUSPENDED", "Suspensa"],
-  ["CLOSED", "Encerrada"],
+  ...Object.entries(statusLabels),
 ] as const;
 
 function opportunitiesHref(query: string, status: string, pageSize: number) {

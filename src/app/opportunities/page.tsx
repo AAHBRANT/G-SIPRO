@@ -9,9 +9,9 @@ import { getDatabase } from "@/core/database/prisma";
 import type { OpportunityStatus } from "@/modules/opportunities/domain/opportunity";
 import { CreateOpportunityForm } from "./create-opportunity-form";
 import { OpportunityPageSizeSelect, OpportunityTableControls } from "./opportunity-table-controls";
+import { statusLabels } from "./opportunity-labels";
 
 type Filters = { query?: string; status?: string; page?: string; pageSize?: string };
-const statusLabels: Record<OpportunityStatus, string> = { DRAFT: "Rascunho", QUALIFICATION: "Em análise", ACTIVE: "Validada / em proposta", SUSPENDED: "Suspensa", CLOSED: "Encerrada" };
 const statusTone: Record<OpportunityStatus, string> = { DRAFT: "bg-slate-100 text-slate-600", QUALIFICATION: "bg-violet-50 text-violet-700", ACTIVE: "bg-emerald-50 text-emerald-700", SUSPENDED: "bg-amber-50 text-amber-700", CLOSED: "bg-slate-200 text-slate-700" };
 const currency = (value: Prisma.Decimal | null, code: string | null) => value === null ? "—" : Number(value).toLocaleString("pt-BR", { style: "currency", currency: code ?? "BRL", maximumFractionDigits: 0 });
 

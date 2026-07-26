@@ -18,41 +18,46 @@ export function CreateOpportunityForm({ users = [] }: { users?: readonly { id: s
     setSubmitting(true);
     setMessage("");
     const form = new FormData(formElement);
-    const fields = ["code", "origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"];
-    const response = await fetch("/api/opportunities", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...Object.fromEntries(
-          fields
-            .map((field) => [field, form.get(field)?.toString().trim()])
-            .filter(([, value]) => value),
-        ),
-        ...(duplicateCandidates.length > 0 && {
-          duplicateDecision: "CREATE_SEPARATE",
-          duplicateJustification: form.get("duplicateJustification"),
+    const fields = ["origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"];
+    try {
+      const response = await fetch("/api/opportunities", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...Object.fromEntries(
+            fields
+              .map((field) => [field, form.get(field)?.toString().trim()])
+              .filter(([, value]) => value),
+          ),
+          ...(duplicateCandidates.length > 0 && {
+            duplicateDecision: "CREATE_SEPARATE",
+            duplicateJustification: form.get("duplicateJustification"),
+          }),
         }),
-      }),
-    });
-    const payload = (await response.json()) as {
-      error?: {
-        message?: string;
-        details?: { code?: string; candidates?: readonly { code: string; reasons: readonly string[] }[] };
+      });
+      const payload = (await response.json()) as {
+        error?: {
+          message?: string;
+          details?: { code?: string; candidates?: readonly { code: string; reasons: readonly string[] }[] };
+        };
       };
-    };
-    setSubmitting(false);
-    if (!response.ok) {
-      if (payload.error?.details?.code === "POSSIBLE_DUPLICATE" && payload.error.details.candidates) {
-        setDuplicateCandidates(payload.error.details.candidates);
+      setSubmitting(false);
+      if (!response.ok) {
+        if (payload.error?.details?.code === "POSSIBLE_DUPLICATE" && payload.error.details.candidates) {
+          setDuplicateCandidates(payload.error.details.candidates);
+        }
+        setMessage(payload.error?.message ?? "Não foi possível cadastrar a oportunidade.");
+        return;
       }
-      setMessage(payload.error?.message ?? "Não foi possível cadastrar a oportunidade.");
-      return;
+      formElement.reset();
+      setDuplicateCandidates([]);
+      setMessage("");
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setSubmitting(false);
+      setMessage("Falha de conexão. Verifique sua rede e tente novamente.");
     }
-    formElement.reset();
-    setDuplicateCandidates([]);
-    setMessage("");
-    setOpen(false);
-    router.refresh();
   }
 
   return (

@@ -9,7 +9,7 @@ import type {
   DuplicateReview,
 } from "@/modules/opportunities/application/opportunity-service";
 import type { OpportunityDraft } from "@/modules/opportunities/domain/opportunity";
-import { shouldConvertOpportunityToProposal } from "@/modules/opportunities/domain/opportunity";
+import { formatOpportunityCode, shouldConvertOpportunityToProposal } from "@/modules/opportunities/domain/opportunity";
 
 export class OpportunityConcurrencyError extends Error {
   constructor(id: string) {
@@ -28,9 +28,19 @@ export class PrismaOpportunityRepository implements OpportunityRepository {
     const database = getDatabase();
 
     return database.$transaction(async (transaction) => {
+      const year = new Date().getFullYear();
+      const [{ lastNumber }] = await transaction.$queryRaw<{ lastNumber: number }[]>`
+        INSERT INTO opportunity_code_counters ("year", "lastNumber")
+        VALUES (${year}, 1)
+        ON CONFLICT ("year") DO UPDATE SET "lastNumber" = opportunity_code_counters."lastNumber" + 1, "updatedAt" = now()
+        RETURNING "lastNumber"
+      `;
+      const code = formatOpportunityCode(lastNumber, year);
+
       const opportunity = await transaction.opportunity.create({
         data: {
           id: randomUUID(),
+          code,
           ...this.persistenceFields(draft),
           status: "DRAFT",
           version: 1,
@@ -144,9 +154,7 @@ export class PrismaOpportunityRepository implements OpportunityRepository {
           ]);
           const proposalId = randomUUID();
           const proposalVersionId = randomUUID();
-          const normalizedCode = `PROP-${revision.after.code}`.slice(0, 50);
-          const duplicateCode = await transaction.proposal.findUnique({ where: { code: normalizedCode }, select: { id: true } });
-          const code = duplicateCode ? `${normalizedCode.slice(0, 41)}-${proposalId.slice(0, 8).toUpperCase()}` : normalizedCode;
+          const code = revision.after.code;
           await transaction.proposal.create({
             data: {
               id: proposalId,
@@ -237,7 +245,6 @@ export class PrismaOpportunityRepository implements OpportunityRepository {
 
   private persistenceFields(draft: OpportunityDraft) {
     return {
-      code: draft.code,
       origin: draft.origin,
       subject: draft.subject ?? null,
       customerId: draft.customerId ?? null,
