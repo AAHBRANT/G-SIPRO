@@ -24,7 +24,9 @@ export default function TeamsEntryPage() {
         if (!active) return;
         setState("READY");
         setMessage("Acesso confirmado. Abrindo o G-SIPRO...");
-        window.location.replace("/");
+        const context = await app.getContext();
+        const target = context.page.subPageId;
+        window.location.replace(target && target.startsWith("/") ? target : "/");
       } catch (error) {
         if (!active) return;
         setState("ERROR");

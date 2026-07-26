@@ -13,6 +13,7 @@ const baseEnvironment = {
   ENTRA_CLIENT_SECRET: "segredo-de-cliente-com-tamanho-valido",
   AUTH_URL: "https://gsipro.example.com",
   NOTIFICATION_EMAIL_SENDER: "gsipro@example.com",
+  TEAMS_CATALOG_APP_ID: "a3e5f89d-b77d-4fd7-a4dd-ed88c36af16c",
 };
 const message = {
   recipientEmail: "usuario+teste@example.com",
@@ -57,7 +58,22 @@ describe("Microsoft Graph notification provider", () => {
     expect(fetchMock.mock.calls[1]?.[0]).toContain("usuario%2Bteste%40example.com/teamwork/sendActivityNotification");
     const body = String(fetchMock.mock.calls[1]?.[1]?.body);
     expect(body).toContain("gsiproOpportunityNotification");
-    expect(body).toContain("https://gsipro.example.com/opportunities/");
+    // O Teams recusa link comum como webUrl de atividade (erro 400) — precisa ser
+    // um link de entidade do próprio Teams (teams.microsoft.com/l/entity/...).
+    expect(body).toContain("https://teams.microsoft.com/l/entity/a3e5f89d-b77d-4fd7-a4dd-ed88c36af16c/gsipro-home");
+    expect(body).toContain(encodeURIComponent("https://gsipro.example.com/opportunities/"));
+    expect(body).toContain(encodeURIComponent(JSON.stringify({ subEntityId: message.deepLink })));
+  });
+
+  it("não envia notificação no Teams quando o app publicado no catálogo não está configurado", async () => {
+    for (const [key, value] of Object.entries(baseEnvironment)) {
+      if (key !== "TEAMS_CATALOG_APP_ID") vi.stubEnv(key, value);
+    }
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await new MicrosoftGraphNotificationProvider(noStoredSender).sendTeams(message);
+    expect(result).toMatchObject({ status: "SKIPPED", errorCode: "TEAMS_CATALOG_APP_NOT_CONFIGURED" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("records email as accepted, without claiming delivery", async () => {

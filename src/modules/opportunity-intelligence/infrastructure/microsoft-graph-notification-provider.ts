@@ -17,7 +17,11 @@ type GraphConfiguration = {
   timeoutMs: number;
   appBaseUrl: string;
   emailSender: string | null;
+  teamsCatalogAppId: string | null;
 };
+
+/** Precisa bater com o entityId da staticTab em appPackage/manifest.json. */
+const TEAMS_STATIC_TAB_ENTITY_ID = "gsipro-home";
 
 type NotificationMessage = {
   recipientEmail: string;
@@ -46,8 +50,22 @@ const configuration = async (settingsReader: NotificationSenderSettingsReader): 
     timeoutMs: environment.MICROSOFT_GRAPH_TIMEOUT_MS,
     appBaseUrl: environment.AUTH_URL.replace(/\/$/, ""),
     emailSender: configuredSender || environment.NOTIFICATION_EMAIL_SENDER || null,
+    teamsCatalogAppId: environment.TEAMS_CATALOG_APP_ID || null,
   };
 };
+
+/**
+ * O Microsoft Teams recusa qualquer `webUrl` de atividade que não seja um link
+ * de entidade do próprio Teams (`/l/entity/...`) — um link comum do site é
+ * rejeitado com HTTP 400. O `context.subEntityId` carrega o caminho real da
+ * página, que a aba (`src/app/teams/page.tsx`) lê para redirecionar depois do
+ * login, permitindo o deep link até o registro específico.
+ */
+function buildTeamsActivityWebUrl(config: GraphConfiguration, deepLink: string): string {
+  const targetUrl = `${config.appBaseUrl}${deepLink}`;
+  const context = encodeURIComponent(JSON.stringify({ subEntityId: deepLink }));
+  return `https://teams.microsoft.com/l/entity/${config.teamsCatalogAppId}/${TEAMS_STATIC_TAB_ENTITY_ID}?webUrl=${encodeURIComponent(targetUrl)}&label=${encodeURIComponent("G-SIPRO")}&context=${context}`;
+}
 
 const graphFetch = async (url: string, init: RequestInit, timeoutMs: number) => {
   const controller = new AbortController();
@@ -114,9 +132,12 @@ export class MicrosoftGraphNotificationProvider {
     if (message.recipientTeamsStatus !== "INSTALLED") {
       return { status: "SKIPPED", errorCode: "TEAMS_APP_NOT_INSTALLED", providerReference: null };
     }
+    if (!config.teamsCatalogAppId) {
+      return { status: "SKIPPED", errorCode: "TEAMS_CATALOG_APP_NOT_CONFIGURED", providerReference: null };
+    }
     try {
       const token = await getToken(config);
-      const webUrl = `${config.appBaseUrl}${message.deepLink}`;
+      const webUrl = buildTeamsActivityWebUrl(config, message.deepLink);
       const response = await graphFetch(
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(message.recipientEmail)}/teamwork/sendActivityNotification`,
         {
