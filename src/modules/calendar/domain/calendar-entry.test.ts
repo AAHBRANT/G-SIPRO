@@ -26,6 +26,7 @@ describe("mergeCalendarEntries", () => {
       meetings: [{
         id: "meeting-1",
         title: "Reunião de alinhamento",
+        description: "Pauta: revisão do cronograma.",
         startAt: new Date("2026-08-01T12:00:00Z"),
         endAt: null,
         responsibleId: "user-3",
@@ -37,7 +38,7 @@ describe("mergeCalendarEntries", () => {
     });
 
     expect(entries.map((entry) => entry.type)).toEqual(["MEETING", "DELIVERY", "DEADLINE"]);
-    expect(entries[0]).toMatchObject({ id: "meeting-1", editable: true, href: undefined, category: "MEETING" });
+    expect(entries[0]).toMatchObject({ id: "meeting-1", editable: true, href: undefined, category: "MEETING", description: "Pauta: revisão do cronograma." });
     expect(entries[1]).toMatchObject({ id: "proposal-1", editable: false, href: "/opportunities/opportunity-1" });
     expect(entries[2]).toMatchObject({ id: "deadline-1", editable: false, href: "/tenders/tender-1" });
   });
@@ -63,6 +64,7 @@ describe("mergeCalendarEntries", () => {
       meetings: [{
         id: "meeting-2",
         title: "Visita técnica",
+        description: null,
         startAt: new Date("2026-08-01T12:00:00Z"),
         endAt: new Date("2026-08-01T14:00:00Z"),
         responsibleId: "user-4",
@@ -74,5 +76,6 @@ describe("mergeCalendarEntries", () => {
     });
 
     expect(entries[0]).toMatchObject({ href: "/opportunities/opportunity-3", endAt: "2026-08-01T14:00:00.000Z", category: "TRAVEL" });
+    expect(entries[0].description).toBeUndefined();
   });
 });

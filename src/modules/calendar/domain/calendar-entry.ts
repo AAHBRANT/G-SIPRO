@@ -5,6 +5,7 @@ export type CalendarEntry = {
   id: string;
   type: CalendarEntryType;
   title: string;
+  description?: string;
   startAt: string;
   endAt?: string;
   responsibleId?: string;
@@ -37,6 +38,7 @@ export type ProposalSource = {
 export type MeetingSource = {
   id: string;
   title: string;
+  description: string | null;
   startAt: Date;
   endAt: Date | null;
   responsibleId: string;
@@ -79,6 +81,7 @@ export function mergeCalendarEntries(sources: Readonly<{
       id: item.id,
       type: "MEETING",
       title: item.title,
+      ...(item.description && { description: item.description }),
       startAt: item.startAt.toISOString(),
       ...(item.endAt && { endAt: item.endAt.toISOString() }),
       responsibleId: item.responsibleId,
