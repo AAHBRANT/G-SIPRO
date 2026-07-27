@@ -136,6 +136,9 @@ export function calculateTechnicalCapacity(
     unresolvedCriticalRequirements: criticalItems.filter(
       item => !item.assessment || item.assessment.decision === "PARTIAL",
     ).length,
+    metRequirements: assessedItems.filter(item => item.assessment?.decision === "MEETS").length,
+    partialRequirements: assessedItems.filter(item => item.assessment?.decision === "PARTIAL").length,
+    unmetRequirements: assessedItems.filter(item => item.assessment?.decision === "DOES_NOT_MEET").length,
   };
   const calculations = {
     criticalityWeights: criticalityWeight,

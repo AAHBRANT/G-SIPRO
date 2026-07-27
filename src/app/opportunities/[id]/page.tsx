@@ -7,7 +7,6 @@ import { ContextDocumentUploader } from "@/components/documents/context-document
 import { getCurrentAuthorizationContext } from "@/core/authorization/authorization-context";
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
-import { evaluateIntelligenceIntegrationReadiness } from "@/modules/opportunity-intelligence/domain/integration-readiness";
 
 import {
   IntelligencePanel,
@@ -25,6 +24,13 @@ const climateMonthlySchema = z.array(z.object({
   averageTemperatureC: z.number().optional(),
   completeness: z.number().min(0).max(100),
 }).passthrough());
+const technicalBreakdownSchema = z.object({
+  totalRequirements: z.number().int().nonnegative().optional(),
+  assessedRequirements: z.number().int().nonnegative().optional(),
+  metRequirements: z.number().int().nonnegative().optional(),
+  partialRequirements: z.number().int().nonnegative().optional(),
+  unmetRequirements: z.number().int().nonnegative().optional(),
+}).passthrough();
 const routeAlternativesSchema = z.array(z.object({
   baseId: z.uuid(),
   baseCode: z.string(),
@@ -54,7 +60,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   if (!id.success) notFound();
   const canReadAnalytics = authorize(authorization, { permission: "analytics.read" }).allowed;
   const canCalculateAnalytics = authorize(authorization, { permission: "analytics.calculate" }).allowed;
-  const canConfigureAnalytics = authorize(authorization, { permission: "analytics.configure" }).allowed;
   const canReadFinancial = authorize(authorization, { permission: "analytics.read-financial" }).allowed
     && authorize(authorization, { permission: "analytics.read-client-risk" }).allowed;
   const canAssessFinancial = authorize(authorization, { permission: "analytics.assess-financial" }).allowed;
@@ -156,6 +161,9 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
       risks: z.string().array().catch([]).parse(dimension.risks),
       pendingCount: dimension._count.pendingItems,
       evidenceCount: dimension._count.evidences,
+      ...(dimension.perspective === "TECHNICAL" && {
+        technicalBreakdown: technicalBreakdownSchema.catch({}).parse(dimension.facts),
+      }),
     })),
     pendingItems: latestAnalysis.pendingItems.map((item) => ({
       id: item.id,
@@ -212,9 +220,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
       },
     }),
   } : null;
-  const integrationReadiness = canConfigureAnalytics
-    ? evaluateIntelligenceIntegrationReadiness(process.env)
-    : undefined;
   const documentTypes = ["EDITAL", "TERMO_REFERENCIA", "ESTUDO_TECNICO_PRELIMINAR", "ANEXO_EDITAL", "OUTRO"] as const;
   const extractionDefinitions: Partial<Record<(typeof documentTypes)[number], string>> = {};
   if (authorize(authorization, { permission: "ai.execute" }).allowed) {
@@ -369,7 +374,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               : record.contractingAuthority
                 ? { type: "authority", id: record.contractingAuthority.id, name: record.contractingAuthority.name }
                 : undefined}
-            integrationReadiness={integrationReadiness}
             opportunityCode={record.code}
             opportunityId={record.id}
             contextDefaults={analysisContextDefaults}
