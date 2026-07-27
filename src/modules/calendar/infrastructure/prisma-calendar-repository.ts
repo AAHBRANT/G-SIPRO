@@ -12,6 +12,7 @@ import {
   type GraphCalendarEventInput,
   type GraphCalendarSyncResult,
 } from "@/modules/calendar/infrastructure/microsoft-graph-calendar-provider";
+import { MicrosoftGraphNotificationProvider } from "@/modules/opportunity-intelligence/infrastructure/microsoft-graph-notification-provider";
 
 const GRAPH_SOURCE = "MICROSOFT_GRAPH";
 
@@ -25,7 +26,10 @@ export class CalendarEventConcurrencyError extends Error {
 }
 
 export class PrismaCalendarRepository implements CalendarEventRepository {
-  constructor(private readonly graphProvider: MicrosoftGraphCalendarProvider = new MicrosoftGraphCalendarProvider()) {}
+  constructor(
+    private readonly graphProvider: MicrosoftGraphCalendarProvider = new MicrosoftGraphCalendarProvider(),
+    private readonly notificationProvider: MicrosoftGraphNotificationProvider = new MicrosoftGraphNotificationProvider(),
+  ) {}
 
   async create(draft: CalendarEventDraft, actorId: string, correlationId: string): Promise<CalendarEventRecord> {
     const database = getDatabase();
@@ -63,6 +67,7 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
     });
 
     await this.syncCreateToGraph(event);
+    await this.notifyDelegatedResponsible(event, actorId);
     return this.toRecord(event);
   }
 
@@ -112,7 +117,9 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
       return transaction.calendarEvent.findUniqueOrThrow({ where: { id: record.id }, include: { participants: true } });
     });
 
-    await this.syncUpdateToGraph(saved, draft.responsibleId !== record.responsibleId ? record.responsibleId : null);
+    const responsibleChanged = draft.responsibleId !== record.responsibleId;
+    await this.syncUpdateToGraph(saved, responsibleChanged ? record.responsibleId : null);
+    if (responsibleChanged) await this.notifyDelegatedResponsible(saved, actorId);
     return this.toRecord(saved);
   }
 
@@ -254,6 +261,35 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
       await this.persistGraphResult(saved.id, result);
     } catch {
       // melhor esforço — ver comentário acima.
+    }
+  }
+
+  // Quando alguém marca um compromisso em nome de outra pessoa, o evento é criado
+  // direto na agenda do responsável via Graph — como ele é o próprio dono do
+  // evento, o Outlook não dispara nenhum aviso automático (isso só acontece para
+  // convidados). Sem este e-mail, o responsável nunca ficava sabendo do compromisso.
+  private async notifyDelegatedResponsible(
+    event: Pick<PrismaCalendarEvent, "id" | "title" | "startAt" | "responsibleId">,
+    actorId: string,
+  ): Promise<void> {
+    if (event.responsibleId === actorId) return;
+    try {
+      const database = getDatabase();
+      const [responsible, actor] = await Promise.all([
+        database.user.findUnique({ where: { id: event.responsibleId }, select: { email: true, teamsProvisioningStatus: true } }),
+        database.user.findUnique({ where: { id: actorId }, select: { displayName: true } }),
+      ]);
+      if (!responsible) return;
+      await this.notificationProvider.sendEmail({
+        recipientEmail: responsible.email,
+        recipientTeamsStatus: responsible.teamsProvisioningStatus,
+        summary: `${actor?.displayName ?? "Alguém"} marcou um compromisso para você: ${event.title}`,
+        nextAction: "Confira o horário no Calendário do G-SIPRO ou no seu Outlook.",
+        deepLink: "/calendar",
+        eventId: event.id,
+      });
+    } catch {
+      // melhor esforço — não pode impedir a criação/atualização do compromisso.
     }
   }
 
