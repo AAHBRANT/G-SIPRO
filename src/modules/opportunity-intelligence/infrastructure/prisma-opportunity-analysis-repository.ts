@@ -534,12 +534,7 @@ export class PrismaOpportunityAnalysisRepository implements OpportunityAnalysisR
       });
       if (!previous) {
         throw new OpportunityAnalysisRuleError(
-          "Execute as análises Comercial e Técnica antes do estudo climático.",
-        );
-      }
-      if (!previous.dimensions.some(dimension => dimension.perspective === "TECHNICAL")) {
-        throw new OpportunityAnalysisRuleError(
-          "A capacidade técnica deve ser executada antes do estudo climático.",
+          "Execute a análise da oportunidade antes do estudo climático.",
         );
       }
       const policyDimensions = intelligenceDimensionSchema.array().parse(previous.policy.dimensions);
