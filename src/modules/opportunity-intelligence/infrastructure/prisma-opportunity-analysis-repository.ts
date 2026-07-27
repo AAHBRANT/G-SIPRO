@@ -573,7 +573,11 @@ export class PrismaOpportunityAnalysisRepository implements OpportunityAnalysisR
           requiredInformation: item.requiredInformation,
         })),
       }));
-      const allDimensions = [...priorDimensions, ...climate.dimensions];
+      const climateDimensionCodes = new Set(climate.dimensions.map(dimension => dimension.dimension));
+      const allDimensions = [
+        ...priorDimensions.filter(dimension => !(dimension.perspective === "STUDIES" && climateDimensionCodes.has(dimension.dimension))),
+        ...climate.dimensions,
+      ];
       const technicalFacts = previous.dimensions.find(
         dimension => dimension.perspective === "TECHNICAL",
       )?.facts as { criticalFailures?: number; unresolvedCriticalRequirements?: number } | undefined;

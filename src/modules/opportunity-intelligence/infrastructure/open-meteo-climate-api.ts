@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Agent } from "undici";
 
 import { ClimateApiUnavailableError, type ClimateApi } from "../application/climate-api";
 import {
@@ -6,6 +7,13 @@ import {
   type ClimateApiResponse,
   type ClimateStudyContext,
 } from "../domain/climate-study";
+
+// O undici (cliente HTTP por trás do fetch nativo do Node) tem um timeout de
+// conexão padrão de só 10s, separado do timeout geral da requisição — mais
+// curto do que o necessário pra alcançar a archive-api.open-meteo.com a
+// partir do Azure em alguns momentos, mesmo dentro do timeout configurado
+// (CLIMATE_API_TIMEOUT_MS). Um dispatcher próprio evita esse limite oculto.
+const openMeteoDispatcher = new Agent({ connect: { timeout: 30_000 } });
 
 /**
  * Adaptador para a Open-Meteo Historical Weather API (archive-api.open-meteo.com).
@@ -84,7 +92,8 @@ export class OpenMeteoClimateApi implements ClimateApi {
         headers: { accept: "application/json" },
         signal: controller.signal,
         cache: "no-store",
-      });
+        dispatcher: openMeteoDispatcher,
+      } as RequestInit & { dispatcher: Agent });
       if (!response.ok) {
         throw new ClimateApiUnavailableError(`A Open-Meteo respondeu com status ${response.status}.`);
       }
