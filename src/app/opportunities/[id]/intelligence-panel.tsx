@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { GsIcon } from "@/components/ui/gs-icon";
+import { AttractivenessTab } from "./attractiveness-tab";
 import type { AnalysisContextDefaults } from "./analysis-context-defaults";
 import {
   FinancialAssessmentManager,
@@ -311,7 +312,7 @@ export function IntelligencePanel({
           />
         )}
         {tab === "ATTRACTIVENESS" && (
-          <EmptyDetail text="Em construção: aqui você vai poder registrar, ponto a ponto, o que torna esta oportunidade atrativa (preço praticado x mercado, economias de estrutura, acervo técnico etc.), separando o que é qualitativo do que dá para precificar."/>
+          <AttractivenessTab canRegister={canCalculate} opportunityId={opportunityId}/>
         )}
         {tab === "LOGISTICS" && (
           <LogisticsTab analysis={analysis} bases={operationalBases} busy={busyStage === "LOGISTICS"} canCalculate={canCalculate} contextDefaults={contextDefaults} message={message} onSubmit={(event) => runContextualStage(event, "LOGISTICS")}/>

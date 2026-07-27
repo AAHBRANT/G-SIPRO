@@ -467,6 +467,7 @@ model Opportunity {
   tenders                Tender[]
   proposals              Proposal[]
   intelligenceAnalyses   OpportunityAnalysis[]
+  attractivenessPoints   AttractivenessPoint[]
   financialAssessments   FinancialCapacityAssessment[]
   notificationEvents     NotificationOutboxEvent[]
   calendarEvents         CalendarEvent[]
@@ -735,6 +736,25 @@ model ClimateStudy {
   @@index([provider, retrievedAt])
   @@index([latitude, longitude])
   @@map("climate_studies")
+}
+
+enum AttractivenessCategory {
+  QUALITATIVE
+  QUANTITATIVE
+}
+
+model AttractivenessPoint {
+  id            String                 @id @default(uuid()) @db.Uuid
+  opportunityId String                 @db.Uuid
+  opportunity   Opportunity            @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  category      AttractivenessCategory
+  description   String                 @db.VarChar(1000)
+  amount        Decimal?               @db.Decimal(14, 2)
+  createdAt     DateTime               @default(now()) @db.Timestamptz(6)
+  createdBy     String                 @db.Uuid
+
+  @@index([opportunityId, createdAt])
+  @@map("attractiveness_points")
 }
 
 model OperationalBase {
