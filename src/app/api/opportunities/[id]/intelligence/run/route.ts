@@ -94,10 +94,17 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       }
       return NextResponse.json({ data, correlationId: context.correlationId }, { status: 201 });
     } catch (error) {
+      const causeChain: string[] = [];
+      let cursor: unknown = error instanceof Error ? error.cause : undefined;
+      while (cursor instanceof Error && causeChain.length < 5) {
+        const code = "code" in cursor ? String((cursor as { code?: unknown }).code) : undefined;
+        causeChain.push(code ? `${cursor.message} (${code})` : cursor.message);
+        cursor = cursor.cause;
+      }
       intelligenceRunLogger.error({
         errorType: error instanceof Error ? error.name : "UNKNOWN",
         errorMessage: error instanceof Error ? error.message : String(error),
-        causeMessage: error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined,
+        causeChain,
       }, "Falha ao executar etapa do Modo Analítico Inteligente.");
       try {
         mapOpportunityAnalysisApiError(error);
