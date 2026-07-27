@@ -7,7 +7,7 @@ import { ConflictError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
-import { opportunityDraftSchema, opportunityStatuses } from "@/modules/opportunities/domain/opportunity";
+import { opportunityCodeSchema, opportunityDraftSchema, opportunityStatuses } from "@/modules/opportunities/domain/opportunity";
 import { detectDuplicateCandidates, duplicateDecisionSchema, isNearEmptyDraft } from "@/modules/opportunities/domain/duplicate-detection";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
 import { mapOpportunityApiError } from "@/modules/opportunities/presentation/opportunity-api";
@@ -75,6 +75,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       const authorization = await requirePermission("opportunities.create");
       const body: unknown = await request.json();
       const draft = opportunityDraftSchema.parse(body);
+      const requestedCode = z.object({ code: opportunityCodeSchema.optional() }).parse(body).code;
       const decision = duplicateDecisionSchema.parse(body);
       const sources = await getDatabase().opportunity.findMany({
         where: { status: { not: "CLOSED" } },
@@ -116,6 +117,7 @@ export async function POST(request: Request): Promise<NextResponse> {
               candidateIds: candidates.map((candidate) => candidate.id),
             }
           : undefined,
+        requestedCode,
       );
       const warning = isNearEmptyDraft(draft) ? "Esta oportunidade está com poucos dados preenchidos — considere completar cliente, valor estimado e data de entrega." : undefined;
       return NextResponse.json({ data: opportunity, ...(warning && { warning }), correlationId: context.correlationId }, { status: 201 });

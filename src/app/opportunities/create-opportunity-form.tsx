@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { OpportunityFormFields } from "./opportunity-form-fields";
 
@@ -12,13 +12,37 @@ export function CreateOpportunityForm({ users = [] }: { users?: readonly { id: s
   const [submitting, setSubmitting] = useState(false);
   const [duplicateCandidates, setDuplicateCandidates] = useState<readonly { code: string; reasons: readonly string[] }[]>([]);
 
+  async function suggestCode(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "F4") return;
+    event.preventDefault();
+    const input = event.currentTarget;
+    const prefix = input.value.trim();
+    if (!prefix) {
+      setMessage("Digite o início do código antes de pressionar F4.");
+      return;
+    }
+    setMessage("Buscando próximo código…");
+    try {
+      const response = await fetch(`/api/opportunities/next-code?prefix=${encodeURIComponent(prefix)}`);
+      const payload = (await response.json()) as { data?: { code?: string }; error?: { message?: string } };
+      if (!response.ok || !payload.data?.code) {
+        setMessage(payload.error?.message ?? "Não foi possível gerar o código.");
+        return;
+      }
+      input.value = payload.data.code;
+      setMessage(`Código sugerido: ${payload.data.code}`);
+    } catch {
+      setMessage("Falha de conexão ao gerar o código.");
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     setSubmitting(true);
     setMessage("");
     const form = new FormData(formElement);
-    const fields = ["origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"];
+    const fields = ["code", "origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"];
     try {
       const response = await fetch("/api/opportunities", {
         method: "POST",
@@ -82,6 +106,11 @@ export function CreateOpportunityForm({ users = [] }: { users?: readonly { id: s
               <button aria-label="Fechar cadastro" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-xl text-slate-500 hover:bg-slate-50" onClick={() => setOpen(false)} type="button">×</button>
             </div>
             <form className="grid gap-4" onSubmit={submit}>
+              <label className="grid gap-1 text-sm font-semibold">
+                Código (opcional)
+                <input className="rounded-xl border border-border px-3 py-2 font-normal uppercase" maxLength={50} name="code" onKeyDown={suggestCode} placeholder="Digite PPB_ e pressione F4" />
+                <span className="text-xs font-normal text-slate-500">Digite um prefixo e pressione F4 para buscar a próxima sequência.</span>
+              </label>
               <OpportunityFormFields users={users} />
               {duplicateCandidates.length > 0 && (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
