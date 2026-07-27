@@ -37,6 +37,7 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
           version: 1,
           createdBy: actorId,
           updatedBy: actorId,
+          attendees: { create: draft.attendeeIds.map((userId) => ({ userId })) },
         },
       });
 
@@ -58,13 +59,13 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
       return created;
     });
 
-    await this.syncCreateToGraph(event);
-    return this.toRecord(event);
+    await this.syncCreateToGraph(event, draft);
+    return this.toRecord(event, draft.attendeeIds);
   }
 
   async findById(id: string): Promise<CalendarEventRecord | null> {
-    const event = await getDatabase().calendarEvent.findUnique({ where: { id } });
-    return event ? this.toRecord(event) : null;
+    const event = await getDatabase().calendarEvent.findUnique({ where: { id }, include: { attendees: { select: { userId: true } } } });
+    return event ? this.toRecord(event, event.attendees.map((attendee) => attendee.userId)) : null;
   }
 
   async update(record: CalendarEventRecord, draft: CalendarEventDraft, actorId: string, correlationId: string): Promise<CalendarEventRecord> {
@@ -81,6 +82,11 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
       });
 
       if (result.count !== 1) throw new CalendarEventConcurrencyError(record.id);
+
+      await transaction.calendarEventAttendee.deleteMany({ where: { calendarEventId: record.id } });
+      if (draft.attendeeIds.length) {
+        await transaction.calendarEventAttendee.createMany({ data: draft.attendeeIds.map((userId) => ({ calendarEventId: record.id, userId })) });
+      }
 
       await transaction.auditEvent.create({
         data: {
@@ -100,8 +106,8 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
       return transaction.calendarEvent.findUniqueOrThrow({ where: { id: record.id } });
     });
 
-    await this.syncUpdateToGraph(saved, draft.responsibleId !== record.responsibleId ? record.responsibleId : null);
-    return this.toRecord(saved);
+    await this.syncUpdateToGraph(saved, draft, draft.responsibleId !== record.responsibleId ? record.responsibleId : null);
+    return this.toRecord(saved, draft.attendeeIds);
   }
 
   async cancel(record: CalendarEventRecord, actorId: string, correlationId: string): Promise<CalendarEventRecord> {
@@ -134,7 +140,7 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
     });
 
     await this.syncCancelToGraph(saved);
-    return this.toRecord(saved);
+    return this.toRecord(saved, record.attendeeIds);
   }
 
   private persistenceFields(draft: CalendarEventDraft) {
@@ -152,7 +158,7 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
     };
   }
 
-  private toRecord(model: PrismaCalendarEvent): CalendarEventRecord {
+  private toRecord(model: PrismaCalendarEvent, attendeeIds: readonly string[]): CalendarEventRecord {
     return Object.freeze({
       id: model.id,
       title: model.title,
@@ -160,6 +166,7 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
       allDay: model.allDay,
       category: model.category,
       responsibleId: model.responsibleId,
+      attendeeIds: [...attendeeIds],
       status: model.status,
       version: model.version,
       ...(model.description && { description: model.description }),
@@ -170,13 +177,16 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
     });
   }
 
-  private toGraphEventInput(model: Pick<PrismaCalendarEvent, "title" | "description" | "startAt" | "endAt" | "allDay">): GraphCalendarEventInput {
+  private async toGraphEventInput(model: Pick<PrismaCalendarEvent, "title" | "description" | "startAt" | "endAt" | "allDay" | "category">, attendeeIds: readonly string[]): Promise<GraphCalendarEventInput> {
+    const attendees = attendeeIds.length ? await getDatabase().user.findMany({ where: { id: { in: [...attendeeIds] }, status: "ACTIVE" }, select: { email: true } }) : [];
     return {
       title: model.title,
       ...(model.description && { description: model.description }),
       startAt: model.startAt,
       ...(model.endAt && { endAt: model.endAt }),
       allDay: model.allDay,
+      attendeeEmails: attendees.map((attendee) => attendee.email),
+      onlineMeeting: model.category === "MEETING",
     };
   }
 
@@ -193,23 +203,23 @@ export class PrismaCalendarRepository implements CalendarEventRepository {
 
   // A sincronização com o Outlook/Teams é melhor esforço: uma falha aqui não pode
   // impedir a criação/edição/cancelamento do compromisso dentro do G-SIPRO.
-  private async syncCreateToGraph(event: PrismaCalendarEvent): Promise<void> {
+  private async syncCreateToGraph(event: PrismaCalendarEvent, draft: CalendarEventDraft): Promise<void> {
     try {
       const responsible = await getDatabase().user.findUnique({ where: { id: event.responsibleId }, select: { email: true } });
       if (!responsible) return;
-      const result = await this.graphProvider.createEvent(responsible.email, this.toGraphEventInput(event));
+      const result = await this.graphProvider.createEvent(responsible.email, await this.toGraphEventInput(event, draft.attendeeIds.filter((id) => id !== event.responsibleId)));
       await this.persistGraphResult(event.id, result);
     } catch {
       // melhor esforço — ver comentário acima.
     }
   }
 
-  private async syncUpdateToGraph(saved: PrismaCalendarEvent, previousResponsibleId: string | null): Promise<void> {
+  private async syncUpdateToGraph(saved: PrismaCalendarEvent, draft: CalendarEventDraft, previousResponsibleId: string | null): Promise<void> {
     try {
       const database = getDatabase();
       const responsible = await database.user.findUnique({ where: { id: saved.responsibleId }, select: { email: true } });
       if (!responsible) return;
-      const event = this.toGraphEventInput(saved);
+      const event = await this.toGraphEventInput(saved, draft.attendeeIds.filter((id) => id !== saved.responsibleId));
       const alreadySynced = Boolean(saved.externalId) && saved.externalSource === GRAPH_SOURCE;
 
       if (previousResponsibleId && alreadySynced) {

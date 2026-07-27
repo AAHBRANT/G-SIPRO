@@ -16,6 +16,7 @@ const calendarEventBaseSchema = z.object({
   allDay: z.boolean().default(false),
   category: z.enum(calendarEventCategories).default("MEETING"),
   responsibleId: z.uuid(),
+  attendeeIds: z.array(z.uuid()).max(100).default([]),
   opportunityId: z.uuid().optional(),
   proposalId: z.uuid().optional(),
   tenderId: z.uuid().optional(),
@@ -28,6 +29,9 @@ function checkCalendarEvent(value: z.infer<typeof calendarEventBaseSchema>, cont
   const linkedCount = linkFields.filter((field) => value[field]).length;
   if (linkedCount > 1) {
     context.addIssue({ code: "custom", path: ["opportunityId"], message: "Um compromisso só pode estar vinculado a um único registro (oportunidade, proposta ou edital)." });
+  }
+  if (new Set(value.attendeeIds).size !== value.attendeeIds.length) {
+    context.addIssue({ code: "custom", path: ["attendeeIds"], message: "Cada participante deve ser informado uma única vez." });
   }
 }
 

@@ -65,6 +65,7 @@ export class CalendarService {
       allDay: record.allDay,
       category: record.category,
       responsibleId: record.responsibleId,
+      attendeeIds: record.attendeeIds,
       ...(record.description && { description: record.description }),
       ...(record.endAt && { endAt: record.endAt }),
       ...(record.opportunityId && { opportunityId: record.opportunityId }),

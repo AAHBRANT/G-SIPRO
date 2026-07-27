@@ -19,6 +19,8 @@ const event = {
   startAt: new Date("2026-08-10T13:00:00.000Z"),
   endAt: new Date("2026-08-10T14:00:00.000Z"),
   allDay: false,
+  attendeeEmails: ["colega@example.com"],
+  onlineMeeting: true,
 };
 
 const configure = () => {
@@ -59,6 +61,8 @@ describe("Microsoft Graph calendar provider", () => {
     expect(body.subject).toBe("Reunião com o cliente");
     expect(body.start.dateTime).toBe(event.startAt.toISOString());
     expect(body.end.dateTime).toBe(event.endAt.toISOString());
+    expect(body.attendees).toEqual([{ emailAddress: { address: "colega@example.com" }, type: "required" }]);
+    expect(body).toMatchObject({ isOnlineMeeting: true, onlineMeetingProvider: "teamsForBusiness" });
   });
 
   it("aplica uma duração padrão quando o compromisso não tem horário de término", async () => {

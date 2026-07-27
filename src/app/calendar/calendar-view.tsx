@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { GsIcon } from "@/components/ui/gs-icon";
 import { MetricCard } from "@/components/ui/metric-card";
+import { localDateTimeToIso } from "./local-date-time";
 
 type EntryType = "DEADLINE" | "DELIVERY" | "MEETING";
 type EventCategory = "MEETING" | "TRAVEL" | "INTERNAL_DEADLINE" | "PERSONAL" | "OTHER";
@@ -258,9 +259,10 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
     const payload = {
       title: form.get("title")?.toString().trim(),
       description: form.get("description")?.toString().trim() || undefined,
-      startAt: form.get("startAt"),
-      endAt: form.get("endAt") || undefined,
+      startAt: localDateTimeToIso(form.get("startAt")),
+      endAt: localDateTimeToIso(form.get("endAt")),
       responsibleId: form.get("responsibleId"),
+      attendeeIds: form.getAll("attendeeIds"),
       category: form.get("category"),
     };
     try {
@@ -553,6 +555,13 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
                   {users.map((user) => <option key={user.id} value={user.id}>{user.id === currentUserId ? `${user.name} (eu)` : user.name}</option>)}
                 </select>
                 <span className="text-xs font-normal text-slate-500">Deixe seu nome selecionado para criar na sua própria agenda, ou escolha outra pessoa para delegar o compromisso.</span>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold">
+                Participantes
+                <select className={`${fieldClass} min-h-28`} multiple name="attendeeIds">
+                  {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                </select>
+                <span className="text-xs font-normal text-slate-500">Use Ctrl (Windows) ou Command (Mac) para selecionar mais de uma pessoa. Em reuniões, os participantes recebem o convite do Outlook/Teams.</span>
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <button className="rounded-lg bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={submitting}>{submitting ? "Salvando…" : "Salvar compromisso"}</button>

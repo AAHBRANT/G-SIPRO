@@ -339,6 +339,7 @@ model User {
   deadlineConfirmations          TenderDeadline[]                  @relation("DeadlineConfirmedBy")
   deadlineChanges                DeadlineHistory[]                 @relation("DeadlineChangedBy")
   calendarEventResponsibilities  CalendarEvent[]                   @relation("CalendarEventResponsible")
+  calendarEventAttendances       CalendarEventAttendee[]
   analysisAssignments            RequirementAnalysis[]             @relation("AnalysisAssignee")
   analysisDecisions              RequirementAnalysis[]             @relation("AnalysisDecidedBy")
   analysisChanges                AnalysisHistory[]                 @relation("AnalysisChangedBy")
@@ -492,34 +493,46 @@ model OpportunityCodeCounter {
 }
 
 model CalendarEvent {
-  id             String              @id @default(uuid()) @db.Uuid
-  title          String              @db.VarChar(200)
-  description    String?             @db.VarChar(2000)
-  startAt        DateTime            @db.Timestamptz(6)
-  endAt          DateTime?           @db.Timestamptz(6)
-  allDay         Boolean             @default(false)
-  responsibleId  String              @db.Uuid
-  responsible    User                @relation("CalendarEventResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
-  opportunityId  String?             @db.Uuid
-  opportunity    Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
-  proposalId     String?             @db.Uuid
-  proposal       Proposal?           @relation(fields: [proposalId], references: [id], onDelete: Restrict)
-  tenderId       String?             @db.Uuid
-  tender         Tender?             @relation(fields: [tenderId], references: [id], onDelete: Restrict)
-  status         CalendarEventStatus @default(SCHEDULED)
-  category       CalendarEventCategory @default(MEETING)
-  externalId     String?             @db.VarChar(200)
-  externalSource String?             @db.VarChar(40)
-  version        Int                 @default(1)
-  createdAt      DateTime            @default(now()) @db.Timestamptz(6)
-  createdBy      String              @db.Uuid
-  updatedAt      DateTime            @updatedAt @db.Timestamptz(6)
-  updatedBy      String              @db.Uuid
+  id             String                  @id @default(uuid()) @db.Uuid
+  title          String                  @db.VarChar(200)
+  description    String?                 @db.VarChar(2000)
+  startAt        DateTime                @db.Timestamptz(6)
+  endAt          DateTime?               @db.Timestamptz(6)
+  allDay         Boolean                 @default(false)
+  responsibleId  String                  @db.Uuid
+  responsible    User                    @relation("CalendarEventResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  attendees      CalendarEventAttendee[]
+  opportunityId  String?                 @db.Uuid
+  opportunity    Opportunity?            @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  proposalId     String?                 @db.Uuid
+  proposal       Proposal?               @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  tenderId       String?                 @db.Uuid
+  tender         Tender?                 @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  status         CalendarEventStatus     @default(SCHEDULED)
+  category       CalendarEventCategory   @default(MEETING)
+  externalId     String?                 @db.VarChar(200)
+  externalSource String?                 @db.VarChar(40)
+  version        Int                     @default(1)
+  createdAt      DateTime                @default(now()) @db.Timestamptz(6)
+  createdBy      String                  @db.Uuid
+  updatedAt      DateTime                @updatedAt @db.Timestamptz(6)
+  updatedBy      String                  @db.Uuid
 
   @@index([responsibleId, startAt])
   @@index([startAt])
   @@index([opportunityId])
   @@map("calendar_events")
+}
+
+model CalendarEventAttendee {
+  calendarEventId String        @db.Uuid
+  calendarEvent   CalendarEvent @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
+  userId          String        @db.Uuid
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([calendarEventId, userId])
+  @@index([userId])
+  @@map("calendar_event_attendees")
 }
 
 model IntelligencePolicy {

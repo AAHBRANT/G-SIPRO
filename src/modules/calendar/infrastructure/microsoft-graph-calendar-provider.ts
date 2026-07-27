@@ -12,6 +12,8 @@ export type GraphCalendarEventInput = {
   startAt: Date;
   endAt?: Date;
   allDay: boolean;
+  attendeeEmails?: readonly string[];
+  onlineMeeting?: boolean;
 };
 
 type GraphCalendarConfiguration = {
@@ -85,6 +87,10 @@ function toGraphEventBody(event: GraphCalendarEventInput) {
     isAllDay: event.allDay,
     start: { dateTime: event.startAt.toISOString(), timeZone: "UTC" },
     end: { dateTime: endAt.toISOString(), timeZone: "UTC" },
+    ...(event.attendeeEmails?.length && {
+      attendees: event.attendeeEmails.map((address) => ({ emailAddress: { address }, type: "required" })),
+    }),
+    ...(event.onlineMeeting && { isOnlineMeeting: true, onlineMeetingProvider: "teamsForBusiness" }),
   };
 }
 
