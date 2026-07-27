@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requirePermission } from "@/core/authorization/authorization-context";
+import { getEnvironment } from "@/core/config/env";
 import { toApiError } from "@/core/errors/api-error";
 import { ValidationError } from "@/core/errors/application-error";
+import { createLogger } from "@/core/observability/logger";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { OpportunityAnalysisService } from "@/modules/opportunity-intelligence/application/opportunity-analysis-service";
 import { ClimateStudyService } from "@/modules/opportunity-intelligence/application/climate-study-service";
@@ -17,6 +19,8 @@ import { AzureMapsRoutesApi } from "@/modules/opportunity-intelligence/infrastru
 import { PrismaRouteStudyRepository } from "@/modules/opportunity-intelligence/infrastructure/prisma-route-study-repository";
 import { FinancialAnalysisService } from "@/modules/opportunity-intelligence/application/financial-analysis-service";
 import { PrismaFinancialAnalysisRepository } from "@/modules/opportunity-intelligence/infrastructure/prisma-financial-analysis-repository";
+
+const intelligenceRunLogger = createLogger(getEnvironment());
 
 const idempotencyKeySchema = z.string().trim().min(8).max(160);
 const commandSchema = z.object({
@@ -90,6 +94,11 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       }
       return NextResponse.json({ data, correlationId: context.correlationId }, { status: 201 });
     } catch (error) {
+      intelligenceRunLogger.error({
+        errorType: error instanceof Error ? error.name : "UNKNOWN",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        causeMessage: error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined,
+      }, "Falha ao executar etapa do Modo Analítico Inteligente.");
       try {
         mapOpportunityAnalysisApiError(error);
       } catch (mapped) {
