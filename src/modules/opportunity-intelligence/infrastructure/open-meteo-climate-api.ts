@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Agent } from "undici";
 
 import { ClimateApiUnavailableError, type ClimateApi } from "../application/climate-api";
 import {
@@ -7,13 +6,6 @@ import {
   type ClimateApiResponse,
   type ClimateStudyContext,
 } from "../domain/climate-study";
-
-// O undici (cliente HTTP por trás do fetch nativo do Node) tem um timeout de
-// conexão padrão de só 10s, separado do timeout geral da requisição — mais
-// curto do que o necessário pra alcançar a archive-api.open-meteo.com a
-// partir do Azure em alguns momentos, mesmo dentro do timeout configurado
-// (CLIMATE_API_TIMEOUT_MS). Um dispatcher próprio evita esse limite oculto.
-const openMeteoDispatcher = new Agent({ connect: { timeout: 30_000 } });
 
 /**
  * Adaptador para a Open-Meteo Historical Weather API (archive-api.open-meteo.com).
@@ -84,16 +76,8 @@ export class OpenMeteoClimateApi implements ClimateApi {
     url.searchParams.set("daily", "precipitation_sum,temperature_2m_mean");
     url.searchParams.set("timezone", "UTC");
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.configuration.timeoutMs);
     try {
-      const response = await this.fetcher(url, {
-        method: "GET",
-        headers: { accept: "application/json" },
-        signal: controller.signal,
-        cache: "no-store",
-        dispatcher: openMeteoDispatcher,
-      } as RequestInit & { dispatcher: Agent });
+      const response = await this.fetchWithRetries(url);
       if (!response.ok) {
         throw new ClimateApiUnavailableError(`A Open-Meteo respondeu com status ${response.status}.`);
       }
@@ -115,9 +99,31 @@ export class OpenMeteoClimateApi implements ClimateApi {
     } catch (error) {
       if (error instanceof ClimateApiUnavailableError) throw error;
       throw new ClimateApiUnavailableError("Não foi possível obter os dados da Open-Meteo.", { cause: error });
-    } finally {
-      clearTimeout(timeout);
     }
+  }
+
+  // A archive-api.open-meteo.com às vezes demora mais que o timeout de conexão
+  // do cliente HTTP a partir do Azure para responder — tenta de novo antes de
+  // desistir, já que costuma ser lentidão passageira, não indisponibilidade real.
+  private async fetchWithRetries(url: URL, attempts = 3): Promise<Response> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.configuration.timeoutMs);
+      try {
+        return await this.fetcher(url, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          signal: controller.signal,
+          cache: "no-store",
+        });
+      } catch (error) {
+        lastError = error;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    throw lastError;
   }
 
   private aggregateByMonth(daily: {

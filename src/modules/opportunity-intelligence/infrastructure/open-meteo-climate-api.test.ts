@@ -82,4 +82,28 @@ describe("OpenMeteoClimateApi", () => {
 
     expect(result.monthly.map((item) => item.month)).toEqual([1]);
   });
+
+  it("tenta de novo quando a conexão falha antes de desistir", async () => {
+    const fetcher = vi.fn()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(dailyResponse([
+        { date: "2024-01-10", precipitation: 10, temperature: 25 },
+      ]));
+    const result = await new OpenMeteoClimateApi(
+      { baseUrl: "https://archive-api.open-meteo.com/v1/archive", historyYears: 20, timeoutMs: 5_000 },
+      fetcher,
+    ).collectHistoricalMonthly(context);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(result.monthly.map((item) => item.month)).toEqual([1]);
+  });
+
+  it("desiste depois de esgotar as tentativas de reconexão", async () => {
+    const fetcher = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    await expect(new OpenMeteoClimateApi(
+      { baseUrl: "https://archive-api.open-meteo.com/v1/archive", historyYears: 20, timeoutMs: 5_000 },
+      fetcher,
+    ).collectHistoricalMonthly(context)).rejects.toThrow("Não foi possível obter os dados da Open-Meteo.");
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
 });
