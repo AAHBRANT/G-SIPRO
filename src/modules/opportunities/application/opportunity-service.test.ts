@@ -38,7 +38,7 @@ describe("OpportunityService", () => {
     service = new OpportunityService(repository);
   });
 
-  it("cria sempre em rascunho, sem aceitar código informado pelo chamador", async () => {
+  it("cria sempre em rascunho com o código padrão do repositório", async () => {
     const created = await service.create({ origin: "CHANNEL" }, actorId);
     expect(created.status).toBe("DRAFT");
     expect(created.code).toBe("PPB-010-26");
@@ -48,6 +48,13 @@ describe("OpportunityService", () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+    );
+  });
+
+  it("encaminha código prefixado validado para criação", async () => {
+    await service.create({ origin: "CHANNEL" }, actorId, "correlation-id", undefined, "PPR_001");
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.anything(), actorId, "correlation-id", undefined, "PPR_001",
     );
   });
 

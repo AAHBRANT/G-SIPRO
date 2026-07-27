@@ -4,6 +4,7 @@ import {
   assertOpportunityTransition,
   collectCriticalChanges,
   formatOpportunityCode,
+  nextOpportunityCode,
   opportunityDraftSchema,
   OpportunityRuleError,
   shouldConvertOpportunityToProposal,
@@ -106,6 +107,11 @@ describe("regras de oportunidade", () => {
   it("preserva 3 dígitos mínimos e permite crescer além disso", () => {
     expect(formatOpportunityCode(999, 2026)).toBe("PPB-999-26");
     expect(formatOpportunityCode(1000, 2026)).toBe("PPB-1000-26");
+  });
+
+  it("gera a próxima sequência de três dígitos para cada prefixo", () => {
+    expect(nextOpportunityCode("ppb_", ["PPB_007", "PPB_002", "PPR_099"])).toBe("PPB_008");
+    expect(nextOpportunityCode("PPR_", ["PPB_007"])).toBe("PPR_001");
   });
 
   it("registra somente campos críticos alterados", () => {

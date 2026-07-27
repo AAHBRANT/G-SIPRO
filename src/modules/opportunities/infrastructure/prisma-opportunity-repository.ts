@@ -24,18 +24,22 @@ export class PrismaOpportunityRepository implements OpportunityRepository {
     actorId: string,
     correlationId: string,
     duplicateReview?: DuplicateReview,
+    requestedCode?: string,
   ): Promise<OpportunityRecord> {
     const database = getDatabase();
 
     return database.$transaction(async (transaction) => {
-      const year = new Date().getFullYear();
-      const [{ lastNumber }] = await transaction.$queryRaw<{ lastNumber: number }[]>`
+      let code = requestedCode;
+      if (!code) {
+        const year = new Date().getFullYear();
+        const [{ lastNumber }] = await transaction.$queryRaw<{ lastNumber: number }[]>`
         INSERT INTO opportunity_code_counters ("year", "lastNumber")
         VALUES (${year}, 1)
         ON CONFLICT ("year") DO UPDATE SET "lastNumber" = opportunity_code_counters."lastNumber" + 1, "updatedAt" = now()
         RETURNING "lastNumber"
       `;
-      const code = formatOpportunityCode(lastNumber, year);
+        code = formatOpportunityCode(lastNumber, year);
+      }
 
       const opportunity = await transaction.opportunity.create({
         data: {

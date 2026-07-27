@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   assertOpportunityTransition,
   collectCriticalChanges,
+  opportunityCodeSchema,
   opportunityDraftSchema,
   opportunityPatchSchema,
   type OpportunityDraft,
@@ -41,6 +42,7 @@ export interface OpportunityRepository {
     actorId: string,
     correlationId: string,
     duplicateReview?: DuplicateReview,
+    requestedCode?: string,
   ): Promise<OpportunityRecord>;
   findById(id: string): Promise<OpportunityRecord | null>;
   revise(revision: OpportunityRevision): Promise<OpportunityRecord>;
@@ -61,9 +63,11 @@ export class OpportunityService {
     actorId: string,
     correlationId: string = randomUUID(),
     duplicateReview?: DuplicateReview,
+    requestedCode?: string,
   ): Promise<OpportunityRecord> {
     const draft = opportunityDraftSchema.parse(input);
-    return this.repository.create(draft, actorId, correlationId, duplicateReview);
+    const code = requestedCode === undefined ? undefined : opportunityCodeSchema.parse(requestedCode);
+    return this.repository.create(draft, actorId, correlationId, duplicateReview, code);
   }
 
   async update(

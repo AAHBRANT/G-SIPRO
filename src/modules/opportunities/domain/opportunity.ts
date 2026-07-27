@@ -6,6 +6,28 @@ export const opportunityStatuses = ["DRAFT", "QUALIFICATION", "ACTIVE", "SUSPEND
 export type OpportunityOrigin = (typeof opportunityOrigins)[number];
 export type OpportunityStatus = (typeof opportunityStatuses)[number];
 
+export const opportunityCodeSchema = z.string().trim().toUpperCase().regex(
+  /^[A-Z0-9][A-Z0-9_-]{0,46}[A-Z0-9_-]$|^[A-Z0-9]$/,
+  "O código deve usar apenas letras, números, hífen ou sublinhado.",
+).max(50);
+
+export const opportunityCodePrefixSchema = z.string().trim().toUpperCase().regex(
+  /^[A-Z0-9][A-Z0-9_-]{0,45}[A-Z0-9_-]$|^[A-Z0-9]$/,
+  "O prefixo deve usar apenas letras, números, hífen ou sublinhado.",
+).max(47);
+
+export function nextOpportunityCode(prefix: string, existingCodes: readonly string[]): string {
+  const normalizedPrefix = opportunityCodePrefixSchema.parse(prefix);
+  const nextNumber = existingCodes.reduce((highest, code) => {
+    if (!code.startsWith(normalizedPrefix)) return highest;
+    const suffix = code.slice(normalizedPrefix.length);
+    if (!/^\d+$/.test(suffix)) return highest;
+    const sequence = BigInt(suffix);
+    return sequence > highest ? sequence : highest;
+  }, 0n) + 1n;
+  return opportunityCodeSchema.parse(`${normalizedPrefix}${String(nextNumber).padStart(3, "0")}`);
+}
+
 const opportunityDraftBaseSchema = z.object({
     origin: z.enum(opportunityOrigins),
     subject: z.string().trim().min(1).max(10_000).optional(),
@@ -44,7 +66,8 @@ export type OpportunityLifecycleSnapshot = Readonly<
 >;
 
 /**
- * Código sequencial imutável gerado no cadastro (nunca digitado pelo usuário).
+ * Código sequencial padrão e imutável gerado no cadastro quando nenhum código
+ * prefixado foi solicitado pelo usuário.
  * Reinicia a cada ano; a contagem de 2026 começa em 10 (continuando os 9
  * registros PPB_001..PPB_009 já cadastrados manualmente antes desta função existir).
  */
