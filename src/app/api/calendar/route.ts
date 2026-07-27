@@ -56,7 +56,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             status: "SCHEDULED",
             ...(Object.keys(dateRange).length > 0 && { startAt: dateRange }),
           },
-          include: { responsible: true },
+          include: { responsible: true, participants: { include: { user: true } } },
           orderBy: { startAt: "asc" },
           take: 200,
         }),

@@ -16,6 +16,7 @@ const record: CalendarEventRecord = Object.freeze({
   allDay: false,
   category: "MEETING",
   responsibleId,
+  participantIds: [],
   status: "SCHEDULED",
   version: 1,
 });

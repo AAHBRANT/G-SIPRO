@@ -46,6 +46,36 @@ describe("calendarEventSchema", () => {
   });
 });
 
+describe("fuso horário", () => {
+  it("interpreta um horário sem fuso (do formulário) como horário de Brasília, não UTC", () => {
+    const result = calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T14:00", responsibleId });
+    expect(result.startAt.toISOString()).toBe("2026-08-01T17:00:00.000Z");
+  });
+
+  it("mantém um horário que já vem com fuso explícito sem alterar", () => {
+    const result = calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T14:00:00-03:00", responsibleId });
+    expect(result.startAt.toISOString()).toBe("2026-08-01T17:00:00.000Z");
+  });
+
+  it("também converte o término informado sem fuso", () => {
+    const result = calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T14:00", endAt: "2026-08-01T15:30", responsibleId });
+    expect(result.endAt?.toISOString()).toBe("2026-08-01T18:30:00.000Z");
+  });
+});
+
+describe("participantIds", () => {
+  it("aceita lista vazia por padrão quando não informado", () => {
+    const result = calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T10:00:00Z", responsibleId });
+    expect(result.participantIds).toEqual([]);
+  });
+
+  it("aceita múltiplos participantes válidos", () => {
+    const participantIds = ["44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"];
+    const result = calendarEventSchema.parse({ title: "Reunião", startAt: "2026-08-01T10:00:00Z", responsibleId, participantIds });
+    expect(result.participantIds).toEqual(participantIds);
+  });
+});
+
 describe("assertCalendarEventCancellable", () => {
   it("permite cancelar um compromisso agendado", () => {
     expect(() => assertCalendarEventCancellable("SCHEDULED")).not.toThrow();

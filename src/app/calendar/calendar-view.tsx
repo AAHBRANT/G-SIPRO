@@ -16,6 +16,7 @@ type Entry = {
   endAt?: string;
   responsibleId?: string;
   responsibleName?: string;
+  participantNames?: string[];
   category?: EventCategory;
   editable: boolean;
   href?: string;
@@ -261,6 +262,7 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
       startAt: form.get("startAt"),
       endAt: form.get("endAt") || undefined,
       responsibleId: form.get("responsibleId"),
+      participantIds: form.getAll("participantIds"),
       category: form.get("category"),
     };
     try {
@@ -554,6 +556,18 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
                 </select>
                 <span className="text-xs font-normal text-slate-500">Deixe seu nome selecionado para criar na sua própria agenda, ou escolha outra pessoa para delegar o compromisso.</span>
               </label>
+              <div className="grid gap-1 text-sm font-semibold">
+                Participantes
+                <div className="grid max-h-40 gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
+                  {users.map((user) => (
+                    <label className="flex items-center gap-2 rounded px-1.5 py-1 text-sm font-normal text-slate-700 hover:bg-slate-50" key={user.id}>
+                      <input name="participantIds" type="checkbox" value={user.id} />
+                      {user.id === currentUserId ? `${user.name} (eu)` : user.name}
+                    </label>
+                  ))}
+                </div>
+                <span className="text-xs font-normal text-slate-500">Opcional. Cada participante selecionado recebe o compromisso no próprio Outlook/Teams.</span>
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button className="rounded-lg bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={submitting}>{submitting ? "Salvando…" : "Salvar compromisso"}</button>
               </div>
@@ -593,6 +607,12 @@ export function CalendarView({ users, canManage, currentUserId }: { users: reado
                   {viewingEntry.responsibleName ?? "Não atribuído"}
                 </dd>
               </div>
+              {viewingEntry.participantNames && viewingEntry.participantNames.length > 0 && (
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="font-semibold text-slate-500">Participantes</dt>
+                  <dd className="text-right font-semibold text-slate-800">{viewingEntry.participantNames.join(", ")}</dd>
+                </div>
+              )}
               {viewingEntry.description && (
                 <div>
                   <dt className="font-semibold text-slate-500">Descrição</dt>

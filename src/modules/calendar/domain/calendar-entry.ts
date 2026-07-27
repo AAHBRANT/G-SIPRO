@@ -10,6 +10,7 @@ export type CalendarEntry = {
   endAt?: string;
   responsibleId?: string;
   responsibleName?: string;
+  participantNames?: string[];
   category?: CalendarEventCategory;
   editable: boolean;
   href?: string;
@@ -43,6 +44,7 @@ export type MeetingSource = {
   endAt: Date | null;
   responsibleId: string;
   responsible: { displayName: string };
+  participants: { user: { displayName: string } }[];
   category: CalendarEventCategory;
   opportunityId: string | null;
   tenderId: string | null;
@@ -86,6 +88,7 @@ export function mergeCalendarEntries(sources: Readonly<{
       ...(item.endAt && { endAt: item.endAt.toISOString() }),
       responsibleId: item.responsibleId,
       responsibleName: item.responsible.displayName,
+      ...(item.participants.length > 0 && { participantNames: item.participants.map((participant) => participant.user.displayName) }),
       category: item.category,
       editable: true,
       href: item.opportunityId ? `/opportunities/${item.opportunityId}` : item.tenderId ? `/tenders/${item.tenderId}` : undefined,

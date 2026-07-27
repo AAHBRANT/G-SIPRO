@@ -6,12 +6,18 @@ export type GraphCalendarSyncResult = {
   errorCode: string | null;
 };
 
+export type GraphCalendarAttendee = {
+  email: string;
+  name?: string;
+};
+
 export type GraphCalendarEventInput = {
   title: string;
   description?: string;
   startAt: Date;
   endAt?: Date;
   allDay: boolean;
+  attendees?: readonly GraphCalendarAttendee[];
 };
 
 type GraphCalendarConfiguration = {
@@ -85,6 +91,12 @@ function toGraphEventBody(event: GraphCalendarEventInput) {
     isAllDay: event.allDay,
     start: { dateTime: event.startAt.toISOString(), timeZone: "UTC" },
     end: { dateTime: endAt.toISOString(), timeZone: "UTC" },
+    ...(event.attendees && event.attendees.length > 0 && {
+      attendees: event.attendees.map((attendee) => ({
+        emailAddress: { address: attendee.email, ...(attendee.name && { name: attendee.name }) },
+        type: "required",
+      })),
+    }),
   };
 }
 

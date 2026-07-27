@@ -87,6 +87,38 @@ describe("Microsoft Graph calendar provider", () => {
     expect(new Date(body.end.dateTime).getTime() - new Date(body.start.dateTime).getTime()).toBe(24 * 60 * 60 * 1000);
   });
 
+  it("inclui os participantes como convidados do evento", async () => {
+    configure();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "AAMk-evento-4" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MicrosoftGraphCalendarProvider().createEvent("usuario@example.com", {
+      ...event,
+      attendees: [{ email: "colega@example.com", name: "Colega" }, { email: "outro@example.com" }],
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(body.attendees).toEqual([
+      { emailAddress: { address: "colega@example.com", name: "Colega" }, type: "required" },
+      { emailAddress: { address: "outro@example.com" }, type: "required" },
+    ]);
+  });
+
+  it("não envia o campo attendees quando não há participantes", async () => {
+    configure();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "AAMk-evento-5" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MicrosoftGraphCalendarProvider().createEvent("usuario@example.com", event);
+
+    const body = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(body).not.toHaveProperty("attendees");
+  });
+
   it("atualiza um evento existente pelo id externo", async () => {
     configure();
     const fetchMock = vi.fn()

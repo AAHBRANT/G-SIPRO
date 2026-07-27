@@ -339,6 +339,7 @@ model User {
   deadlineConfirmations          TenderDeadline[]                  @relation("DeadlineConfirmedBy")
   deadlineChanges                DeadlineHistory[]                 @relation("DeadlineChangedBy")
   calendarEventResponsibilities  CalendarEvent[]                   @relation("CalendarEventResponsible")
+  calendarEventParticipations    CalendarEventParticipant[]         @relation("CalendarEventParticipantUser")
   analysisAssignments            RequirementAnalysis[]             @relation("AnalysisAssignee")
   analysisDecisions              RequirementAnalysis[]             @relation("AnalysisDecidedBy")
   analysisChanges                AnalysisHistory[]                 @relation("AnalysisChangedBy")
@@ -510,6 +511,7 @@ model CalendarEvent {
   category       CalendarEventCategory @default(MEETING)
   externalId     String?             @db.VarChar(200)
   externalSource String?             @db.VarChar(40)
+  participants   CalendarEventParticipant[]
   version        Int                 @default(1)
   createdAt      DateTime            @default(now()) @db.Timestamptz(6)
   createdBy      String              @db.Uuid
@@ -520,6 +522,19 @@ model CalendarEvent {
   @@index([startAt])
   @@index([opportunityId])
   @@map("calendar_events")
+}
+
+model CalendarEventParticipant {
+  id              String       @id @default(uuid()) @db.Uuid
+  calendarEventId String       @db.Uuid
+  calendarEvent   CalendarEvent @relation(fields: [calendarEventId], references: [id], onDelete: Restrict)
+  userId          String       @db.Uuid
+  user            User         @relation("CalendarEventParticipantUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+
+  @@unique([calendarEventId, userId])
+  @@index([userId])
+  @@map("calendar_event_participants")
 }
 
 model IntelligencePolicy {
