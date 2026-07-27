@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { Fragment, useState, type FormEvent, type ReactNode } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -13,7 +13,7 @@ import {
 } from "./financial-assessment-manager";
 import { humanize } from "./intelligence-view-helpers";
 
-type TabKind = "OVERVIEW" | "ATTRACTIVENESS" | "LOGISTICS" | "CLIMATE" | "FINANCIAL";
+type TabKind = "SUMMARY" | "DOCUMENTS" | "OVERVIEW" | "ATTRACTIVENESS" | "LOGISTICS" | "CLIMATE" | "FINANCIAL";
 
 export type IntelligenceDimensionView = Readonly<{
   id: string;
@@ -125,9 +125,9 @@ export type OperationalBaseOption = Readonly<{
   locality: string;
 }>;
 
-const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+export const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-const tabs: { key: TabKind; label: string }[] = [
+const analyticalTabs: { key: TabKind; label: string }[] = [
   { key: "OVERVIEW", label: "Visão geral" },
   { key: "ATTRACTIVENESS", label: "Atratividade" },
   { key: "LOGISTICS", label: "Logística e distância" },
@@ -135,7 +135,7 @@ const tabs: { key: TabKind; label: string }[] = [
   { key: "FINANCIAL", label: "Capacidade financeira do cliente" },
 ];
 
-function buildMapsUrl(route: RouteView, alternative?: RouteAlternativeView) {
+export function buildMapsUrl(route: RouteView, alternative?: RouteAlternativeView) {
   if (!alternative) return "";
   const query = new URLSearchParams({
     originLat: alternative.origin.latitude.toString(),
@@ -160,8 +160,8 @@ export function formatRouteTolls(tolls: RouteAlternativeView["tolls"]) {
 
 export function IntelligencePanel({
   opportunityId,
-  opportunityCode,
   analysis,
+  canReadAnalytics,
   canCalculate,
   canReadFinancial,
   canAssessFinancial,
@@ -171,10 +171,12 @@ export function IntelligencePanel({
   isOwner,
   contextDefaults,
   operationalBases,
+  summaryContent,
+  documentsContent,
 }: {
   opportunityId: string;
-  opportunityCode: string;
   analysis: IntelligenceAnalysisView | null;
+  canReadAnalytics: boolean;
   canCalculate: boolean;
   canReadFinancial: boolean;
   canAssessFinancial: boolean;
@@ -184,9 +186,11 @@ export function IntelligencePanel({
   isOwner: boolean;
   contextDefaults: AnalysisContextDefaults;
   operationalBases: readonly OperationalBaseOption[];
+  summaryContent: ReactNode;
+  documentsContent: ReactNode;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<TabKind>("OVERVIEW");
+  const [tab, setTab] = useState<TabKind>("SUMMARY");
   const [busyStage, setBusyStage] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
@@ -264,77 +268,69 @@ export function IntelligencePanel({
     }
   }
 
-  if (!analysis) {
-    return (
-      <section aria-labelledby="intelligence-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-        <PanelHeader opportunityCode={opportunityCode}/>
-        <div className="grid min-h-64 place-items-center px-6 py-12 text-center">
-          <div className="max-w-lg">
-            <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-600"><GsIcon name="chart"/></span>
-            <h3 className="mt-4 text-lg font-black text-slate-900">Nenhuma análise executada</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Inicie pela avaliação comercial. Cada nova etapa gera uma versão rastreável sem alterar os dados originais da oportunidade.</p>
-            {canCalculate && <button className="mt-5 rounded-lg bg-brand px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={Boolean(busyStage)} onClick={() => runStage("COMMERCIAL")} type="button">{busyStage === "COMMERCIAL" ? "Iniciando…" : "Iniciar análise"}</button>}
-            {message && <p aria-live="polite" className="mt-3 text-xs font-semibold text-slate-600" role="status">{message}</p>}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  const commercialDimension = analysis.dimensions.find((item) => item.perspective === "COMMERCIAL");
-  const technicalDimension = analysis.dimensions.find((item) => item.perspective === "TECHNICAL");
+  const commercialDimension = analysis?.dimensions.find((item) => item.perspective === "COMMERCIAL");
+  const technicalDimension = analysis?.dimensions.find((item) => item.perspective === "TECHNICAL");
+  const navItems: { key: TabKind; label: string }[] = [
+    { key: "SUMMARY", label: "Visão resumida" },
+    { key: "DOCUMENTS", label: "Documentos" },
+    ...(canReadAnalytics ? analyticalTabs : []),
+  ];
 
   return (
-    <section aria-labelledby="intelligence-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
-      <PanelHeader opportunityCode={opportunityCode}/>
-
-      <nav aria-label="Seções da análise" className="flex gap-1 overflow-x-auto border-b border-slate-100 px-5 sm:px-7">
-        {tabs.map((item) => (
-          <button aria-current={tab === item.key ? "page" : undefined} className={`whitespace-nowrap border-b-2 px-4 py-3 text-xs font-bold transition ${tab === item.key ? "border-brand text-brand" : "border-transparent text-slate-500 hover:text-slate-900"}`} key={item.key} onClick={() => setTab(item.key)} type="button">
-            {item.label}
-          </button>
-        ))}
+    <section aria-label="Navegação da oportunidade" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+      <nav aria-label="Seções da oportunidade" className="px-5 py-4 sm:px-7">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
+          {navItems.map((item) => (
+            <button aria-current={tab === item.key ? "page" : undefined} className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition ${tab === item.key ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-900"}`} key={item.key} onClick={() => setTab(item.key)} type="button">
+              {item.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
-      <div className="p-5 sm:p-7">
-        {tab === "OVERVIEW" && (
-          <OverviewTab
-            analysis={analysis}
-            busyStage={busyStage}
-            canCalculate={canCalculate}
-            canDecide={canDecide}
-            commercialDimension={commercialDimension}
-            isOwner={isOwner}
-            message={message}
-            onDecisionSaved={() => router.refresh()}
-            onRunStage={runStage}
-            technicalDimension={technicalDimension}
-          />
-        )}
-        {tab === "ATTRACTIVENESS" && (
+      <div className="border-t border-slate-100 p-5 sm:p-7">
+        <Fragment key="SUMMARY">{tab === "SUMMARY" && summaryContent}</Fragment>
+        <Fragment key="DOCUMENTS">{tab === "DOCUMENTS" && documentsContent}</Fragment>
+        <Fragment key="OVERVIEW">{tab === "OVERVIEW" && (
+          analysis ? (
+            <OverviewTab
+              analysis={analysis}
+              busyStage={busyStage}
+              canCalculate={canCalculate}
+              canDecide={canDecide}
+              commercialDimension={commercialDimension}
+              isOwner={isOwner}
+              message={message}
+              onDecisionSaved={() => router.refresh()}
+              onRunStage={runStage}
+              technicalDimension={technicalDimension}
+            />
+          ) : (
+            <div className="grid min-h-64 place-items-center px-6 py-12 text-center">
+              <div className="max-w-lg">
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-600"><GsIcon name="chart"/></span>
+                <h3 className="mt-4 text-lg font-black text-slate-900">Nenhuma análise executada</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">Inicie pela avaliação comercial. Cada nova etapa gera uma versão rastreável sem alterar os dados originais da oportunidade.</p>
+                {canCalculate && <button className="mt-5 rounded-lg bg-brand px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50" disabled={Boolean(busyStage)} onClick={() => runStage("COMMERCIAL")} type="button">{busyStage === "COMMERCIAL" ? "Iniciando…" : "Iniciar análise"}</button>}
+                {message && <p aria-live="polite" className="mt-3 text-xs font-semibold text-slate-600" role="status">{message}</p>}
+              </div>
+            </div>
+          )
+        )}</Fragment>
+        <Fragment key="ATTRACTIVENESS">{tab === "ATTRACTIVENESS" && (
           <AttractivenessTab canRegister={canCalculate} opportunityId={opportunityId}/>
-        )}
-        {tab === "LOGISTICS" && (
+        )}</Fragment>
+        <Fragment key="LOGISTICS">{tab === "LOGISTICS" && (
           <LogisticsTab analysis={analysis} bases={operationalBases} busy={busyStage === "LOGISTICS"} canCalculate={canCalculate} contextDefaults={contextDefaults} message={message} onSubmit={(event) => runContextualStage(event, "LOGISTICS")}/>
-        )}
-        {tab === "CLIMATE" && (
+        )}</Fragment>
+        <Fragment key="CLIMATE">{tab === "CLIMATE" && (
           <ClimateTab analysis={analysis} busy={busyStage === "CLIMATE"} canCalculate={canCalculate} contextDefaults={contextDefaults} message={message} onSubmit={(event) => runContextualStage(event, "CLIMATE")}/>
-        )}
-        {tab === "FINANCIAL" && (
+        )}</Fragment>
+        <Fragment key="FINANCIAL">{tab === "FINANCIAL" && (
           <FinancialTab analysis={analysis} busy={busyStage === "FINANCIAL"} canAssessClientRisk={canAssessClientRisk} canAssessFinancial={canAssessFinancial} canCalculate={canCalculate} canReadFinancial={canReadFinancial} financialSubject={financialSubject} onRun={() => runStage("FINANCIAL")} opportunityId={opportunityId}/>
-        )}
+        )}</Fragment>
       </div>
     </section>
-  );
-}
-
-function PanelHeader({ opportunityCode }: { opportunityCode: string }) {
-  return (
-    <header className="border-b border-slate-100 px-5 py-5 sm:px-7">
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand">Inteligência</p>
-      <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950" id="intelligence-title">Modo Analítico Inteligente</h2>
-      <p className="mt-1 text-xs text-slate-500">Avaliação assistida da oportunidade {opportunityCode}.</p>
-    </header>
   );
 }
 
@@ -498,8 +494,8 @@ function DecisionSection({ analysis, isOwner, onSaved }: { analysis: Intelligenc
   );
 }
 
-function LogisticsTab({ analysis, bases, canCalculate, busy, contextDefaults, message, onSubmit }: { analysis: IntelligenceAnalysisView; bases: readonly OperationalBaseOption[]; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; message: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  const route = analysis.route;
+function LogisticsTab({ analysis, bases, canCalculate, busy, contextDefaults, message, onSubmit }: { analysis: IntelligenceAnalysisView | null; bases: readonly OperationalBaseOption[]; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; message: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  const route = analysis?.route;
   const best = route?.alternatives.filter((item) => item.condition === "ROUTE_EXISTS").sort((left, right) => (left.distanceKm ?? Infinity) - (right.distanceKm ?? Infinity))[0];
   const [selectedBaseId, setSelectedBaseId] = useState<string | undefined>(undefined);
   const selected = route?.alternatives.find((item) => item.baseId === selectedBaseId && item.condition === "ROUTE_EXISTS") ?? best;
@@ -549,8 +545,8 @@ function LogisticsTab({ analysis, bases, canCalculate, busy, contextDefaults, me
   );
 }
 
-function ClimateTab({ analysis, canCalculate, busy, contextDefaults, message, onSubmit }: { analysis: IntelligenceAnalysisView; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; message: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  const climate = analysis.climate;
+function ClimateTab({ analysis, canCalculate, busy, contextDefaults, message, onSubmit }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; busy: boolean; contextDefaults: AnalysisContextDefaults; message: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  const climate = analysis?.climate;
   const max = Math.max(1, ...(climate?.monthlySeries.map((item) => item.precipitationMm) ?? [1]));
   return (
     <div className="grid gap-5 lg:grid-cols-3">
@@ -610,8 +606,8 @@ function ClimateTab({ analysis, canCalculate, busy, contextDefaults, message, on
   );
 }
 
-function FinancialTab({ analysis, canCalculate, canReadFinancial, canAssessFinancial, canAssessClientRisk, financialSubject, opportunityId, busy, onRun }: { analysis: IntelligenceAnalysisView; canCalculate: boolean; canReadFinancial: boolean; canAssessFinancial: boolean; canAssessClientRisk: boolean; financialSubject?: FinancialSubject; opportunityId: string; busy: boolean; onRun: () => void }) {
-  const financial = analysis.financial;
+function FinancialTab({ analysis, canCalculate, canReadFinancial, canAssessFinancial, canAssessClientRisk, financialSubject, opportunityId, busy, onRun }: { analysis: IntelligenceAnalysisView | null; canCalculate: boolean; canReadFinancial: boolean; canAssessFinancial: boolean; canAssessClientRisk: boolean; financialSubject?: FinancialSubject; opportunityId: string; busy: boolean; onRun: () => void }) {
+  const financial = analysis?.financial;
   return (
     <div className="space-y-5">
       {financial ? (

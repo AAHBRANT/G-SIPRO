@@ -213,34 +213,42 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-        <header className="border-b border-slate-200 px-5 py-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-brand">Resumo da proposta</p>
-          <h2 className="mt-1 text-xl font-bold">Informações principais</h2>
-        </header>
-        <div className="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ["Cliente/órgão", client],
-            ["Responsável", record.opportunity.owner?.displayName ?? "Não atribuído"],
-            ["Tipo", originLabels[record.originType] ?? record.originType],
-            ["Data de entrega", record.opportunity.deliveryAt?.toLocaleDateString("pt-BR") ?? "Não informada"],
-            ["Oportunidade de origem", record.opportunity.code],
-          ].map(([label, value]) => (
-            <dl className="min-h-24 bg-white p-4" key={label}>
-              <dt className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</dt>
-              <dd className="mt-2 text-sm font-bold text-slate-900">{value}</dd>
-            </dl>
-          ))}
-        </div>
-      </section>
-
-      {canReadAnalytics && <InheritedAnalysis analysis={analysis} opportunityCode={record.opportunity.code} />}
-
-      <ProposalWorkspace
-        canUploadDocuments={authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed}
-        extractionDefinitions={extractionDefinitions}
-        proposalCode={record.code}
-        proposalId={record.id}
+      <InheritedAnalysis
+        analysis={analysis}
+        canReadAnalytics={canReadAnalytics}
+        opportunityCode={record.opportunity.code}
+        opportunityId={record.opportunityId}
+        summaryContent={
+          <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm" key="summary">
+            <header className="border-b border-slate-200 px-5 py-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-brand">Resumo da proposta</p>
+              <h2 className="mt-1 text-xl font-bold">Informações principais</h2>
+            </header>
+            <div className="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ["Cliente/órgão", client],
+                ["Responsável", record.opportunity.owner?.displayName ?? "Não atribuído"],
+                ["Tipo", originLabels[record.originType] ?? record.originType],
+                ["Data de entrega", record.opportunity.deliveryAt?.toLocaleDateString("pt-BR") ?? "Não informada"],
+                ["Oportunidade de origem", record.opportunity.code],
+              ].map(([label, value]) => (
+                <dl className="min-h-24 bg-white p-4" key={label}>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</dt>
+                  <dd className="mt-2 text-sm font-bold text-slate-900">{value}</dd>
+                </dl>
+              ))}
+            </div>
+          </section>
+        }
+        documentsContent={
+          <ProposalWorkspace
+            canUploadDocuments={authorize(authorization, { permission: "documents.create" }).allowed && authorize(authorization, { permission: "documents.link" }).allowed}
+            extractionDefinitions={extractionDefinitions}
+            key="documents"
+            proposalCode={record.code}
+            proposalId={record.id}
+          />
+        }
       />
     </main>
   );

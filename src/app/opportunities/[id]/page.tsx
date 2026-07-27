@@ -14,7 +14,6 @@ import {
 } from "./intelligence-panel";
 import { collectAnalysisContextDefaults } from "./analysis-context-defaults";
 import { OpportunityEditor, type OpportunityEditorData } from "./opportunity-editor";
-import { OpportunityTabs } from "./opportunity-tabs";
 import { collectRequestedServices } from "./requested-services";
 import { originLabels, statusLabels } from "../opportunity-labels";
 
@@ -278,9 +277,25 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         </div>
       </div>
 
-      <OpportunityTabs
-        summary={
-          <div className="grid gap-6">
+      <IntelligencePanel
+        analysis={analysis}
+        canCalculate={canCalculateAnalytics}
+        canReadAnalytics={canReadAnalytics}
+        canReadFinancial={canReadFinancial}
+        canAssessFinancial={canAssessFinancial}
+        canAssessClientRisk={canAssessClientRisk}
+        canDecide={canDecideAnalytics}
+        isOwner={Boolean(authorization?.isOwner)}
+        financialSubject={record.customer
+          ? { type: "customer", id: record.customer.id, name: record.customer.name }
+          : record.contractingAuthority
+            ? { type: "authority", id: record.contractingAuthority.id, name: record.contractingAuthority.name }
+            : undefined}
+        opportunityId={record.id}
+        contextDefaults={analysisContextDefaults}
+        operationalBases={operationalBases}
+        summaryContent={
+          <div className="grid gap-6" key="summary">
             <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
               <header className="border-b border-slate-200 px-5 py-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-brand">Resumo da oportunidade</p>
@@ -339,8 +354,8 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 
           </div>
         }
-        documents={
-          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        documentsContent={
+          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm" key="documents">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-brand">Documentação da oportunidade</p>
@@ -360,26 +375,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             </div>
           </section>
         }
-        analytics={canReadAnalytics ? (
-          <IntelligencePanel
-            analysis={analysis}
-            canCalculate={canCalculateAnalytics}
-            canReadFinancial={canReadFinancial}
-            canAssessFinancial={canAssessFinancial}
-            canAssessClientRisk={canAssessClientRisk}
-            canDecide={canDecideAnalytics}
-            isOwner={Boolean(authorization?.isOwner)}
-            financialSubject={record.customer
-              ? { type: "customer", id: record.customer.id, name: record.customer.name }
-              : record.contractingAuthority
-                ? { type: "authority", id: record.contractingAuthority.id, name: record.contractingAuthority.name }
-                : undefined}
-            opportunityCode={record.code}
-            opportunityId={record.id}
-            contextDefaults={analysisContextDefaults}
-            operationalBases={operationalBases}
-          />
-        ) : undefined}
       />
     </main>
   );
