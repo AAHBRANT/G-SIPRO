@@ -45,7 +45,7 @@ jobs:
       ACR_NAME: ${{ vars.AZURE_ACR_NAME || 'acrgsiprohml27207f' }}
       CONTAINERAPP_NAME: ${{ vars.AZURE_CONTAINERAPP_NAME || 'ca-gsipro-hml-aahbrant' }}
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-gsipro-hml-brazilsouth' }}
-      APP_URL: ${{ vars.AZURE_CONTAINERAPP_URL || 'https://gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io' }}
+      APP_URL: ${{ vars.AZURE_CONTAINERAPP_URL || 'https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io' }}
     steps:
       - name: Resolver commit a publicar
         id: alvo
@@ -135,7 +135,7 @@ jobs:
               --output tsv 2>/dev/null || echo "Pendente")"
             echo "tentativa ${tentativa}: ${estado}"
             case "${estado}" in
-              Running) echo "Revisão em execução."; exit 0 ;;
+              Running|RunningAtMaxScale) echo "Revisão em execução."; exit 0 ;;
               Failed|Degraded) echo "::error::Revisão entrou em ${estado}."; exit 1 ;;
             esac
             sleep 10

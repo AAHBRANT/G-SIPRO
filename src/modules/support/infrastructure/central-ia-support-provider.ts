@@ -50,6 +50,7 @@ export class CentralIaSupportProvider {
   constructor(
     private readonly baseUrl = process.env.CENTRAL_IA_BASE_URL?.trim(),
     private readonly timeoutMs = Number(process.env.CENTRAL_IA_REQUEST_TIMEOUT_MS) || 120_000,
+    private readonly apiToken = process.env.CENTRAL_IA_API_TOKEN?.trim(),
   ) {}
 
   async diagnose(input: SupportTicketInput, correlationId: string): Promise<SupportDiagnosis> {
@@ -81,7 +82,11 @@ export class CentralIaSupportProvider {
       const response = await fetch(`${this.baseUrl}/chat`, {
         method: "POST",
         signal: controller.signal,
-        headers: { "Content-Type": "application/json", "X-Client-Request-Id": correlationId },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Client-Request-Id": correlationId,
+          ...(this.apiToken ? { Authorization: `Bearer ${this.apiToken}` } : {}),
+        },
         body: JSON.stringify({ message, system, format }),
       });
       if (!response.ok) throw new Error(`CENTRAL_IA_HTTP_${response.status}`);
