@@ -1,0 +1,156 @@
+name: G-SIPRO Deploy HML
+
+# Publica a imagem no ACR e atualiza o Container App de homologação.
+#
+# Motivação: até 2026-07-31 o deploy era manual, e isso já causou uma parada
+# real — a correção da identidade OIDC do executor ficou na main sem chegar em
+# produção, e nenhum chamado de suporte era resolvido enquanto isso.
+#
+# O build roda com "az acr build", ou seja, dentro do Azure (ACR Tasks). Não
+# depende de docker no runner e mantém a imagem no registry desde a origem.
+#
+# As migrações de banco NÃO têm passo próprio aqui: o próprio contêiner executa
+# scripts/apply-database-migrations.mjs antes de subir o servidor (ver Dockerfile).
+
+on:
+  # Dispara somente quando a CI concluir na main, para nunca publicar build vermelho.
+  workflow_run:
+    workflows: ["G-SIPRO CI"]
+    types: [completed]
+    branches: [main]
+  # Permite publicar a main atual sob demanda, inclusive para recuperar uma
+  # correção que ficou para trás.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # exigido pelo login federado (OIDC) no Azure
+
+concurrency:
+  group: deploy-hml
+  cancel-in-progress: false # nunca abortar um deploy pela metade
+
+jobs:
+  publish:
+    # Em workflow_run, só segue se a CI passou. Em workflow_dispatch, segue sempre.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: homologacao
+    env:
+      # Valores documentados em PROJECT_STATUS.md (seção "Ambientes"). As vars
+      # do repositório permitem sobrescrever sem editar o workflow.
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ACR_NAME: ${{ vars.AZURE_ACR_NAME || 'acrgsiprohml27207f' }}
+      CONTAINERAPP_NAME: ${{ vars.AZURE_CONTAINERAPP_NAME || 'ca-gsipro-hml-aahbrant' }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-gsipro-hml-brazilsouth' }}
+      APP_URL: ${{ vars.AZURE_CONTAINERAPP_URL || 'https://gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io' }}
+    steps:
+      - name: Resolver commit a publicar
+        id: alvo
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            sha="${{ github.event.workflow_run.head_sha }}"
+          else
+            sha="${GITHUB_SHA}"
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "tag=${sha:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Publicando commit ${sha}"
+
+      - name: Conferir configuração obrigatória
+        run: |
+          set -euo pipefail
+          for nome in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            valor="$(printenv "$nome" || true)"
+            if [ -z "${valor}" ]; then
+              echo "::error::Defina a variável de repositório ${nome} (Settings > Secrets and variables > Actions > Variables)."
+              exit 1
+            fi
+          done
+          echo "Registry:       ${ACR_NAME}"
+          echo "Container App:  ${CONTAINERAPP_NAME}"
+          echo "Resource group: ${RESOURCE_GROUP}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.alvo.outputs.sha }}
+
+      - name: Autenticar no Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      # Constrói dentro do Azure. A tag é o SHA curto, para ser sempre possível
+      # dizer qual commit está rodando — "latest" sozinho esconde isso.
+      - name: Construir imagem no ACR
+        run: |
+          set -euo pipefail
+          az acr build \
+            --registry "${ACR_NAME}" \
+            --resource-group "${RESOURCE_GROUP}" \
+            --image "gsipro:${{ steps.alvo.outputs.tag }}" \
+            --image "gsipro:latest" \
+            --file Dockerfile \
+            .
+          # Não confiar só no resultado do build: confirmar que a tag existe
+          # de fato no registry antes de apontar o Container App para ela.
+          az acr repository show-tags \
+            --name "${ACR_NAME}" \
+            --repository gsipro \
+            --query "contains(@, 'gsipro:${{ steps.alvo.outputs.tag }}') || contains(@, '${{ steps.alvo.outputs.tag }}')" \
+            --output tsv | grep -qi true
+
+      - name: Atualizar o Container App
+        id: update
+        run: |
+          set -euo pipefail
+          # Sufixo único por execução: cada deploy cria uma revisão nova e
+          # identificável, em vez de reaproveitar/ambiguar uma existente.
+          sufixo="gh${{ github.run_number }}-${{ steps.alvo.outputs.tag }}"
+          echo "suffix=${sufixo}" >> "$GITHUB_OUTPUT"
+          az containerapp update \
+            --name "${CONTAINERAPP_NAME}" \
+            --resource-group "${RESOURCE_GROUP}" \
+            --image "${ACR_NAME}.azurecr.io/gsipro:${{ steps.alvo.outputs.tag }}" \
+            --revision-suffix "${sufixo}" \
+            --output none
+          echo "Container App atualizado para gsipro:${{ steps.alvo.outputs.tag }} (revisão ${sufixo})"
+
+      # Falha explicitamente se a revisão nova não entrar em execução, para o
+      # deploy não ser reportado como sucesso com o app quebrado.
+      - name: Aguardar a revisão nova ficar em execução
+        run: |
+          set -euo pipefail
+          for tentativa in $(seq 1 30); do
+            estado="$(az containerapp revision show \
+              --name "${CONTAINERAPP_NAME}" \
+              --resource-group "${RESOURCE_GROUP}" \
+              --revision "${CONTAINERAPP_NAME}--${{ steps.update.outputs.suffix }}" \
+              --query "properties.runningState" \
+              --output tsv 2>/dev/null || echo "Pendente")"
+            echo "tentativa ${tentativa}: ${estado}"
+            case "${estado}" in
+              Running) echo "Revisão em execução."; exit 0 ;;
+              Failed|Degraded) echo "::error::Revisão entrou em ${estado}."; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::A revisão não atingiu o estado Running em 5 minutos."
+          exit 1
+
+      # Verificação de ponta a ponta contra o app público, no mesmo padrão
+      # documentado em PROJECT_STATUS.md: /api/health confirma que o processo
+      # está no ar, /api/readiness confirma que o banco está alcançável.
+      - name: Verificar /api/health e /api/readiness
+        run: |
+          set -euo pipefail
+          for rota in health readiness; do
+            echo "Checando ${APP_URL}/api/${rota}"
+            curl --fail --silent --show-error --max-time 15 "${APP_URL}/api/${rota}"
+            echo ""
+          done
