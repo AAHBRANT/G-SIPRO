@@ -15,6 +15,8 @@ import {
 import { collectAnalysisContextDefaults } from "./analysis-context-defaults";
 import { OpportunityEditor, type OpportunityEditorData } from "./opportunity-editor";
 import { collectRequestedServices } from "./requested-services";
+import { inferAuthorityHintFromDocuments } from "./authority-hint";
+import { AuthoritySuggestion } from "./authority-suggestion";
 import { originLabels, statusLabels } from "../opportunity-labels";
 
 const climateMonthlySchema = z.array(z.object({
@@ -250,6 +252,9 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   });
 
   const requestedServices = collectRequestedServices(documents);
+  const authorityHint = !record.customer && !record.contractingAuthority && authorize(authorization, { permission: "opportunities.update" }).allowed
+    ? inferAuthorityHintFromDocuments(documents)
+    : undefined;
   const analysisContextDefaults = collectAnalysisContextDefaults(documents);
   const estimatedValue = record.estimatedValue === null
     ? "Não informado"
@@ -318,6 +323,9 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                   </dl>
                 ))}
               </div>
+              {authorityHint && (
+                <AuthoritySuggestion opportunityId={record.id} raw={authorityHint.raw} suggestedName={authorityHint.suggestedName} />
+              )}
               <div className="border-t border-slate-200 p-5">
                 <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Objeto</p>
                 <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-700">{record.subject ?? "Não informado"}</p>
