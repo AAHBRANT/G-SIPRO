@@ -5,12 +5,18 @@ import { AuthorizationError } from "@/core/errors/application-error";
 const githubOidcIssuer = "https://token.actions.githubusercontent.com";
 const githubOidcAudience = "gsipro-support-agent";
 const githubOidcJwks = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"));
+// Identidade fixada do repositório autorizado a executar chamados.
+// Atualizada em 2026-07-31: o repositório foi transferido de "gutembergp-droid"
+// para a organização "AAHBRANT" e estes valores ficaram para trás, fazendo toda
+// verificação OIDC falhar — o executor era rejeitado com 403 em cada execução do
+// cron e nenhum chamado saía da fila. O repositoryId é preservado pelo GitHub em
+// transferências; apenas o nome completo e o owner mudam.
 const trustedGitHubIdentity = {
-  repository: "gutembergp-droid/G-SIPRO",
+  repository: "AAHBRANT/G-SIPRO",
   repositoryId: "1306983768",
-  repositoryOwnerId: "252495539",
+  repositoryOwnerId: "310253480",
   ref: "refs/heads/main",
-  workflowRef: "gutembergp-droid/G-SIPRO/.github/workflows/support-codex.yml@refs/heads/main",
+  workflowRef: "AAHBRANT/G-SIPRO/.github/workflows/support-codex.yml@refs/heads/main",
 } as const;
 
 function digest(value: string) {
