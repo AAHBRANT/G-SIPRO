@@ -9,7 +9,7 @@ import { createRequestContext, runWithRequestContext } from "@/core/observabilit
 import { storeDocumentFile } from "@/core/storage/document-storage";
 import { supportTicketInputSchema, type SupportDiagnosis, type SupportTicketInput } from "@/modules/support/domain/support-ticket";
 import { supportApprovalPolicy } from "@/modules/support/domain/support-triage-policy";
-import { OpenAiSupportProvider } from "@/modules/support/infrastructure/openai-support-provider";
+import { CentralIaSupportProvider } from "@/modules/support/infrastructure/central-ia-support-provider";
 
 const allowedAttachments = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain"]);
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: "USER", actorId: authorization.actorId, action: "SUPPORT_TICKET_CREATED", entityType: "SUPPORT_TICKET", entityId: ticketId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-center", metadata: { type: input.type, priority: input.priority, attachment: Boolean(stored) } } });
       });
 
-      const provider = new OpenAiSupportProvider();
+      const provider = new CentralIaSupportProvider();
       let diagnosis: SupportDiagnosis;
       let model: string | undefined;
       try { diagnosis = await provider.diagnose(input, context.correlationId); model = provider.modelName; } catch { diagnosis = fallbackDiagnosis(input); }
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
           ? "A triagem identificou imediatamente uma ação exclusiva do proprietário. O chamado foi direcionado sem consumir tentativas automáticas."
           : model ? "Triagem assistida por inteligência concluída." : "Triagem inicial concluída; diagnóstico técnico detalhado ainda será realizado.";
         await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId, fromStatus: "OPEN", toStatus: status, note: triageNote, createdById: authorization.actorId, actorLabel: externalBlocker ? "Triagem inteligente" : "Usuário" } });
-        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: model ? "APPLICATION" : "SYSTEM", actorId: model ? "openai-support-triage" : "support-fallback-triage", action: externalBlocker ? "SUPPORT_OWNER_ACTION_REQUIRED" : "SUPPORT_TICKET_TRIAGED", entityType: "SUPPORT_TICKET", entityId: ticketId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-center", metadata: { approvalRequired, changeClass: diagnosis.changeClass, requiredActor: diagnosis.requiredActor, model: model ?? null } } });
+        await transaction.auditEvent.create({ data: { id: randomUUID(), actorType: model ? "APPLICATION" : "SYSTEM", actorId: model ? "central-ia-support-triage" : "support-fallback-triage", action: externalBlocker ? "SUPPORT_OWNER_ACTION_REQUIRED" : "SUPPORT_TICKET_TRIAGED", entityType: "SUPPORT_TICKET", entityId: ticketId, correlationId: context.correlationId, outcome: "SUCCESS", origin: "support-center", metadata: { approvalRequired, changeClass: diagnosis.changeClass, requiredActor: diagnosis.requiredActor, model: model ?? null } } });
       });
       return NextResponse.json({ data: { id: ticketId, status, approvalRequired }, correlationId: context.correlationId }, { status: 201 });
     } catch (error) { return toApiError(error); }

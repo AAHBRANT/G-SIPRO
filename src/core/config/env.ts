@@ -19,6 +19,8 @@ const environmentSchema = z.object({
   AUTH_URL: z.url().optional().or(z.literal("")),
   OPENAI_API_KEY: z.string().min(20).optional().or(z.literal("")),
   OPENAI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(120_000),
+  CENTRAL_IA_BASE_URL: z.url().optional().or(z.literal("")),
+  CENTRAL_IA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(120_000),
   SUPPORT_EXECUTOR_TOKEN: z.string().min(32).optional().or(z.literal("")),
 });
 
