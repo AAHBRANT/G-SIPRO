@@ -16,8 +16,17 @@ const trustedGitHubIdentity = {
   repositoryId: "1306983768",
   repositoryOwnerId: "310253480",
   ref: "refs/heads/main",
-  workflowRef: "AAHBRANT/G-SIPRO/.github/workflows/support-codex.yml@refs/heads/main",
 } as const;
+
+// Lista fechada de workflows autorizados a agir como executor de suporte.
+// É uma lista, e não um valor único, porque a triagem assíncrona precisa de um
+// segundo workflow (rede de segurança) além do executor de correções. Manter
+// explícita: qualquer outro workflow do mesmo repositório continua recusado,
+// então um workflow novo não herda esse acesso por acidente.
+const trustedWorkflowRefs: readonly string[] = [
+  "AAHBRANT/G-SIPRO/.github/workflows/support-codex.yml@refs/heads/main",
+  "AAHBRANT/G-SIPRO/.github/workflows/support-triage.yml@refs/heads/main",
+];
 
 function digest(value: string) {
   return createHash("sha256").update(value, "utf8").digest();
@@ -33,7 +42,8 @@ export function isGitHubSupportExecutorClaimsValid(payload: JWTPayload) {
     && payload.repository_id === trustedGitHubIdentity.repositoryId
     && payload.repository_owner_id === trustedGitHubIdentity.repositoryOwnerId
     && payload.ref === trustedGitHubIdentity.ref
-    && payload.workflow_ref === trustedGitHubIdentity.workflowRef
+    && typeof payload.workflow_ref === "string"
+    && trustedWorkflowRefs.includes(payload.workflow_ref)
     && payload.repository_visibility === "private"
     && payload.runner_environment === "github-hosted"
     && (payload.event_name === "workflow_dispatch" || payload.event_name === "schedule");

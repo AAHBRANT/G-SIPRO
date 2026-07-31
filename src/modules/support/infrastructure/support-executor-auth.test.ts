@@ -29,6 +29,34 @@ describe("support executor authentication", () => {
     expect(isGitHubSupportExecutorClaimsValid({ ...claims, workflow_ref: "AAHBRANT/G-SIPRO/.github/workflows/other.yml@refs/heads/main" })).toBe(false);
   });
 
+  it("accepts the triage dispatch workflow as well", () => {
+    const claims = {
+      repository: "AAHBRANT/G-SIPRO",
+      repository_id: "1306983768",
+      repository_owner_id: "310253480",
+      ref: "refs/heads/main",
+      workflow_ref: "AAHBRANT/G-SIPRO/.github/workflows/support-triage.yml@refs/heads/main",
+      repository_visibility: "private",
+      runner_environment: "github-hosted",
+      event_name: "schedule",
+    };
+    expect(isGitHubSupportExecutorClaimsValid(claims)).toBe(true);
+  });
+
+  it("still rejects an unlisted workflow in the same repository", () => {
+    const claims = {
+      repository: "AAHBRANT/G-SIPRO",
+      repository_id: "1306983768",
+      repository_owner_id: "310253480",
+      ref: "refs/heads/main",
+      workflow_ref: "AAHBRANT/G-SIPRO/.github/workflows/ci.yml@refs/heads/main",
+      repository_visibility: "private",
+      runner_environment: "github-hosted",
+      event_name: "schedule",
+    };
+    expect(isGitHubSupportExecutorClaimsValid(claims)).toBe(false);
+  });
+
   it("rejects the previous owner after the repository transfer", () => {
     const staleClaims = {
       repository: "gutembergp-droid/G-SIPRO",

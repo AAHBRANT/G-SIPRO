@@ -1,0 +1,48 @@
+name: G-SIPRO Support Triage
+
+# Rede de segurança da triagem assistida.
+#
+# O caminho normal é o `after()` na criação do chamado, que dispensa espera do
+# usuário. Este workflow existe só para o que escapar dali: reinício do
+# contêiner, implantação no meio do processamento, queda da inteligência. Ele
+# reprocessa chamados que seguem em OPEN sem diagnóstico.
+#
+# Autentica por OIDC, sem segredo de longa duração — o nome deste arquivo está
+# na lista fechada de workflows autorizados em support-executor-auth.ts, então
+# renomeá-lo quebra o acesso de propósito.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+concurrency:
+  group: gsipro-support-triage
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    env:
+      SUPPORT_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+    steps:
+      - name: Reprocessar chamados sem triagem
+        run: |
+          set -euo pipefail
+          oidc_response="$(curl --fail --silent --show-error \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gsipro-support-agent")"
+          support_token="$(jq -r '.value' <<<"$oidc_response")"
+          test -n "$support_token"
+          echo "::add-mask::$support_token"
+          resposta="$(curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${support_token}" \
+            --header "Content-Type: application/json" \
+            --data '{"limit":10}' \
+            "${SUPPORT_URL}/api/support/triage/dispatch")"
+          echo "Chamados triados nesta execução: $(jq -r '.count' <<<"$resposta")"
