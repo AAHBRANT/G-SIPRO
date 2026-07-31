@@ -20,7 +20,10 @@ const environmentSchema = z.object({
   OPENAI_API_KEY: z.string().min(20).optional().or(z.literal("")),
   OPENAI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(120_000),
   CENTRAL_IA_BASE_URL: z.url().optional().or(z.literal("")),
-  CENTRAL_IA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(120_000),
+  // Teto maior que o da OpenAI porque a Central IA roda modelo local em CPU:
+  // uma triagem com gemma4:12b leva de 197s a 302s. Viável só porque a triagem
+  // é assíncrona (ver SupportTriageService).
+  CENTRAL_IA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(600_000),
   CENTRAL_IA_API_TOKEN: z.string().min(20).optional().or(z.literal("")),
   SUPPORT_EXECUTOR_TOKEN: z.string().min(32).optional().or(z.literal("")),
 });

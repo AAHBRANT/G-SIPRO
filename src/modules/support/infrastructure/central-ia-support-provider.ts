@@ -1,5 +1,13 @@
 import { supportClarificationSchema, supportDiagnosisSchema, type SupportClarification, type SupportDiagnosis, type SupportTicketInput } from "../domain/support-ticket";
 
+/** Limite de cada requisição individual. Curto de propósito: nenhuma chamada
+ *  espera a inferência, só cria o trabalho ou consulta o status. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Intervalo entre consultas. Equilibra latência de detecção e volume de
+ *  requisições no túnel, cujo plano gratuito tem limite de uso. */
+const POLL_INTERVAL_MS = 5_000;
+
 const triageResponseFormat = {
   type: "object", additionalProperties: false,
   required: ["summary", "probableCause", "severity", "changeClass", "requiredActor", "ownerActionCategory", "requiredAction", "securityGuidance", "recommendedAction", "suggestedTests", "userGuidance", "confidence"],
@@ -75,27 +83,59 @@ export class CentralIaSupportProvider {
 
   get modelName() { return this.lastModel ?? "central-ia"; }
 
-  private async callChat(message: string, system: string, format: object, correlationId: string): Promise<string> {
+  private headers(correlationId: string): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      "X-Client-Request-Id": correlationId,
+      ...(this.apiToken ? { Authorization: `Bearer ${this.apiToken}` } : {}),
+    };
+  }
+
+  /** Requisição curta, com limite próprio — nunca espera a inferência inteira. */
+  private async request(path: string, correlationId: string, body?: object): Promise<Response> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), Math.min(Math.max(this.timeoutMs, 5_000), 300_000));
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`${this.baseUrl}/chat`, {
-        method: "POST",
+      return await fetch(`${this.baseUrl}${path}`, {
+        method: body ? "POST" : "GET",
         signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Client-Request-Id": correlationId,
-          ...(this.apiToken ? { Authorization: `Bearer ${this.apiToken}` } : {}),
-        },
-        body: JSON.stringify({ message, system, format }),
+        headers: this.headers(correlationId),
+        ...(body ? { body: JSON.stringify(body) } : {}),
       });
-      if (!response.ok) throw new Error(`CENTRAL_IA_HTTP_${response.status}`);
-      const payload = await response.json() as { response?: string; model?: string };
-      if (!payload.response) throw new Error("CENTRAL_IA_EMPTY_OUTPUT");
-      this.lastModel = payload.model;
-      return payload.response;
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  /**
+   * Cria o trabalho na Central IA e consulta até concluir.
+   *
+   * A Central IA processa a inferência em segundo plano justamente para que
+   * nenhuma requisição HTTP fique aberta por minutos: com o gemma4:12b em CPU,
+   * uma triagem passa de 300s e estourava três limites diferentes em sequência
+   * (cliente, a própria Central IA e o `fetch` do Node), além dos limites do
+   * túnel e do ingress do Azure. Aqui cada chamada dura ~300ms; a espera vira
+   * uma sequência de consultas curtas.
+   */
+  private async callChat(message: string, system: string, format: object, correlationId: string): Promise<string> {
+    const created = await this.request("/chat", correlationId, { message, system, format });
+    if (!created.ok) throw new Error(`CENTRAL_IA_HTTP_${created.status}`);
+    const job = await created.json() as { job_id?: string };
+    if (!job.job_id) throw new Error("CENTRAL_IA_JOB_NOT_CREATED");
+
+    const deadline = Date.now() + Math.min(Math.max(this.timeoutMs, 5_000), 600_000);
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+      const polled = await this.request(`/chat/${job.job_id}`, correlationId);
+      if (!polled.ok) throw new Error(`CENTRAL_IA_HTTP_${polled.status}`);
+      const status = await polled.json() as { status?: string; response?: string; model?: string; error?: string };
+      if (status.status === "error") throw new Error(`CENTRAL_IA_JOB_FAILED: ${status.error ?? "sem detalhe"}`);
+      if (status.status === "done") {
+        if (!status.response) throw new Error("CENTRAL_IA_EMPTY_OUTPUT");
+        this.lastModel = status.model;
+        return status.response;
+      }
+    }
+    throw new Error("CENTRAL_IA_JOB_TIMEOUT");
   }
 }

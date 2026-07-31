@@ -1,9 +1,18 @@
 import { randomUUID } from "node:crypto";
 
+import { getEnvironment } from "@/core/config/env";
 import { getDatabase } from "@/core/database/prisma";
+import { createLogger } from "@/core/observability/logger";
 import { supportTicketInputSchema, type SupportDiagnosis, type SupportTicketInput } from "@/modules/support/domain/support-ticket";
 import { supportApprovalPolicy } from "@/modules/support/domain/support-triage-policy";
 import { CentralIaSupportProvider } from "@/modules/support/infrastructure/central-ia-support-provider";
+
+// Criado sob demanda, e não no nível do módulo: `getEnvironment()` valida o
+// ambiente inteiro e lançaria só por importar este arquivo, quebrando os testes
+// de unidade das funções puras daqui, que não precisam de banco configurado.
+function triageLogger() {
+  return createLogger(getEnvironment());
+}
 
 /**
  * Diagnóstico determinístico usado quando a inteligência não responde. Mantém o
@@ -77,7 +86,17 @@ export class SupportTriageService {
     try {
       diagnosis = await this.provider.diagnose(input, correlationId);
       model = this.provider.modelName;
-    } catch {
+    } catch (error) {
+      // Registrar o motivo é essencial: cair no fallback é silencioso por
+      // definição (o chamado avança normalmente, só sem inteligência). Sem este
+      // log, uma inteligência fora do ar por dias passa despercebida.
+      triageLogger().warn({
+        ticketId,
+        correlationId,
+        errorName: error instanceof Error ? error.name : "UNKNOWN",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        centralIaConfigured: Boolean(process.env.CENTRAL_IA_BASE_URL?.trim()),
+      }, "Triagem assistida indisponível; aplicando diagnóstico de retaguarda.");
       diagnosis = fallbackDiagnosis(input);
     }
 
