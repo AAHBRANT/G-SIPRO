@@ -10,6 +10,7 @@ import type { OpportunityStatus } from "@/modules/opportunities/domain/opportuni
 import { CreateOpportunityForm } from "./create-opportunity-form";
 import { OpportunityPageSizeSelect, OpportunityTableControls } from "./opportunity-table-controls";
 import { statusLabels } from "./opportunity-labels";
+import { ScoutedMetricCard } from "./scouted-metric-card";
 
 type Filters = { query?: string; status?: string; page?: string; pageSize?: string };
 const statusTone: Record<OpportunityStatus, string> = { DRAFT: "bg-slate-100 text-slate-600", QUALIFICATION: "bg-violet-50 text-violet-700", ACTIVE: "bg-emerald-50 text-emerald-700", SUSPENDED: "bg-amber-50 text-amber-700", CLOSED: "bg-slate-200 text-slate-700" };
@@ -37,12 +38,15 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   };
   const database = getDatabase();
   const now = new Date(); const nextThirtyDays = new Date(now.getTime() + 30 * 86400000);
-  const [opportunities, totalFiltered, total, active, qualification, upcoming, closed, users] = await Promise.all([
+  const [opportunities, totalFiltered, total, active, qualification, upcoming, closed, users, pendingScouted] = await Promise.all([
     database.opportunity.findMany({ where, include: { customer: true, contractingAuthority: true, owner: true }, orderBy: [{ deliveryAt: "asc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize }),
     database.opportunity.count({ where }),
     database.opportunity.count(), database.opportunity.count({ where: { status: "ACTIVE" } }), database.opportunity.count({ where: { status: "QUALIFICATION" } }),
     database.opportunity.count({ where: { status: { not: "CLOSED" }, deliveryAt: { gte: now, lte: nextThirtyDays } } }), database.opportunity.count({ where: { status: "CLOSED" } }),
     database.user.findMany({ where: { status: "ACTIVE" }, select: { id: true, displayName: true }, orderBy: { displayName: "asc" } }),
+    // Degrada para zero se a tabela do Buscador ainda não existir, para não
+    // derrubar a relação de oportunidades por causa do card.
+    database.scoutedTender.count({ where: { status: "PENDING" } }).catch(() => 0),
   ]);
   const canCreate = authorize(authorization, { permission: "opportunities.create" }).allowed;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize)); const safePage = Math.min(page, totalPages);
@@ -51,7 +55,8 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   return <main className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
     <PageHeader eyebrow="Comercial" icon="target" subtitle="Registre sinais de mercado e acompanhe sua evolução até a decisão comercial." title="Oportunidades" variant="executive"/>
 
-    <section aria-label="Indicadores de oportunidades" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <section aria-label="Indicadores de oportunidades" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ScoutedMetricCard value={pendingScouted}/>
       <MetricCard description="Todas as oportunidades registradas" icon="target" title="Total de oportunidades" value={total} variant="executive"/>
       <MetricCard description="Oportunidades atualmente em acompanhamento" icon="chart" title="Oportunidades ativas" value={active} variant="executive"/>
       <MetricCard description="Registros aguardando análise comercial" icon="clock" title="Em qualificação" value={qualification} variant="executive"/>

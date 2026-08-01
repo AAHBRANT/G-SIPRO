@@ -1,6 +1,7 @@
 export const moduleCatalog = [
   { id: "identity", name: "Identidade e Administração", purpose: "Usuários, perfis, departamentos, alçadas e configurações.", dependencies: ["audit"] },
   { id: "opportunities", name: "Oportunidades", purpose: "Entrada e qualificação do pipeline comercial.", dependencies: ["documents", "workflow", "audit"] },
+  { id: "scouting", name: "Buscador G-SIPRO", purpose: "Captação automática de licitações de obra em fonte pública e fila de triagem que alimenta as oportunidades.", dependencies: ["opportunities", "identity", "audit"] },
   { id: "opportunity-intelligence", name: "Modo Analítico Inteligente", purpose: "Análises comerciais, técnicas e de praticabilidade para apoiar decisões sobre oportunidades.", dependencies: ["opportunities", "proposals", "tenders", "technical-collection", "compliance-matrix", "analytics", "ai", "workflow", "identity", "audit"] },
   { id: "tenders", name: "Editais e Requisitos", purpose: "Editais, prazos, requisitos, riscos e evidências.", dependencies: ["documents", "ai", "workflow", "technical-collection", "audit"] },
   { id: "technical-collection", name: "Acervo Técnico", purpose: "Atestados, CATs, ARTs, contratos, obras e profissionais.", dependencies: ["documents", "audit"] },

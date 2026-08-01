@@ -20,6 +20,7 @@ const environmentSchema = z.object({
   OPENAI_API_KEY: z.string().min(20).optional().or(z.literal("")),
   OPENAI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(120_000),
   SUPPORT_EXECUTOR_TOKEN: z.string().min(32).optional().or(z.literal("")),
+  SCOUT_DISPATCH_TOKEN: z.string().min(32).optional().or(z.literal("")),
 });
 
 export type AppEnvironment = z.infer<typeof environmentSchema>;
