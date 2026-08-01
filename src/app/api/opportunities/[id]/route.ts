@@ -24,9 +24,10 @@ export async function PATCH(request: Request, route: { params: Promise<{ id: str
       const id = z.uuid().parse((await route.params).id);
       const service = new OpportunityService(new PrismaOpportunityRepository());
       const input = await request.json() as Record<string, unknown>;
-      const inferredAuthority = inferPublicAuthorityFromValueSource(
-        typeof input.valueSource === "string" ? input.valueSource : undefined,
-      );
+      const authorityHintSource = typeof input.authorityNameHint === "string"
+        ? input.authorityNameHint
+        : typeof input.valueSource === "string" ? input.valueSource : undefined;
+      const inferredAuthority = inferPublicAuthorityFromValueSource(authorityHintSource);
       if (!input.contractingAuthorityId && inferredAuthority) {
         const database = getDatabase();
         const existingAuthority = await database.contractingAuthority.findFirst({

@@ -1,0 +1,4 @@
+{
+  "outcome": "REPORT_FAILURE",
+  "summary": "A correção proposta foi recusada pelas verificações do executor (src/app/support/support-progress-card.tsx: trecho informado não existe no arquivo)."
+}

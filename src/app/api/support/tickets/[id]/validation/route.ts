@@ -8,7 +8,7 @@ import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { Prisma } from "@/generated/prisma/client";
 import { supportClarificationSchema, supportValidationSchema, type SupportClarification } from "@/modules/support/domain/support-ticket";
-import { OpenAiSupportProvider } from "@/modules/support/infrastructure/openai-support-provider";
+import { CentralIaSupportProvider } from "@/modules/support/infrastructure/central-ia-support-provider";
 
 const fallbackClarification: SupportClarification = {
   introduction: "Para encaminhar a correção com precisão, confirme os pontos abaixo.",
@@ -47,7 +47,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
         if (ticket.validationQuestions) throw new ConflictError("As perguntas de esclarecimento já foram geradas.");
         let clarification = fallbackClarification;
         try {
-          clarification = await new OpenAiSupportProvider().clarify({ title: ticket.title, description: ticket.description, errorMessage: ticket.errorMessage, stepsToReproduce: ticket.stepsToReproduce, resolution: ticket.resolution, reason: input.reason, attempt: ticket.resolutionAttempts }, context.correlationId);
+          clarification = await new CentralIaSupportProvider().clarify({ title: ticket.title, description: ticket.description, errorMessage: ticket.errorMessage, stepsToReproduce: ticket.stepsToReproduce, resolution: ticket.resolution, reason: input.reason, attempt: ticket.resolutionAttempts }, context.correlationId);
         } catch {
           clarification = fallbackClarification;
         }
