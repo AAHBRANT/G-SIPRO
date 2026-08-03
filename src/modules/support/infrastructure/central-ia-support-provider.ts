@@ -19,7 +19,11 @@ const triageResponseFormat = {
     ownerActionCategory: { anyOf: [{ type: "string", enum: ["MICROSOFT_365", "TEAMS", "AZURE", "IDENTITY_ACCESS", "SECURITY", "EXTERNAL_SERVICE", "OTHER"] }, { type: "null" }] },
     requiredAction: { anyOf: [{ type: "string" }, { type: "null" }] },
     securityGuidance: { anyOf: [{ type: "string" }, { type: "null" }] },
-    recommendedAction: { type: "string" }, suggestedTests: { type: "array", items: { type: "string" } },
+    recommendedAction: { type: "string" },
+    // O limite é deliberadamente mais apertado que o `.max(12)` do Zod: um array
+    // sem teto é um convite à fuga de geração, porque nada obriga o modelo a
+    // fechá-lo. Triagens saudáveis produzem 3 itens; 5 já é folga.
+    suggestedTests: { type: "array", minItems: 1, maxItems: 5, items: { type: "string" } },
     userGuidance: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
   },
 } as const;
