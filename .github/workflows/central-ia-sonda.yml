@@ -1,0 +1,56 @@
+name: Sonda da Central IA
+
+# Avisa quando a inteligência de suporte fica indisponível, mesmo sem nenhum
+# chamado ser aberto nesse período.
+#
+# Motivação: a Central IA (Ollama) roda numa máquina local, exposta por túnel
+# ngrok. Se o PC dormir, o túnel cair ou o Ollama travar, o suporte cai no
+# fallback sem IA em silêncio — o chamado avança normalmente, só sem
+# inteligência, e ninguém percebe a menos que leia os logs. Ver
+# support-triage-service.ts, comentário no catch de triageTicket.
+#
+# Este workflow não precisa de token: /readiness é público de propósito,
+# assim a sonda funciona mesmo sem nenhuma credencial guardada aqui. A falha
+# do workflow É o alerta — o GitHub e-maila automaticamente quem editou por
+# último o agendamento quando uma execução de cron falha.
+#
+# Ressalva conhecida: cron do GitHub Actions pode atrasar em minutos de carga
+# alta na plataforma, e é desativado automaticamente se o repositório passar
+# 60 dias sem nenhum commit. Isto detecta indisponibilidade, não a garante
+# detectar no minuto exato.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+concurrency:
+  group: gsipro-central-ia-sonda
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    env:
+      CENTRAL_IA_URL: https://antirust-faster-domain.ngrok-free.dev
+    steps:
+      - name: Verificar /readiness da Central IA
+        run: |
+          set -euo pipefail
+          resposta="$(curl --silent --show-error --max-time 15 \
+            --header "ngrok-skip-browser-warning: 1" \
+            "${CENTRAL_IA_URL}/readiness")" || {
+            echo "::error::Central IA inalcançável em ${CENTRAL_IA_URL}/readiness — PC desligado, Ollama parado ou túnel ngrok caído."
+            exit 1
+          }
+          echo "Resposta: ${resposta}"
+          status="$(jq -r '.status' <<<"$resposta")"
+          if [ "$status" != "ready" ]; then
+            detail="$(jq -r '.detail // "sem detalhe"' <<<"$resposta")"
+            echo "::error::Central IA respondeu status=${status}. Detalhe: ${detail}"
+            exit 1
+          fi
+          echo "Central IA pronta: $(jq -r '.model' <<<"$resposta")"
