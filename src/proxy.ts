@@ -29,6 +29,19 @@ export const proxy = auth((request: NextAuthRequest): NextResponse => {
     return response;
   }
 
+  // Rede de segurança da triagem assistida (cron por OIDC do GitHub Actions,
+  // sem sessão de usuário). Faltou aqui desde a criação da rota em 2026-08-03:
+  // toda execução do workflow recebia 401 deste middleware antes mesmo de a
+  // rota chegar a validar o token OIDC — a própria validação nunca executava,
+  // por isso o rejeitamento não deixava rastro em nenhum log.
+  if (request.nextUrl.pathname === "/api/support/triage/dispatch") {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-correlation-id", correlationId);
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set("x-correlation-id", correlationId);
+    return response;
+  }
+
   if (!request.auth?.user) {
     if (request.nextUrl.pathname.startsWith("/api/")) {
       const response = NextResponse.json(
