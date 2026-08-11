@@ -113,10 +113,19 @@ jobs:
           # identificável, em vez de reaproveitar/ambiguar uma existente.
           sufixo="gh${{ github.run_number }}-${{ steps.alvo.outputs.tag }}"
           echo "suffix=${sufixo}" >> "$GITHUB_OUTPUT"
+          # APP_VERSION acompanha a imagem: é o que /api/health devolve no campo
+          # "version". Sem isto a variável fica congelada no valor do primeiro
+          # deploy e o health mente sobre qual commit está rodando — foi o que
+          # aconteceu em 2026-08-03 (health dizia d0e1595 rodando 84e8fd7).
+          #
+          # --set-env-vars altera SOMENTE as variáveis citadas e preserva as
+          # demais. Nunca trocar por --replace-env-vars: ele descarta todo o
+          # resto (DATABASE_URL, AUTH_SECRET, ENTRA_*, ...) e derruba o app.
           az containerapp update \
             --name "${CONTAINERAPP_NAME}" \
             --resource-group "${RESOURCE_GROUP}" \
             --image "${ACR_NAME}.azurecr.io/gsipro:${{ steps.alvo.outputs.tag }}" \
+            --set-env-vars "APP_VERSION=${{ steps.alvo.outputs.tag }}" \
             --revision-suffix "${sufixo}" \
             --output none
           echo "Container App atualizado para gsipro:${{ steps.alvo.outputs.tag }} (revisão ${sufixo})"
@@ -154,3 +163,27 @@ jobs:
             curl --fail --silent --show-error --max-time 15 "${APP_URL}/api/${rota}"
             echo ""
           done
+
+      # Guarda-corpo contra a regressão de 2026-08-03: o deploy passava verde
+      # com o /api/health reportando um commit antigo, e só dava para saber a
+      # imagem real via "az containerapp show". Se o campo "version" não bater
+      # com a tag publicada, o deploy falha aqui em vez de mentir.
+      #
+      # O ingress está em modo Single com 100% do tráfego na revisão mais nova,
+      # mas a revisão antiga ainda drena por alguns segundos — daí a repetição.
+      - name: Confirmar que /api/health reporta o commit publicado
+        run: |
+          set -euo pipefail
+          esperado="${{ steps.alvo.outputs.tag }}"
+          for tentativa in $(seq 1 12); do
+            corpo="$(curl --fail --silent --show-error --max-time 15 "${APP_URL}/api/health" || echo '{}')"
+            atual="$(printf '%s' "${corpo}" | jq -r '.version // empty' 2>/dev/null || true)"
+            echo "tentativa ${tentativa}: version=${atual:-<ausente>} (esperado ${esperado})"
+            if [ "${atual}" = "${esperado}" ]; then
+              echo "/api/health confirma o commit publicado."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::/api/health reporta \"${atual:-<ausente>}\", mas foi publicado \"${esperado}\". Verifique se APP_VERSION foi aplicada na revisão nova."
+          exit 1
