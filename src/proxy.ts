@@ -29,6 +29,18 @@ export const proxy = auth((request: NextAuthRequest): NextResponse => {
     return response;
   }
 
+  // Mesma classe de lacuna já vista em /api/support/triage/dispatch (abaixo):
+  // rota nova autenticada por token de agendador (Bearer), sem sessão de
+  // usuário. Sem esta exceção, o middleware rejeita com 401 antes mesmo de a
+  // rota validar o token do Buscador.
+  if (request.nextUrl.pathname === "/api/scouting/scan") {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-correlation-id", correlationId);
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set("x-correlation-id", correlationId);
+    return response;
+  }
+
   // Rede de segurança da triagem assistida (cron por OIDC do GitHub Actions,
   // sem sessão de usuário). Faltou aqui desde a criação da rota em 2026-08-03:
   // toda execução do workflow recebia 401 deste middleware antes mesmo de a
