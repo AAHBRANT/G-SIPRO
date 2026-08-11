@@ -73,6 +73,7 @@ const ticket = { number: 42, title: "Erro ao salvar proposta" };
 describe("formatTicketTriagedMessage", () => {
   it("inclui número, título, status e severidade", () => {
     const texto = formatTicketTriagedMessage(ticket, diagnosis, "TRIAGED", false);
+    expect(texto).toContain("GUULY");
     expect(texto).toContain("#42");
     expect(texto).toContain("Erro ao salvar proposta");
     expect(texto).toContain("TRIAGED");
@@ -112,6 +113,7 @@ describe("TelegramNotifier", () => {
     expect(url).toBe("https://api.telegram.org/bottoken-valido-de-teste/sendMessage");
     const body = JSON.parse(init.body as string);
     expect(body.chat_id).toBe("123456");
+    expect(body.text).toContain("GUULY");
     expect(body.text).toContain("#42");
   });
 
@@ -171,7 +173,7 @@ export function formatTicketTriagedMessage(
   approvalRequired: boolean,
 ): string {
   const linhas = [
-    `Chamado #${ticket.number} triado`,
+    `GUULY concluiu a triagem do chamado #${ticket.number}`,
     ticket.title,
     `Status: ${status}`,
     `Severidade: ${severityLabel[diagnosis.severity]}`,

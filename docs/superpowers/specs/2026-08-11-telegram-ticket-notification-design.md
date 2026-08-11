@@ -5,8 +5,9 @@ Data: 2026-08-11
 ## Objetivo
 
 Sempre que a Central IA terminar de triar um chamado de suporte do G-SIPRO (`SupportTicket`),
-enviar uma mensagem no Telegram avisando o resultado. Sem filtro por severidade ou status — todo
-chamado triado gera um aviso.
+enviar uma mensagem no Telegram avisando o resultado, assinada pelo nome da IA: **GUULY** (nome
+adotado em 2026-08-11 para todo texto do G-SIPRO visível ao usuário que se refere à IA — ver
+commit `3edccaa`). Sem filtro por severidade ou status — todo chamado triado gera um aviso.
 
 ## Destinatário
 
