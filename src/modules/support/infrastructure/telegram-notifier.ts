@@ -1,11 +1,16 @@
-import { getEnvironment } from "@/core/config/env";
 import { createLogger } from "@/core/observability/logger";
 import type { SupportDiagnosis } from "@/modules/support/domain/support-ticket";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 
 function notifierLogger() {
-  return createLogger(getEnvironment());
+  const logLevel = process.env.LOG_LEVEL as "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent" | undefined;
+  return createLogger({
+    APP_NAME: process.env.APP_NAME || "G-SIPRO",
+    APP_VERSION: process.env.APP_VERSION || "0.1.0",
+    LOG_LEVEL: logLevel || "info",
+    NODE_ENV: (process.env.NODE_ENV as "development" | "test" | "production") || "production",
+  });
 }
 
 const severityLabel: Record<SupportDiagnosis["severity"], string> = {
