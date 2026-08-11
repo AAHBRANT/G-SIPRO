@@ -1,0 +1,56 @@
+name: G-SIPRO Buscador — varredura semanal
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Domingo, 09:00 UTC (06:00 em Brasília): não há publicação de novos editais
+    # e o portal está descongestionado.
+    - cron: "0 9 * * 0"
+
+concurrency:
+  group: gsipro-buscador-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    env:
+      GSIPRO_URL: https://ca-gsipro-hml-aahbrant.thankfulpond-8424c61a.brazilsouth.azurecontainerapps.io
+      SCOUT_DISPATCH_TOKEN: ${{ secrets.SCOUT_DISPATCH_TOKEN }}
+    steps:
+      # A varredura roda dentro de uma requisição HTTP, e o balanceador encerra
+      # conexões longas. Por isso o país é varrido em lotes de unidades
+      # federativas: cada chamada fica curta, e um lote que falhe não
+      # compromete os demais. Quem tiver estados configurados nos filtros
+      # continua sendo atendido — o recorte só se aplica a quem varre o Brasil
+      # inteiro, e o próprio serviço descarta o que estiver fora do perfil.
+      - name: Executar a varredura do Buscador
+        run: |
+          set -uo pipefail
+          test -n "$SCOUT_DISPATCH_TOKEN"
+          echo "::add-mask::$SCOUT_DISPATCH_TOKEN"
+          falhas=0
+          for lote in \
+            '["AC","AL","AM","AP","BA"]' \
+            '["CE","DF","ES","GO","MA"]' \
+            '["MG","MS","MT","PA","PB"]' \
+            '["PE","PI","PR","RJ","RN"]' \
+            '["RO","RR","RS","SC","SE"]' \
+            '["SP","TO"]' ; do
+            echo "lote: ${lote}"
+            if ! curl --fail --silent --show-error \
+              --max-time 600 \
+              --request POST \
+              --header "Authorization: Bearer ${SCOUT_DISPATCH_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data "{\"trigger\":\"SCHEDULED\",\"states\":${lote}}" \
+              "${GSIPRO_URL}/api/scouting/scan" ; then
+              echo "::warning::lote ${lote} não pôde ser varrido"
+              falhas=$((falhas + 1))
+            fi
+          done
+          echo "lotes com falha: ${falhas}"
+          test "${falhas}" -lt 6

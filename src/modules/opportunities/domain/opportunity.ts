@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const opportunityOrigins = ["CHANNEL", "REFERRAL", "PORTAL", "CUSTOMER", "PROSPECTING"] as const;
+export const opportunityOrigins = ["CHANNEL", "REFERRAL", "PORTAL", "CUSTOMER", "PROSPECTING", "BUSCADOR"] as const;
 export const opportunityStatuses = ["DRAFT", "QUALIFICATION", "ACTIVE", "SUSPENDED", "CLOSED"] as const;
 
 export type OpportunityOrigin = (typeof opportunityOrigins)[number];

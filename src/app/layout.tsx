@@ -28,6 +28,13 @@ export default async function RootLayout({
   const unreadNotifications = authorization?.permissions.has("notifications.read")
     ? await getDatabase().userNotification.count({ where: { recipientId: authorization.actorId, readAt: null } })
     : 0;
+  // Licitações captadas pelo Buscador que ainda aguardam triagem da equipe.
+  // Este layout envolve todas as páginas: uma falha aqui derrubaria o sistema
+  // inteiro. Como a tabela é recente, a contagem degrada para zero — o aviso
+  // deixa de aparecer, e nada mais é afetado.
+  const pendingScouted = authorization?.isMaster || authorization?.permissions.has("opportunities.read")
+    ? await getDatabase().scoutedTender.count({ where: { status: "PENDING" } }).catch(() => 0)
+    : 0;
   async function signOutAction() {
     "use server";
     await signOut({ redirectTo: "/" });
@@ -35,7 +42,7 @@ export default async function RootLayout({
 
   return (
     <html lang="pt-BR" className="h-full antialiased">
-      <body className="min-h-full"><AppShell isMaster={authorization?.isMaster} isOwner={authorization?.isOwner} pendingApprovals={pendingApprovals} permissions={permissions} unreadNotifications={unreadNotifications} userLabel={userLabel} signOutAction={signOutAction}>{children}</AppShell></body>
+      <body className="min-h-full"><AppShell isMaster={authorization?.isMaster} isOwner={authorization?.isOwner} pendingApprovals={pendingApprovals} pendingScouted={pendingScouted} permissions={permissions} unreadNotifications={unreadNotifications} userLabel={userLabel} signOutAction={signOutAction}>{children}</AppShell></body>
     </html>
   );
 }
