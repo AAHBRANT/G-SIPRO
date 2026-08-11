@@ -39,6 +39,21 @@ describe("formatTicketTriagedMessage", () => {
     const texto = formatTicketTriagedMessage(ticket, diagnosis, "TRIAGED", false);
     expect(texto).not.toContain("aprovação do proprietário");
   });
+
+  it("inclui link relativo quando authUrl não é fornecido", () => {
+    const texto = formatTicketTriagedMessage(ticket, diagnosis, "TRIAGED", false);
+    expect(texto).toContain("Veja em: /support");
+  });
+
+  it("inclui link absoluto quando authUrl é fornecido", () => {
+    const texto = formatTicketTriagedMessage(ticket, diagnosis, "TRIAGED", false, "http://localhost:3001");
+    expect(texto).toContain("Veja em: http://localhost:3001/support");
+  });
+
+  it("remove trailing slash de authUrl", () => {
+    const texto = formatTicketTriagedMessage(ticket, diagnosis, "TRIAGED", false, "http://localhost:3001/");
+    expect(texto).toContain("Veja em: http://localhost:3001/support");
+  });
 });
 
 describe("TelegramNotifier", () => {
@@ -65,6 +80,15 @@ describe("TelegramNotifier", () => {
     expect(body.chat_id).toBe("123456");
     expect(body.text).toContain("GUULY");
     expect(body.text).toContain("#42");
+  });
+
+  it("passa AbortSignal com timeout de 10s ao fetcher", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    await new TelegramNotifier("token-valido-de-teste", "123456", fetcher).notifyTicketTriaged(ticket, diagnosis, "TRIAGED", false);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("não lança quando a API responde com erro HTTP", async () => {

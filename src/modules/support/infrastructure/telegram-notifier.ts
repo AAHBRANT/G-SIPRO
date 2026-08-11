@@ -35,6 +35,7 @@ export function formatTicketTriagedMessage(
   diagnosis: SupportDiagnosis,
   status: string,
   approvalRequired: boolean,
+  authUrl?: string,
 ): string {
   const linhas = [
     `GUULY concluiu a triagem do chamado #${ticket.number}`,
@@ -43,7 +44,14 @@ export function formatTicketTriagedMessage(
     `Severidade: ${severityLabel[diagnosis.severity]}`,
   ];
   if (approvalRequired) linhas.push("Precisa de aprovação do proprietário.");
-  linhas.push("Veja em: /support");
+
+  if (authUrl) {
+    const baseUrl = authUrl.trim().replace(/\/$/, "");
+    linhas.push(`Veja em: ${baseUrl}/support`);
+  } else {
+    linhas.push("Veja em: /support");
+  }
+
   return linhas.join("\n");
 }
 
@@ -67,11 +75,24 @@ export class TelegramNotifier implements SupportTicketNotifier {
     status: string,
     approvalRequired: boolean,
   ): Promise<void> {
-    if (!this.botToken || !this.chatId) return;
+    if (!this.botToken || !this.chatId) {
+      try {
+        notifierLogger().debug({
+          ticketNumber: ticket.number,
+          tokenConfigured: Boolean(this.botToken),
+          chatIdConfigured: Boolean(this.chatId),
+        }, "Aviso de triagem no Telegram pulado: notificador não configurado.");
+      } catch {
+        // Logger não pode falhar — ignora silenciosamente se houver erro
+      }
+      return;
+    }
     try {
-      const text = formatTicketTriagedMessage(ticket, diagnosis, status, approvalRequired);
+      const authUrl = process.env.AUTH_URL?.trim();
+      const text = formatTicketTriagedMessage(ticket, diagnosis, status, approvalRequired, authUrl);
       const response = await this.fetcher(`${TELEGRAM_API_BASE}/bot${this.botToken}/sendMessage`, {
         method: "POST",
+        signal: AbortSignal.timeout(10_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: this.chatId, text }),
       });
