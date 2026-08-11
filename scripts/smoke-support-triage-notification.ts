@@ -32,8 +32,15 @@ async function main() {
   const outcome = await service.triageTicket(ticket.id, randomUUID());
   if (!outcome) throw new Error("A triagem não aplicou (o chamado já estava triado?).");
   if (chamadas.length !== 1) throw new Error(`O notificador deveria ter sido chamado 1 vez; foi chamado ${chamadas.length}.`);
+  const chamada = chamadas[0];
+  if (chamada.ticketNumber !== ticket.number) throw new Error(`Notificador recebeu ticketNumber ${chamada.ticketNumber}, esperado ${ticket.number}.`);
+  if (chamada.status !== outcome.status) throw new Error(`Notificador recebeu status "${chamada.status}", esperado "${outcome.status}".`);
+  if (chamada.approvalRequired !== outcome.approvalRequired) throw new Error(`Notificador recebeu approvalRequired=${chamada.approvalRequired}, esperado ${outcome.approvalRequired}.`);
+  // Determinístico neste caminho: chamado BUG com prioridade padrão (NORMAL) sempre
+  // produz severidade MEDIUM no fallbackDiagnosis (ver support-triage-service.ts).
+  if (chamada.severity !== "MEDIUM") throw new Error(`Notificador recebeu severity "${chamada.severity}", esperado "MEDIUM".`);
 
-  console.log(JSON.stringify({ outcomeStatus: outcome.status, notifierCalls: chamadas.length, notifierPayload: chamadas[0] }));
+  console.log(JSON.stringify({ outcomeStatus: outcome.status, notifierCalls: chamadas.length, notifierPayload: chamada }));
   await database.$disconnect();
 }
 
