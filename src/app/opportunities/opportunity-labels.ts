@@ -14,4 +14,5 @@ export const originLabels: Record<OpportunityOrigin, string> = {
   REFERRAL: "Indicação",
   CUSTOMER: "Cliente",
   PROSPECTING: "Prospecção",
+  BUSCADOR: "Buscador G-SIPRO",
 };

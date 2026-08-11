@@ -115,6 +115,7 @@ enum OpportunityOrigin {
   PORTAL
   CUSTOMER
   PROSPECTING
+  BUSCADOR
 }
 
 enum OpportunityStatus {
@@ -360,6 +361,7 @@ model User {
   supportTicketsReported         SupportTicket[]                   @relation("SupportReportedBy")
   supportTicketsAssigned         SupportTicket[]                   @relation("SupportAssignedTo")
   supportTicketsResolved         SupportTicket[]                   @relation("SupportResolvedBy")
+  scoutedTenderDecisions         ScoutedTender[]                   @relation("ScoutedTenderDecidedBy")
   supportDecisions               SupportTicketDecision[]           @relation("SupportDecidedBy")
   supportUpdates                 SupportTicketUpdate[]             @relation("SupportUpdatedBy")
   accessRequestsMade             UserAccessRequest[]               @relation("AccessRequestRequestedBy")
@@ -472,6 +474,7 @@ model Opportunity {
   financialAssessments   FinancialCapacityAssessment[]
   notificationEvents     NotificationOutboxEvent[]
   calendarEvents         CalendarEvent[]
+  scoutedTenders         ScoutedTender[]
   createdAt              DateTime                      @default(now()) @db.Timestamptz(6)
   createdBy              String                        @db.Uuid
   updatedAt              DateTime                      @updatedAt @db.Timestamptz(6)
@@ -2890,4 +2893,103 @@ model SupportTicketUpdate {
   @@index([ticketId, createdAt])
   @@index([createdById, createdAt])
   @@map("support_ticket_updates")
+}
+
+// ---------------------------------------------------------------------------
+// Buscador G-SIPRO — captação automática de licitações (APP-MOD-201)
+// ---------------------------------------------------------------------------
+
+enum ScoutRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ScoutRunTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+enum ScoutedTenderStatus {
+  PENDING
+  APPROVED
+  DISCARDED
+  EXPIRED
+}
+
+/// Configuração única dos filtros da varredura. Mantida como registro único
+/// (singleton) para que a equipe ajuste os critérios sem versionar cópias.
+model ScoutFilter {
+  id                    String   @id @default(uuid()) @db.Uuid
+  includeKeywords       String[]
+  excludeKeywords       String[]
+  workTypes             String[]
+  states                String[]
+  spheres               String[]
+  minimumValue          Decimal? @db.Decimal(19, 4)
+  maximumValue          Decimal? @db.Decimal(19, 4)
+  minimumDaysToClose    Int      @default(10)
+  includeUndisclosedValue Boolean @default(true)
+  /// Tratamento de cada condição do certame lida no edital:
+  /// { "PRESENCIAL": "FLAG", "TENDER_BOND": "IGNORE", ... }
+  conditionTreatments   Json     @default("{}")
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6)
+  updatedBy             String   @db.Uuid
+
+  @@map("scout_filters")
+}
+
+/// Uma execução da varredura (semanal aos domingos ou manual).
+model ScoutRun {
+  id             String          @id @default(uuid()) @db.Uuid
+  trigger        ScoutRunTrigger @default(SCHEDULED)
+  status         ScoutRunStatus  @default(RUNNING)
+  startedAt      DateTime        @default(now()) @db.Timestamptz(6)
+  finishedAt     DateTime?       @db.Timestamptz(6)
+  totalFetched   Int             @default(0)
+  totalQualified Int             @default(0)
+  totalNew       Int             @default(0)
+  failureReason  String?         @db.VarChar(1000)
+  scoutedTenders ScoutedTender[]
+
+  @@index([status, startedAt])
+  @@map("scout_runs")
+}
+
+/// Licitação captada pela varredura, aguardando triagem humana.
+model ScoutedTender {
+  id                String              @id @default(uuid()) @db.Uuid
+  /// Identificador da licitação na fonte (numeroControlePNCP). Garante que a
+  /// mesma contratação não retorne à fila em varreduras seguintes.
+  externalId        String              @unique @db.VarChar(120)
+  source            String              @default("PNCP") @db.VarChar(40)
+  subject           String              @db.Text
+  authorityName     String              @db.VarChar(400)
+  authorityDocument String?             @db.VarChar(20)
+  sphere            String              @db.VarChar(1)
+  city              String?             @db.VarChar(200)
+  state             String?             @db.Char(2)
+  modality          String              @db.VarChar(120)
+  processNumber     String?             @db.VarChar(120)
+  estimatedValue    Decimal?            @db.Decimal(19, 4)
+  valueUndisclosed  Boolean             @default(false)
+  proposalOpensAt   DateTime?           @db.Timestamptz(6)
+  proposalClosesAt  DateTime?           @db.Timestamptz(6)
+  noticeUrl         String?             @db.VarChar(600)
+  sourceUrl         String?             @db.VarChar(600)
+  status            ScoutedTenderStatus @default(PENDING)
+  decidedAt         DateTime?           @db.Timestamptz(6)
+  decidedById       String?             @db.Uuid
+  decidedBy         User?               @relation("ScoutedTenderDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decisionReason    String?             @db.VarChar(1000)
+  opportunityId     String?             @db.Uuid
+  opportunity       Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  runId             String              @db.Uuid
+  run               ScoutRun            @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+
+  @@index([status, proposalClosesAt])
+  @@index([runId])
+  @@index([opportunityId])
+  @@map("scouted_tenders")
 }

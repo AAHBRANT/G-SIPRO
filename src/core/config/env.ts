@@ -26,6 +26,7 @@ const environmentSchema = z.object({
   CENTRAL_IA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(600_000),
   CENTRAL_IA_API_TOKEN: z.string().min(20).optional().or(z.literal("")),
   SUPPORT_EXECUTOR_TOKEN: z.string().min(32).optional().or(z.literal("")),
+  SCOUT_DISPATCH_TOKEN: z.string().min(32).optional().or(z.literal("")),
 });
 
 export type AppEnvironment = z.infer<typeof environmentSchema>;
