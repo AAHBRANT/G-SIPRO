@@ -209,7 +209,7 @@ export function CreateProposalForm({
       if (!definitionId) {
         updateDocument(document.id, {
           status: "UPLOADED",
-          message: "Não existe caso de uso de IA aprovado para este tipo documental.",
+          message: "Não existe caso de uso da GUULY aprovado para este tipo documental.",
         });
         return;
       }

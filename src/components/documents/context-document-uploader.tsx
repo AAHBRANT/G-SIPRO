@@ -67,7 +67,7 @@ export function ContextDocumentUploader({ entityType, entityId, ownerId, context
         if (!extraction.ok || analysis.data?.status !== "SUCCEEDED") throw new Error(analysis.error?.message ?? analysis.data?.errorMessage ?? "Documento vinculado; análise automática pendente.");
         setMessage("Documento vinculado e análise resumida concluída.");
       } else {
-        setMessage("Documento vinculado. Não há caso de IA aprovado para este tipo.");
+        setMessage("Documento vinculado. Não há caso de GUULY aprovado para este tipo.");
       }
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";

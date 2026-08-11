@@ -26,7 +26,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       if (externalActionCompleted && !input.note) throw new ConflictError("Informe o que foi executado no ambiente externo.");
       const nextStatus = externalActionCompleted ? "TRIAGED" : "IN_PROGRESS";
       const note = externalActionCompleted
-        ? `O proprietário confirmou a ação externa: ${input.note}. O chamado retornou automaticamente à IA para validação e continuidade.`
+        ? `O proprietário confirmou a ação externa: ${input.note}. O chamado retornou automaticamente à GUULY para validação e continuidade.`
         : "O proprietário assumiu o chamado após três tentativas completas sem solução.";
       await database.$transaction(async transaction => {
         await transaction.supportTicket.update({

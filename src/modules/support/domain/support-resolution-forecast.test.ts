@@ -17,12 +17,12 @@ describe("supportResolutionForecast", () => {
     );
     expect(result).toMatchObject({
       state: "ON_TRACK",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       remainingMinutes: 35,
     });
     expect(result.nextActions[0]).toMatchObject({
       label: "Concluir a execução técnica",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "CURRENT",
     });
     expect(result.estimateAt).toBe("2026-07-23T12:55:00.000Z");

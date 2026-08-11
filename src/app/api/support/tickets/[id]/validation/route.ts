@@ -70,7 +70,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
       const details = clarification.data.questions.map(question => `${question.question}\nResposta: ${answers.get(question.id)}`).join("\n\n");
       const note = escalated
         ? `Terceira tentativa não solucionou o problema. Chamado escalado automaticamente ao proprietário.\n\n${details}`
-        : `Reabertura aceita. Os esclarecimentos foram registrados e a IA iniciará automaticamente a tentativa ${Math.min(3, ticket.resolutionAttempts + 1)} de 3, sem nova aprovação.\n\n${details}`;
+        : `Reabertura aceita. Os esclarecimentos foram registrados e a GUULY iniciará automaticamente a tentativa ${Math.min(3, ticket.resolutionAttempts + 1)} de 3, sem nova aprovação.\n\n${details}`;
       await database.$transaction(async transaction => {
         await transaction.supportTicket.update({ where: { id }, data: { status: nextStatus, approvalRequired: false, approvalReason: null, validationQuestions: Prisma.JsonNull, validationRequestedAt: null, escalatedAt: escalated ? new Date() : null, executionLeaseId: null, executorId: null, executionClaimedAt: null, executionHeartbeatAt: null } });
         await transaction.supportTicketUpdate.create({ data: { id: randomUUID(), ticketId: id, fromStatus: "WAITING_USER_VALIDATION", toStatus: nextStatus, note, createdById: authorization.actorId, actorLabel: "Solicitante" } });

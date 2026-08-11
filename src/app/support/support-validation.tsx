@@ -32,10 +32,10 @@ export function SupportValidation({ ticketId, attempt, clarification }: { ticket
     const answers = clarification.questions.map(question => ({ questionId: question.id, answer: selected[question.id] === "__OTHER__" ? (other[question.id] ?? "").trim() : selected[question.id] })).filter(answer => answer.answer);
     const complete = answers.length === clarification.questions.length;
     return <section className="mt-5 rounded-xl border-2 border-violet-200 bg-violet-50/50 p-5">
-      <p className="text-xs font-black uppercase tracking-wider text-violet-700">Esclarecimento orientado pela IA</p>
+      <p className="text-xs font-black uppercase tracking-wider text-violet-700">Esclarecimento orientado pela GUULY</p>
       <h4 className="mt-1 text-lg font-black text-slate-950">Precisamos de informações objetivas</h4>
       <p className="mt-2 text-sm text-slate-700">{clarification.introduction}</p>
-      <p className="mt-2 text-xs font-bold text-slate-500">A IA fará no máximo cinco perguntas. Isto não é um bate-papo.</p>
+      <p className="mt-2 text-xs font-bold text-slate-500">A GUULY fará no máximo cinco perguntas. Isto não é um bate-papo.</p>
       <div className="mt-5 grid gap-5">{clarification.questions.map((question, index) => <fieldset className="rounded-xl border border-violet-100 bg-white p-4" key={question.id}>
         <legend className="px-1 text-sm font-black text-slate-900">{index + 1}. {question.question}</legend>
         <div className="mt-3 grid gap-2">{[...question.options, "__OTHER__"].map(option => <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700" key={option}><input checked={selected[question.id] === option} name={question.id} onChange={() => setSelected(current => ({ ...current, [question.id]: option }))} type="radio"/><span>{option === "__OTHER__" ? "Outra" : option}</span></label>)}</div>

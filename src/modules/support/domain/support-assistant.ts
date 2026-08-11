@@ -15,41 +15,41 @@ export function supportAssistantDisposition(status: string, isOwner: boolean, ex
     case "OPEN":
       return {
         nextStatus: "TRIAGED",
-        response: "Entendi. Registrei sua orientação e coloquei o chamado na fila automática da IA. A previsão, a próxima ação e o responsável ficam atualizados no painel do chamado.",
+        response: "Entendi. Registrei sua orientação e coloquei o chamado na fila automática da GUULY. A previsão, a próxima ação e o responsável ficam atualizados no painel do chamado.",
       };
     case "TRIAGED":
     case "APPROVED":
       return {
-        response: "Entendi. Sua orientação foi anexada ao chamado, que já está na fila automática da IA. A previsão, a próxima ação e o responsável ficam atualizados no painel do chamado.",
+        response: "Entendi. Sua orientação foi anexada ao chamado, que já está na fila automática da GUULY. A previsão, a próxima ação e o responsável ficam atualizados no painel do chamado.",
       };
     case "IN_PROGRESS":
       return isOwner && executorId === "proprietario"
         ? {
             nextStatus: "TRIAGED",
             resetExecution: true,
-            response: "Entendi. Retirei o chamado da execução manual do proprietário e o devolvi à fila automática da IA para uma nova tentativa.",
+            response: "Entendi. Retirei o chamado da execução manual do proprietário e o devolvi à fila automática da GUULY para uma nova tentativa.",
           }
         : {
             response: "Entendi. Sua orientação foi registrada no histórico técnico. A execução automática atual continuará e o resultado aparecerá aqui para validação.",
           };
     case "WAITING_APPROVAL":
       return {
-        response: "Registrei sua mensagem, mas esta alteração ainda depende da aprovação do proprietário. A IA começará automaticamente após a aprovação.",
+        response: "Registrei sua mensagem, mas esta alteração ainda depende da aprovação do proprietário. A GUULY começará automaticamente após a aprovação.",
       };
     case "OWNER_ACTION_REQUIRED":
       return {
-        response: "Este chamado depende de uma ação protegida fora do G-SIPRO. Execute a orientação exibida acima e use “Confirmar ação e devolver à IA”; depois disso, a automação continuará.",
+        response: "Este chamado depende de uma ação protegida fora do G-SIPRO. Execute a orientação exibida acima e use “Confirmar ação e devolver à GUULY”; depois disso, a automação continuará.",
       };
     case "WAITING_USER_VALIDATION":
       return {
-        response: "A IA já entregou uma solução para este ciclo. Valide o resultado acima. Se o problema continuar, informe o motivo para iniciar uma nova tentativa.",
+        response: "A GUULY já entregou uma solução para este ciclo. Valide o resultado acima. Se o problema continuar, informe o motivo para iniciar uma nova tentativa.",
       };
     case "ESCALATED":
       return isOwner
         ? {
             nextStatus: "TRIAGED",
             resetExecution: true,
-            response: "Nova orientação aceita pelo proprietário. Zerei o ciclo técnico e devolvi o chamado à fila automática da IA para uma nova execução.",
+            response: "Nova orientação aceita pelo proprietário. Zerei o ciclo técnico e devolvi o chamado à fila automática da GUULY para uma nova execução.",
           }
         : {
             response: "Após três tentativas, este chamado depende do proprietário. Sua mensagem foi registrada e ficará disponível para a decisão dele.",

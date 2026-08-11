@@ -14,7 +14,7 @@ export type SupportResolutionForecast = Readonly<{
   estimateAt: string | null;
   elapsedMinutes: number;
   remainingMinutes: number | null;
-  responsible: "IA do G-SIPRO" | "Proprietário" | "Solicitante" | "Concluído";
+  responsible: "GUULY do G-SIPRO" | "Proprietário" | "Solicitante" | "Concluído";
   headline: string;
   explanation: string;
   pendingSummary: string;
@@ -24,7 +24,7 @@ export type SupportResolutionForecast = Readonly<{
 export type SupportResolutionAction = Readonly<{
   label: string;
   detail: string;
-  responsible: "IA do G-SIPRO" | "Proprietário" | "Solicitante";
+  responsible: "GUULY do G-SIPRO" | "Proprietário" | "Solicitante";
   state: "CURRENT" | "UPCOMING";
 }>;
 
@@ -81,19 +81,19 @@ function automaticActions(status: string): readonly SupportResolutionAction[] {
     {
       label: "Analisar e classificar o chamado",
       detail: "Ler a descrição e as evidências para definir o tratamento técnico.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "CURRENT",
     },
     {
       label: "Executar a correção",
       detail: "Preparar a alteração necessária conforme o diagnóstico.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "UPCOMING",
     },
     {
       label: "Testar e implantar",
       detail: "Validar a correção e publicar a nova versão do sistema.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "UPCOMING",
     },
     validationAction,
@@ -103,13 +103,13 @@ function automaticActions(status: string): readonly SupportResolutionAction[] {
     {
       label: "Iniciar a execução técnica",
       detail: "Retirar o chamado da fila e aplicar o diagnóstico já registrado.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "CURRENT",
     },
     {
       label: "Testar e implantar",
       detail: "Validar a correção e publicar a nova versão do sistema.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "UPCOMING",
     },
     validationAction,
@@ -119,13 +119,13 @@ function automaticActions(status: string): readonly SupportResolutionAction[] {
     {
       label: "Iniciar a alteração aprovada",
       detail: "Aplicar automaticamente a melhoria autorizada.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "CURRENT",
     },
     {
       label: "Testar e implantar",
       detail: "Validar a alteração e publicar a nova versão do sistema.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "UPCOMING",
     },
     validationAction,
@@ -135,13 +135,13 @@ function automaticActions(status: string): readonly SupportResolutionAction[] {
     {
       label: "Concluir a execução técnica",
       detail: "Finalizar a correção correspondente à tentativa atual.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "CURRENT",
     },
     {
       label: "Testar e implantar",
       detail: "Executar as validações e publicar a correção.",
-      responsible: "IA do G-SIPRO",
+      responsible: "GUULY do G-SIPRO",
       state: "UPCOMING",
     },
     validationAction,
@@ -197,7 +197,7 @@ export function supportResolutionForecast(
       now,
       "Proprietário",
       "Aguardando ação administrativa",
-      "Ainda não existe uma conclusão estimada porque há uma ação protegida fora do alcance da IA. Após a confirmação do proprietário, o sistema retomará o chamado e recalculará a previsão.",
+      "Ainda não existe uma conclusão estimada porque há uma ação protegida fora do alcance da GUULY. Após a confirmação do proprietário, o sistema retomará o chamado e recalculará a previsão.",
       "Falta concluir a ação administrativa indicada, retomar os testes e obter a validação do solicitante.",
       [
         {
@@ -209,7 +209,7 @@ export function supportResolutionForecast(
         {
           label: "Retomar, testar e implantar",
           detail: "Verificar a liberação, concluir a correção e publicar a versão.",
-          responsible: "IA do G-SIPRO",
+          responsible: "GUULY do G-SIPRO",
           state: "UPCOMING",
         },
         validationAction,
@@ -234,7 +234,7 @@ export function supportResolutionForecast(
         {
           label: "Executar a solução excepcional",
           detail: "Aplicar, testar e implantar a solução definida pelo proprietário.",
-          responsible: "IA do G-SIPRO",
+          responsible: "GUULY do G-SIPRO",
           state: "UPCOMING",
         },
         validationAction,
@@ -247,7 +247,7 @@ export function supportResolutionForecast(
       now,
       "Solicitante",
       "Aguardando validação",
-      "A solução já foi entregue. O encerramento depende da confirmação do solicitante; se o problema continuar, a IA iniciará automaticamente uma nova tentativa.",
+      "A solução já foi entregue. O encerramento depende da confirmação do solicitante; se o problema continuar, a GUULY iniciará automaticamente uma nova tentativa.",
       "Falta apenas confirmar se a solução resolveu o problema ou informar o que ainda não funcionou.",
       [{ ...validationAction, state: "CURRENT" }],
     );
@@ -269,7 +269,7 @@ export function supportResolutionForecast(
     estimateAt: estimate.toISOString(),
     elapsedMinutes,
     remainingMinutes,
-    responsible: "IA do G-SIPRO",
+    responsible: "GUULY do G-SIPRO",
     headline: overdue ? "Previsão excedida" : input.status === "IN_PROGRESS" ? "Correção em execução" : "Atendimento programado",
     explanation: overdue
       ? "A estimativa operacional foi ultrapassada. O chamado continua aberto e deve receber uma atualização ou escalonamento."

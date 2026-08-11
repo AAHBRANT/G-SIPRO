@@ -23,14 +23,14 @@ export function supportProgress(input: SupportProgressInput): SupportProgress {
     attempt: nextAttempt,
     headline: executionAttempts > 0 ? "Nova tentativa programada" : deliveredAttempt > 0 ? "Reabertura aceita" : "Solicitação aceita",
     description: executionAttempts > 0
-      ? `A tentativa anterior não produziu uma solução implantável. A IA executará automaticamente a tentativa ${nextAttempt} de 3.`
-      : `As informações foram recebidas. A IA executará automaticamente a tentativa ${nextAttempt} de 3, sem depender de nova aprovação.`,
-    nextStep: "Próximo passo: a IA analisará as evidências, corrigirá, testará e implantará uma nova versão.",
+      ? `A tentativa anterior não produziu uma solução implantável. A GUULY executará automaticamente a tentativa ${nextAttempt} de 3.`
+      : `As informações foram recebidas. A GUULY executará automaticamente a tentativa ${nextAttempt} de 3, sem depender de nova aprovação.`,
+    nextStep: "Próximo passo: a GUULY analisará as evidências, corrigirá, testará e implantará uma nova versão.",
     tone: "blue", stage: 2,
   };
   if (input.status === "IN_PROGRESS") return {
     attempt: activeAttempt,
-    headline: `IA trabalhando · tentativa ${activeAttempt} de 3`,
+    headline: `GUULY trabalhando · tentativa ${activeAttempt} de 3`,
     description: "A correção está sendo preparada, validada e encaminhada para implantação automática.",
     nextStep: "Próximo passo: após a implantação, você receberá a solicitação para testar a solução.",
     tone: "cyan", stage: 3,
@@ -38,15 +38,15 @@ export function supportProgress(input: SupportProgressInput): SupportProgress {
   if (input.status === "WAITING_USER_VALIDATION") return {
     attempt: activeAttempt,
     headline: `Sua validação é necessária · tentativa ${activeAttempt} de 3`,
-    description: "A IA concluiu e implantou uma solução. Repita a operação que apresentou o problema.",
-    nextStep: "Próximo passo: informe se o problema foi resolvido; se não, a IA coletará dados e tentará novamente.",
+    description: "A GUULY concluiu e implantou uma solução. Repita a operação que apresentou o problema.",
+    nextStep: "Próximo passo: informe se o problema foi resolvido; se não, a GUULY coletará dados e tentará novamente.",
     tone: "amber", stage: 4,
   };
   if (input.status === "OWNER_ACTION_REQUIRED") return {
     attempt: activeAttempt,
     headline: "Ação do proprietário necessária",
-    description: "A IA identificou uma dependência externa, administrativa ou de segurança que não pode ser alterada com segurança pelo código do G-SIPRO.",
-    nextStep: "Próximo passo: o proprietário deve executar a orientação apresentada e confirmar a ação para que a IA valide e continue automaticamente.",
+    description: "A GUULY identificou uma dependência externa, administrativa ou de segurança que não pode ser alterada com segurança pelo código do G-SIPRO.",
+    nextStep: "Próximo passo: o proprietário deve executar a orientação apresentada e confirmar a ação para que a GUULY valide e continue automaticamente.",
     tone: "amber", stage: 3,
   };
   if (input.status === "ESCALATED") return {
@@ -74,6 +74,6 @@ export function supportProgress(input: SupportProgressInput): SupportProgress {
     attempt: Math.max(1, deliveredAttempt), headline: "Chamado encerrado", description: "O atendimento não está mais ativo.", nextStep: "Abra um novo chamado se precisar retomar o assunto.", tone: "slate", stage: 4,
   };
   return {
-    attempt: nextAttempt, headline: "Solicitação recebida", description: "O chamado foi registrado e está sendo analisado pela IA.", nextStep: "Próximo passo: diagnóstico e entrada automática na fila técnica.", tone: "blue", stage: 1,
+    attempt: nextAttempt, headline: "Solicitação recebida", description: "O chamado foi registrado e está sendo analisado pela GUULY.", nextStep: "Próximo passo: diagnóstico e entrada automática na fila técnica.", tone: "blue", stage: 1,
   };
 }

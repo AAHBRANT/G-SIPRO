@@ -82,7 +82,7 @@ export default async function AiExtractionsPage() {
       <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
         <strong>Editais, termos de referência, ETPs e anexos são analisados dentro da proposta.</strong>
         <p className="mt-1">
-          Isso garante que a IA consulte somente os arquivos vinculados àquela oportunidade e não
+          Isso garante que a GUULY consulte somente os arquivos vinculados àquela oportunidade e não
           misture documentos de assuntos diferentes.
         </p>
         <Link className="mt-2 inline-block font-bold text-brand" href="/proposals">

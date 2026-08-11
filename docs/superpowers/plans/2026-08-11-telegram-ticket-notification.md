@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Sempre que a `SupportTriageService` terminar de triar um chamado, enviar uma mensagem para um chat do Telegram avisando o resultado.
+**Goal:** Sempre que a `SupportTriageService` terminar de triar um chamado, enviar uma mensagem para um chat do Telegram avisando o resultado, assinada pelo nome da IA: **GUULY**.
 
 **Architecture:** Um módulo novo (`telegram-notifier.ts`) chama a API do Telegram (`sendMessage`) direto, sem passar por n8n/Central IA. `SupportTriageService` recebe esse notificador por injeção de construtor (mesmo padrão já usado para o `provider` de IA) e o chama depois que a transação de triagem confirma. Falha no Telegram nunca propaga — é capturada e logada dentro do próprio notificador.
 

@@ -9,7 +9,7 @@ const tones = {
   slate: "border-slate-200 bg-slate-50 text-slate-800",
 };
 
-const stages = ["Recebido", "Analisado", "Execução da IA", "Validação"];
+const stages = ["Recebido", "Analisado", "Execução da GUULY", "Validação"];
 
 export function SupportProgressCard({ status, executionAttempts, resolutionAttempts, updatedAt }: { status: string; executionAttempts: number; resolutionAttempts: number; updatedAt: string }) {
   const progress = supportProgress({ status, executionAttempts, resolutionAttempts, updatedAt });

@@ -64,7 +64,7 @@ export async function POST(request: Request, route: { params: Promise<{ id: stri
               fromStatus: nextStatus,
               toStatus: nextStatus,
               note: disposition.response,
-              actorLabel: "IA do G-SIPRO",
+              actorLabel: "GUULY do G-SIPRO",
             },
           ],
         });
