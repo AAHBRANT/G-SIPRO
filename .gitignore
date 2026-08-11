@@ -50,3 +50,6 @@ next-env.d.ts
 
 # tests
 /coverage
+
+# git worktrees created by Claude Code for isolated task execution
+/.claude/worktrees/
