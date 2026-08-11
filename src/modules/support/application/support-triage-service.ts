@@ -6,6 +6,7 @@ import { createLogger } from "@/core/observability/logger";
 import { supportTicketInputSchema, type SupportDiagnosis, type SupportTicketInput } from "@/modules/support/domain/support-ticket";
 import { supportApprovalPolicy } from "@/modules/support/domain/support-triage-policy";
 import { CentralIaSupportProvider } from "@/modules/support/infrastructure/central-ia-support-provider";
+import { TelegramNotifier, type SupportTicketNotifier } from "@/modules/support/infrastructure/telegram-notifier";
 
 // Criado sob demanda, e não no nível do módulo: `getEnvironment()` valida o
 // ambiente inteiro e lançaria só por importar este arquivo, quebrando os testes
@@ -63,7 +64,10 @@ export type TriageOutcome = {
  * reprocessar sem duplicar histórico nem sobrescrever diagnóstico já feito.
  */
 export class SupportTriageService {
-  constructor(private readonly provider = new CentralIaSupportProvider()) {}
+  constructor(
+    private readonly provider = new CentralIaSupportProvider(),
+    private readonly notifier: SupportTicketNotifier = new TelegramNotifier(),
+  ) {}
 
   async triageTicket(ticketId: string, correlationId: string): Promise<TriageOutcome | undefined> {
     const database = getDatabase();
@@ -150,6 +154,7 @@ export class SupportTriageService {
     });
 
     if (!applied) return undefined;
+    await this.notifier.notifyTicketTriaged(ticket, diagnosis, status, approvalRequired);
     return { ticketId, status, approvalRequired, model };
   }
 

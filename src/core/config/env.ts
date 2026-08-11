@@ -25,6 +25,10 @@ const environmentSchema = z.object({
   // é assíncrona (ver SupportTriageService).
   CENTRAL_IA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(600_000),
   CENTRAL_IA_API_TOKEN: z.string().min(20).optional().or(z.literal("")),
+  // Bot dedicado do Telegram para avisos de chamados triados (não é o bot CAFI
+  // do n8n — ver docs/superpowers/specs/2026-08-11-telegram-ticket-notification-design.md).
+  TELEGRAM_BOT_TOKEN: z.string().trim().min(20).optional().or(z.literal("")),
+  TELEGRAM_CHAT_ID: z.string().trim().min(1).optional().or(z.literal("")),
   SUPPORT_EXECUTOR_TOKEN: z.string().min(32).optional().or(z.literal("")),
   SCOUT_DISPATCH_TOKEN: z.string().min(32).optional().or(z.literal("")),
 });
