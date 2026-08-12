@@ -4,7 +4,7 @@
 > retomar o trabalho lendo só este arquivo + `git log`. Atualize-o ao final de cada sessão de trabalho
 > relevante. Não é documentação de arquitetura (isso fica em `docs/`) — é um "onde paramos".
 
-Última atualização: 2026-08-01. Na main, commit `a36fc54`; em revisão, a branch `feat/buscador-gsipro` (Buscador G-SIPRO, ainda sem merge).
+Última atualização: 2026-08-12. Branch `feat/buscador-gsipro` (Buscador G-SIPRO) em revisão, sem merge.
 
 ## Ambientes
 
@@ -21,51 +21,45 @@
 
 ## Trabalho em revisão — Buscador G-SIPRO (APP-MOD-201)
 
-> Está na branch `feat/buscador-gsipro`, **sem merge**. Esta seção descreve o que já existe lá.
+> Está na branch `feat/buscador-gsipro`, **sem merge**.
 
-Módulo novo de **captação automática de licitações**, aprovado pelo proprietário em sessão de
-concepção (documento `APP-MOD-201 — Buscador G-SIPRO`, REV01, com mockups validados).
+### Segunda rodada (2026-08-12) — pedidos da equipe de propostas
 
-Varredura semanal aos domingos na consulta pública do PNCP → funil de enquadramento pelo perfil
-da empresa → fila de triagem → **aprovar cadastra a oportunidade automaticamente** (origem
-`BUSCADOR`, status `QUALIFICATION`, responsável = quem aprovou). O sistema afunila e organiza;
-a decisão é sempre humana — não há recomendação automática.
+1. **Captação restrita a obras a partir de R$ 14 milhões.** Abaixo disso não
+   compensa a mobilização. Valor sigiloso continua entrando: orçamento fechado
+   é comum em obra grande.
+2. **Dois defeitos corrigidos** que apareceram no uso em homologação: o contador
+   exibia as linhas carregadas (200) em vez do total pendente (801), e o objeto
+   vinha prefixado com o nome da plataforma de disputa.
+3. **Fila filtrável**: região, tipo de obra e esfera em menus de marcação
+   múltipla com contagem; busca por objeto/órgão/cidade; ordenação por prazo,
+   valor ou captação; quatro indicadores no topo; linha que abre com
+   identificação, prazos e caminho para o edital.
+4. O **tipo de obra** passou a ser gravado na varredura (migration
+   `20260812090000`, testada contra banco real com 57 registros: coluna criada
+   NOT NULL com `ARRAY[]`, nenhum nulo).
 
-O que foi construído:
+Verificação: **481 testes**, lint e typecheck limpos, `next build` compilando.
 
-1. Módulo `src/modules/scouting` (domínio, aplicação, infraestrutura) — 48 testes próprios.
-2. Banco: origem `BUSCADOR` + tabelas `scout_filters`, `scout_runs`, `scouted_tenders`
-   (duas migrations; a do enum foi isolada por causa da restrição de transação do
-   `ALTER TYPE ... ADD VALUE`).
-3. API: `POST /api/scouting/scan` (token dedicado, chamado pelo agendador),
-   `GET|PUT /api/scouting/filters`, `POST /api/scouting/scouted-tenders/[id]/decision`.
-4. Telas: `/scouting` (filtros) e `/opportunities/scouted` (fila de triagem); card
-   "Oportunidades Rastreadas" em primeiro lugar na tela de Oportunidades e item "Buscador"
-   na barra lateral, com contador de pendências.
-5. Agendamento: `.github/workflows/buscador-scan.yml`, `cron: 0 9 * * 0` (domingo, 06:00 BRT).
-   O país é varrido em **seis lotes de unidades federativas**, um por requisição — a varredura
-   nacional inteira levaria de 15 a 29 minutos e seria encerrada pelo balanceador. O cliente
-   ainda tem teto próprio de duração (200 s) e para sozinho antes de estourar.
+### Decidido e ainda NÃO implementado
 
-Verificado contra banco e portal reais em 01/08/2026 (PostgreSQL descartável na máquina de
-trabalho, PNCP de verdade): migrations aplicadas, 189 licitações buscadas no Ceará, 57 enquadradas,
-aprovação criando `PPB-010-26` com origem BUSCADOR / status Em análise / responsável = quem aprovou,
-descarte com motivo e autor, e não repetição confirmada (57 de 57 reconhecidas).
-
-Dois defeitos foram encontrados nesse teste e corrigidos: a consulta nacional sem recorte por
-unidade federativa faz o portal responder HTTP 500, e horizonte de 18 meses estoura o tempo limite.
-
-Verificação local: **433 testes**, lint e typecheck limpos, `next build` compilando todas as
-rotas novas. **Nada foi publicado** — sem commit em `main`, sem push, sem deploy. O trabalho está
-na branch local `feat/buscador-gsipro`.
-
-**Ainda não validado:** as **telas** nunca foram abertas. O acesso exige Microsoft Entra ID e a
-máquina de trabalho não tem credencial corporativa, então a navegação pela interface — barra
-lateral, card, fila de triagem e formulário de filtros — permanece sem verificação visual. Tudo o
-que roda por baixo delas foi exercitado contra banco e portal reais.
-
-Ver a seção "Como publicar o Buscador" no final deste arquivo.
-
+- **Ordenação por aderência** — valor e distância são um critério só: o piso de
+  R$ 14 mi sobe conforme a obra se afasta das filiais. Depende de **as filiais
+  estarem cadastradas em Bases Operacionais com endereço** — confirmar se há dado.
+- **Pré-análise do edital** (acervo exigido, consórcio, garantia, visita), lendo
+  o PDF do PNCP (`/api/pncp/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/arquivos`,
+  verificado) e mandando **só os trechos relevantes** à Central IA — não o edital
+  inteiro. ⚠️ A Central IA roda modelo local em CPU e leva de 197 s a 302 s por
+  chamada: precisa ser **assíncrona e em lote**, nunca dentro de uma requisição.
+- **Regra de captação acordada:** só entra o que podemos disputar — acervo
+  próprio ou consórcio permitido. O que não atendemos e não permite consórcio
+  não deve ser captado.
+- **Dicionário de equivalências de serviço**: a IA propõe, a equipe confirma uma
+  vez, vira regra determinística. Níveis visíveis: idêntico · equivalente
+  (confirmado) · provável (IA sugeriu) · não atende. Obra de maior porte cobrindo
+  exigência menor **sinaliza, nunca afirma** — nem toda comissão aceita.
+- O mínimo de quantitativo para parcela de maior relevância costuma ser 50%, mas
+  **varia por edital**: tem que sair da leitura, nunca ficar fixo no código.
 
 ## O que foi feito
 
