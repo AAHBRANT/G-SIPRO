@@ -2970,6 +2970,9 @@ model ScoutedTender {
   city              String?             @db.VarChar(200)
   state             String?             @db.Char(2)
   modality          String              @db.VarChar(120)
+  /// Tipos de obra reconhecidos no objeto durante a varredura. Guardados para
+  /// que a fila possa ser filtrada por ramo sem reprocessar o texto.
+  workTypes         String[]
   processNumber     String?             @db.VarChar(120)
   estimatedValue    Decimal?            @db.Decimal(19, 4)
   valueUndisclosed  Boolean             @default(false)
