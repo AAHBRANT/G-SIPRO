@@ -3,7 +3,7 @@ name: G-SIPRO Intelligence Notifications
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "0 * * * *"
 
 concurrency:
   group: gsipro-intelligence-notifications

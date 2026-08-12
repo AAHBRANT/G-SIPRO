@@ -3,7 +3,7 @@ name: G-SIPRO Support Codex
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "0 * * * *"
 
 concurrency:
   group: gsipro-support-codex
