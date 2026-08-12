@@ -13,6 +13,11 @@ const currency = (value: { toString(): string } | null, undisclosed: boolean) =>
 
 const sphereLabels: Record<string, string> = { F: "Federal", E: "Estadual", M: "Municipal", D: "Distrital" };
 
+/** Dias restantes decidem mais rápido que a data absoluta na hora da triagem. */
+function daysUntil(target: Date): number {
+  return Math.max(0, Math.ceil((target.getTime() - Date.now()) / 86_400_000));
+}
+
 export default async function ScoutedTendersPage() {
   const authorization = await getCurrentAuthorizationContext();
   if (!authorize(authorization, { permission: "opportunities.read" }).allowed) {
@@ -21,8 +26,12 @@ export default async function ScoutedTendersPage() {
 
   // Aprovar cria uma oportunidade: exige a mesma alçada do cadastro manual.
   const canDecide = authorize(authorization, { permission: "opportunities.create" }).allowed;
-  const [tenders, lastRun] = await Promise.all([
-    getDatabase().scoutedTender.findMany({ where: { status: "PENDING" }, orderBy: [{ proposalClosesAt: "asc" }, { createdAt: "desc" }], take: 200 }),
+  const PAGE_SIZE = 200;
+  const [tenders, pendingTotal, lastRun] = await Promise.all([
+    getDatabase().scoutedTender.findMany({ where: { status: "PENDING" }, orderBy: [{ proposalClosesAt: "asc" }, { createdAt: "desc" }], take: PAGE_SIZE }),
+    // A listagem é limitada; o contador precisa refletir a fila inteira, senão
+    // a equipe acredita que há menos licitações do que realmente existem.
+    getDatabase().scoutedTender.count({ where: { status: "PENDING" } }),
     getDatabase().scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
   ]);
 
@@ -36,7 +45,8 @@ export default async function ScoutedTendersPage() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-slate-700">
           Relação de rastreadas
-          {tenders.length > 0 && <span className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-black text-brand">{tenders.length} aguardando triagem</span>}
+          {pendingTotal > 0 && <span className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-black text-brand">{pendingTotal} aguardando triagem</span>}
+          {pendingTotal > tenders.length && <span className="text-[10px] font-semibold text-slate-500">mostrando as {tenders.length} de prazo mais curto</span>}
         </h2>
         {lastRun && <span className="text-[11px] text-slate-500">Última varredura: <strong className="text-slate-700">{lastRun.startedAt.toLocaleDateString("pt-BR")}</strong></span>}
       </header>
@@ -54,7 +64,9 @@ export default async function ScoutedTendersPage() {
             </td>
             <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">{currency(tender.estimatedValue, tender.valueUndisclosed)}</td>
             <td className="px-4 py-3"><span className="block truncate text-slate-600">{tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}</span></td>
-            <td className="whitespace-nowrap px-4 py-3 text-slate-600">{tender.proposalClosesAt ? tender.proposalClosesAt.toLocaleDateString("pt-BR") : "—"}</td>
+            <td className="whitespace-nowrap px-4 py-3">{tender.proposalClosesAt
+              ? <><span className={`font-bold ${daysUntil(tender.proposalClosesAt) <= 14 ? "text-brand" : "text-slate-700"}`}>{daysUntil(tender.proposalClosesAt)} dias</span><span className="block text-[10px] text-slate-400">{tender.proposalClosesAt.toLocaleDateString("pt-BR")}</span></>
+              : <span className="text-slate-600">—</span>}</td>
             <td className="px-4 py-3">{tender.noticeUrl ? <a className="font-semibold text-brand hover:underline" href={tender.noticeUrl} rel="noreferrer" target="_blank">PNCP ↗</a> : <span className="text-slate-400">—</span>}</td>
             <td className="px-4 py-3">{canDecide ? <TriageActions id={tender.id}/> : <span className="block text-center text-[10px] text-slate-400">Sem alçada para decidir</span>}</td>
           </tr>)}

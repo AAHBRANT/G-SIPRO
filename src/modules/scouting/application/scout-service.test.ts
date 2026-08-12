@@ -13,7 +13,7 @@ function buildTender(overrides: Partial<PncpTender> = {}): PncpTender {
     authorityName: "Estado do Ceará",
     sphere: "E",
     state: "CE",
-    estimatedValue: 5_000_000,
+    estimatedValue: 30_000_000,
     valueUndisclosed: false,
     proposalClosesAt: new Date("2026-08-28T12:00:00.000Z"),
     modality: "Concorrência - Eletrônica",

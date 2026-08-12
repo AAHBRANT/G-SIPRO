@@ -72,7 +72,10 @@ export const defaultScoutFilter: ScoutFilter = Object.freeze({
   workTypes: ["BUILDING", "SPECIAL_STRUCTURE", "PAVING", "URBAN_INFRASTRUCTURE"],
   states: [],
   spheres: ["F", "E", "M"],
-  minimumValue: undefined,
+  // Abaixo desta faixa a obra não compensa a mobilização. Certame de valor
+  // sigiloso entra mesmo assim: orçamento fechado é comum justamente em obra
+  // grande, e descartá-lo eliminaria o alvo.
+  minimumValue: 14_000_000,
   maximumValue: undefined,
   minimumDaysToClose: 10,
   includeUndisclosedValue: true,

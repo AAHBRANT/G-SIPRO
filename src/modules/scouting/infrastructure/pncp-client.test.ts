@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { brazilStates, buildNoticeUrl, formatFinalDate, isMirrorRecord, PncpClient, toCandidate, workModalityCodes } from "@/modules/scouting/infrastructure/pncp-client";
+import { brazilStates, buildNoticeUrl, cleanSubject, formatFinalDate, isMirrorRecord, PncpClient, toCandidate, workModalityCodes } from "@/modules/scouting/infrastructure/pncp-client";
 
 const baseRecord = {
   numeroControlePNCP: "07954480000179-1-000019/2026",
@@ -43,6 +43,25 @@ describe("isMirrorRecord", () => {
 
   it("não trata prazo real como espelho", () => {
     expect(isMirrorRecord(baseRecord)).toBe(false);
+  });
+});
+
+describe("cleanSubject", () => {
+  it("remove o prefixo da plataforma de disputa", () => {
+    expect(cleanSubject("[Portal de Compras Públicas] - CONTRATAÇÃO DE EMPRESA")).toBe("CONTRATAÇÃO DE EMPRESA");
+  });
+
+  it("remove prefixo entre parênteses e com travessão", () => {
+    expect(cleanSubject("(Licitar Digital) – Execução de obra")).toBe("Execução de obra");
+  });
+
+  it("preserva o objeto quando não há prefixo", () => {
+    expect(cleanSubject("  Pavimentação   da rodovia CE-363 ")).toBe("Pavimentação da rodovia CE-363");
+  });
+
+  it("não corta colchete que faz parte do objeto", () => {
+    const longo = "[trecho muito extenso que claramente não é nome de plataforma de compras e passa de sessenta caracteres] obra";
+    expect(cleanSubject(longo)).toBe(longo);
   });
 });
 

@@ -105,9 +105,22 @@ export function isMirrorRecord(record: PncpRecord): boolean {
   return Boolean(opens && closes && opens.getTime() === closes.getTime());
 }
 
+/**
+ * Muitos órgãos publicam o objeto prefixado com o nome da plataforma de
+ * disputa — "[Portal de Compras Públicas] - ", "[Licitar Digital] – " e afins.
+ * O prefixo não informa nada e consome o espaço de leitura na fila de triagem.
+ */
+export function cleanSubject(raw: string): string {
+  return raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(?:\[[^\]]{2,60}\]|\([^)]{2,60}\))\s*[-–—:]?\s*/u, "")
+    .trim();
+}
+
 export function toCandidate(record: PncpRecord): CandidateTender | undefined {
   const externalId = record.numeroControlePNCP?.trim();
-  const subject = record.objetoCompra?.replace(/\s+/g, " ").trim();
+  const subject = record.objetoCompra ? cleanSubject(record.objetoCompra) : undefined;
   const sphere = record.orgaoEntidade?.esferaId?.trim();
   if (!externalId || !subject || !sphere) return undefined;
 

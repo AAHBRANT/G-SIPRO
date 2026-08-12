@@ -16,7 +16,7 @@ function buildCandidate(overrides: Partial<CandidateTender> = {}): CandidateTend
     authorityName: "Estado do Ceará",
     sphere: "E",
     state: "CE",
-    estimatedValue: 5_000_000,
+    estimatedValue: 30_000_000,
     valueUndisclosed: false,
     proposalClosesAt: new Date("2026-08-28T12:00:00.000Z"),
     ...overrides,
@@ -140,5 +140,19 @@ describe("configuração inicial", () => {
   it("não descarta nenhuma condição automaticamente", () => {
     const treatments = Object.values(defaultScoutFilter.conditionTreatments);
     expect(treatments).not.toContain("DISCARD");
+  });
+
+  it("recusa obra abaixo de R$ 14 milhões", () => {
+    const result = qualify(buildCandidate({ estimatedValue: 13_999_999 }), buildFilter(), reference);
+    expect(result).toEqual({ qualified: false, reason: "MINIMUM_VALUE" });
+  });
+
+  it("aceita obra a partir de R$ 14 milhões", () => {
+    expect(qualify(buildCandidate({ estimatedValue: 14_000_000 }), buildFilter(), reference).qualified).toBe(true);
+  });
+
+  it("aceita valor sigiloso mesmo com piso de R$ 14 milhões, porque obra grande costuma ter orçamento fechado", () => {
+    const candidate = buildCandidate({ estimatedValue: undefined, valueUndisclosed: true });
+    expect(qualify(candidate, buildFilter(), reference).qualified).toBe(true);
   });
 });
