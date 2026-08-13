@@ -22,7 +22,7 @@ name: Sonda da Central IA
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 */4 * * *"
 
 concurrency:
   group: gsipro-central-ia-sonda
