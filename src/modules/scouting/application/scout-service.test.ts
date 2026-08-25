@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ScoutService, type ScoutRepository, type TenderSource } from "@/modules/scouting/application/scout-service";
+import { ScoutService, type QualifiedTender, type ScoutRepository, type TenderSource } from "@/modules/scouting/application/scout-service";
 import { defaultScoutFilter, scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
 import type { PncpTender } from "@/modules/scouting/infrastructure/pncp-client";
 
@@ -13,7 +13,7 @@ function buildTender(overrides: Partial<PncpTender> = {}): PncpTender {
     authorityName: "Estado do Ceará",
     sphere: "E",
     state: "CE",
-    estimatedValue: 5_000_000,
+    estimatedValue: 30_000_000,
     valueUndisclosed: false,
     proposalClosesAt: new Date("2026-08-28T12:00:00.000Z"),
     modality: "Concorrência - Eletrônica",
@@ -22,12 +22,12 @@ function buildTender(overrides: Partial<PncpTender> = {}): PncpTender {
 }
 
 function buildRepository(overrides: Partial<ScoutRepository> = {}) {
-  const saved: PncpTender[] = [];
+  const saved: QualifiedTender[] = [];
   const repository: ScoutRepository = {
     loadFilter: vi.fn(async (): Promise<ScoutFilter | null> => null),
     startRun: vi.fn(async () => "run-1"),
     findKnownExternalIds: vi.fn(async () => []),
-    saveScoutedTenders: vi.fn(async (_runId: string, tenders: readonly PncpTender[]) => { saved.push(...tenders); return tenders.length; }),
+    saveScoutedTenders: vi.fn(async (_runId: string, tenders: readonly QualifiedTender[]) => { saved.push(...tenders); return tenders.length; }),
     completeRun: vi.fn(async () => {}),
     failRun: vi.fn(async () => {}),
     expireOverdue: vi.fn(async () => 0),
@@ -50,6 +50,12 @@ describe("ScoutService", () => {
 
     expect(summary).toMatchObject({ runId: "run-1", totalFetched: 2, totalQualified: 1, totalNew: 1 });
     expect(saved.map((tender) => tender.externalId)).toEqual(["PNCP-1"]);
+  });
+
+  it("guarda o tipo de obra reconhecido, para a fila poder filtrar por ramo", async () => {
+    const { repository, saved } = buildRepository();
+    await new ScoutService(repository, buildSource([buildTender({ subject: "Construção de ponte de concreto sobre o rio" })])).run("SCHEDULED", reference);
+    expect(saved[0]?.workTypes).toContain("SPECIAL_STRUCTURE");
   });
 
   it("não devolve à fila licitação já triada em varredura anterior", async () => {

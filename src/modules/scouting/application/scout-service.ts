@@ -1,8 +1,14 @@
 import { qualify, type CandidateTender } from "@/modules/scouting/domain/qualification";
-import { defaultScoutFilter, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
+import { defaultScoutFilter, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
 import type { PncpTender } from "@/modules/scouting/infrastructure/pncp-client";
 
 export type ScoutRunTrigger = "SCHEDULED" | "MANUAL";
+
+/**
+ * Licitação aprovada no Estágio 1, junto com os tipos de obra reconhecidos no
+ * objeto — que a fila usa depois para filtrar por ramo.
+ */
+export type QualifiedTender = PncpTender & { workTypes: readonly ScoutWorkType[] };
 
 export type ScoutRunSummary = Readonly<{
   runId: string;
@@ -17,7 +23,7 @@ export interface ScoutRepository {
   startRun(trigger: ScoutRunTrigger): Promise<string>;
   /** Devolve, entre os identificadores informados, os que já foram triados ou já estão na fila. */
   findKnownExternalIds(externalIds: readonly string[]): Promise<readonly string[]>;
-  saveScoutedTenders(runId: string, tenders: readonly PncpTender[]): Promise<number>;
+  saveScoutedTenders(runId: string, tenders: readonly QualifiedTender[]): Promise<number>;
   completeRun(runId: string, summary: Omit<ScoutRunSummary, "runId" | "failures">, partialReason?: string): Promise<void>;
   failRun(runId: string, reason: string): Promise<void>;
   /** Marca como expiradas as licitações cujo prazo venceu sem triagem. */
@@ -47,7 +53,10 @@ export class ScoutService {
 
     try {
       const { tenders: fetched, failures } = await this.source.fetchOpenTenders();
-      const qualified = fetched.filter((tender) => qualify(tender as CandidateTender, filter, reference).qualified);
+      const qualified = fetched.flatMap<QualifiedTender>((tender) => {
+        const result = qualify(tender as CandidateTender, filter, reference);
+        return result.qualified ? [{ ...tender, workTypes: result.workTypes }] : [];
+      });
 
       // Licitação já triada em varredura anterior não retorna à fila, tenha
       // sido aprovada ou descartada.

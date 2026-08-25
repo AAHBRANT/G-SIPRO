@@ -1,7 +1,7 @@
 import { getDatabase } from "@/core/database/prisma";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
-import type { ScoutRepository, ScoutRunSummary, ScoutRunTrigger } from "@/modules/scouting/application/scout-service";
+import type { QualifiedTender, ScoutRepository, ScoutRunSummary, ScoutRunTrigger } from "@/modules/scouting/application/scout-service";
 import type {
   OpportunityCreationPort,
   OpportunitySeed,
@@ -9,7 +9,6 @@ import type {
   TriageRepository,
 } from "@/modules/scouting/application/triage-service";
 import { scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
-import type { PncpTender } from "@/modules/scouting/infrastructure/pncp-client";
 
 /** Registro único de configuração dos filtros. */
 const FILTER_SINGLETON_ID = "00000000-0000-4000-8000-000000000001";
@@ -77,7 +76,7 @@ export class PrismaScoutRepository implements ScoutRepository {
     return found.map((entry) => entry.externalId);
   }
 
-  async saveScoutedTenders(runId: string, tenders: readonly PncpTender[]): Promise<number> {
+  async saveScoutedTenders(runId: string, tenders: readonly QualifiedTender[]): Promise<number> {
     const result = await getDatabase().scoutedTender.createMany({
       data: tenders.map((tender) => ({
         runId,
@@ -89,6 +88,7 @@ export class PrismaScoutRepository implements ScoutRepository {
         city: tender.city ?? null,
         state: tender.state ?? null,
         modality: tender.modality,
+        workTypes: [...tender.workTypes],
         processNumber: tender.processNumber ?? null,
         estimatedValue: tender.estimatedValue ?? null,
         valueUndisclosed: tender.valueUndisclosed,
