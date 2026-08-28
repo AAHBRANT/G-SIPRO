@@ -723,3 +723,114 @@
   .bx-num, .bx-prazo, .bx-medidor-caixa { grid-column: 2; text-align: left; }
   .bx-painel { padding-left: 15px; }
 }
+
+/* ---------- sinalização: faixa no topo com a bandeira fincada ---------- */
+
+/* Cada linha sinalizada carrega as DUAS variantes da cor — uma para fundo
+   claro, outra para escuro — e o CSS escolhe pelo tema. Assim a troca de tema
+   é instantânea, sem nova consulta, e nenhuma cor escolhida fica ilegível. */
+.bx-linha[data-sinalizada="sim"] {
+  --sig: var(--sig-claro);
+  background: color-mix(in srgb, var(--sig) 7%, transparent);
+}
+
+.bx[data-tema="escuro"] .bx-linha[data-sinalizada="sim"] { --sig: var(--sig-escuro); }
+
+/* A faixa e a bandeira vivem DENTRO do <summary>. Soltas no <details> o
+   navegador as trata como conteúdo do detalhe e joga tudo para o rodapé. */
+.bx-cab { position: relative; }
+
+/* O terreno onde a bandeira é fincada. */
+.bx-terreno { background: var(--sig); height: 4px; left: 0; position: absolute; right: 0; top: 0; }
+
+/* O mastro nasce dentro da faixa: é o que faz a bandeira parecer cravada em
+   vez de apoiada. */
+.bx-bandeira { left: 13px; line-height: 0; position: absolute; top: 1px; }
+.bx-bandeira .mastro { stroke: var(--sig); }
+.bx-bandeira .pano { fill: var(--sig); }
+.bx-bandeira .chao { fill: var(--sig); opacity: 0.42; }
+
+.bx-linha[data-sinalizada="sim"] > .bx-cab { padding-top: 17px; }
+.bx-linha[data-sinalizada="sim"] > .bx-cab > .min-w-0 { padding-left: 27px; }
+
+.bx-marca-p {
+  align-items: center;
+  background: color-mix(in srgb, var(--sig) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sig) 55%, transparent);
+  border-radius: var(--r-p);
+  color: var(--sig);
+  display: inline-flex;
+  font-size: 10.5px;
+  font-weight: 700;
+  gap: 5px;
+  padding: 2px 8px;
+}
+
+/* ---------- caixa de sinalização ---------- */
+
+.bx-fundo {
+  align-items: center; background: rgba(20, 6, 6, 0.46); display: flex; inset: 0;
+  justify-content: center; padding: 20px; position: fixed; z-index: 90;
+}
+
+.bx-modal {
+  background: var(--sobre); border: 1px solid var(--fio-forte); border-radius: var(--r-g);
+  box-shadow: var(--elev-2); display: flex; flex-direction: column; max-height: 88vh;
+  max-width: 470px; width: 100%;
+}
+
+.bx-modal-cab {
+  align-items: flex-start; border-bottom: 1px solid var(--fio); display: flex;
+  gap: 12px; justify-content: space-between; padding: 15px 17px;
+}
+.bx-modal-cab h2 { font-size: 16px; font-weight: 700; }
+.bx-modal-cab p { color: var(--texto-3); font-size: 11.5px; line-height: 1.45; margin-top: 4px; }
+.bx-modal-cab .fechar { background: none; border: 0; color: var(--texto-3); cursor: pointer; font-size: 20px; line-height: 1; padding: 0 3px; }
+.bx-modal-cab .fechar:hover { color: var(--texto); }
+.bx-modal-corpo { overflow-y: auto; padding: 15px 17px; }
+.bx-modal-pe { border-top: 1px solid var(--fio); display: flex; gap: 8px; justify-content: flex-end; padding: 13px 17px; }
+
+.bx-rot {
+  color: var(--texto-3); display: block; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; margin-bottom: 7px; text-transform: uppercase;
+}
+
+.bx-op-p { display: flex; gap: 6px; }
+.bx-op-p button {
+  background: transparent; border: 1px solid var(--fio); border-radius: var(--r-p);
+  color: var(--texto-2); cursor: pointer; flex: 1; font-family: inherit;
+  font-size: 11.5px; font-weight: 700; padding: 8px 6px; transition: all 0.15s;
+}
+.bx-op-p button:hover[aria-pressed="false"] { border-color: var(--fio-forte); color: var(--texto); }
+.bx-op-p button[aria-pressed="true"] {
+  background: var(--acento-fundo); border-color: var(--acento); color: var(--acento);
+}
+
+.bx-livre {
+  background: color-mix(in srgb, var(--acento) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--acento) 45%, transparent);
+  border-radius: var(--r-p); margin-top: 11px; padding: 11px;
+}
+
+.bx-campo-g {
+  background: var(--campo); border: 1px solid var(--fio); border-radius: var(--r-p);
+  color: var(--texto); font-family: inherit; font-size: 12.5px; line-height: 1.55;
+  min-height: 72px; outline: none; padding: 9px 11px; resize: vertical; width: 100%;
+}
+.bx-campo-g:focus { border-color: var(--acento); }
+
+.bx-cores { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; }
+.bx-cor {
+  border: 2px solid transparent; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--fio-forte);
+  cursor: pointer; height: 26px; padding: 0; width: 26px;
+}
+.bx-cor[aria-pressed="true"] { border-color: var(--texto); }
+
+/* O seletor nativo fica escondido atrás do disco colorido: o controle padrão
+   do sistema não aceita estilo e destoaria da tela. */
+.bx-cor-livre {
+  background: conic-gradient(#e74c3c, #f1c40f, #2ecc71, #3498db, #9b59b6, #e74c3c);
+  border-radius: 50%; cursor: pointer; display: inline-block; height: 28px;
+  overflow: hidden; position: relative; width: 28px;
+}
+.bx-cor-livre input { cursor: pointer; height: 100%; opacity: 0; position: absolute; inset: 0; width: 100%; }

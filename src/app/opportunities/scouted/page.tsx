@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import Link from "next/link";
 
 import { getCurrentAuthorizationContext } from "@/core/authorization/authorization-context";
@@ -7,9 +9,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
 import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
+import { themeVariants } from "@/modules/scouting/domain/signal";
 import { PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { AdherenceGauge } from "./adherence-gauge";
 import { ScoutedFilters, type FilterGroup } from "./scouted-filters";
+import { Flag, SignalActions } from "./signal-actions";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
 import { TriageActions } from "./triage-actions";
 import "./scouted.css";
@@ -126,7 +130,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   const filter = await loadFilter();
 
   const [rows, lastRun, facets] = await Promise.all([
-    database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP }),
+    database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP, include: { signal: true } }),
     database.scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
     // Projeção leve da fila inteira: alimenta os contadores dos cartões e das
     // opções de filtro sem trazer o registro completo.
@@ -138,6 +142,10 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
 
   const scored = rows.map((tender) => ({
     ...tender,
+    // Os dois tons saem da cor gravada a cada leitura: a troca de tema não
+    // consulta nada, e melhorias na regra de contraste valem para o que já
+    // está no banco sem reescrever registro nenhum.
+    signal: tender.signal ? { ...tender.signal, ...themeVariants(tender.signal.color) } : null,
     adherence: computeAdherence(toAdherenceInput(tender), filter, now),
     days: tender.proposalClosesAt ? Math.max(0, Math.ceil((tender.proposalClosesAt.getTime() - now.getTime()) / 86_400_000)) : undefined,
   }));
@@ -203,14 +211,24 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
         {tenders.map((tender) => {
           const value = currency(tender.estimatedValue, tender.valueUndisclosed);
           const days = tender.days;
-          return <details className="bx-linha" key={tender.id}>
+          const signal = tender.signal;
+          return <details
+            className="bx-linha"
+            data-sinalizada={signal ? "sim" : undefined}
+            key={tender.id}
+            style={signal ? ({ "--sig-claro": signal.light, "--sig-escuro": signal.dark } as CSSProperties) : undefined}
+          >
             <summary className="bx-cab">
+              {/* Faixa e bandeira ficam DENTRO do summary: soltas no details o
+                  navegador as trata como conteúdo do detalhe e joga para o rodapé. */}
+              {signal && <><span className="bx-terreno"/><span className="bx-bandeira"><Flag/></span></>}
               <svg aria-hidden="true" className="bx-seta h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
 
               <div className="min-w-0">
                 <p className="bx-objeto">{tender.subject}</p>
                 <p className="bx-orgao">{tender.authorityName} · {tender.modality} · {sphereLabels[tender.sphere] ?? tender.sphere}</p>
                 <div className="bx-etiquetas">
+                  {signal && <span className="bx-marca-p"><Flag size={13}/>{signal.label}</span>}
                   {tender.adherence.workTypes.map((type) => <span className="bx-eti tipo" key={type}>{workTypeLabels[type] ?? type}</span>)}
                   {tender.valueUndisclosed && <span className="bx-eti alerta">valor sigiloso</span>}
                   {tender.adherence.reasons.filter((reason) => !reason.met && !reason.skipped && reason.criterion !== "SPHERE").map((reason) =>
@@ -234,6 +252,11 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
               <div className="bx-medidor-caixa">
                 <AdherenceGauge score={tender.adherence.score} undetermined={tender.adherence.undetermined}/>
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
+                {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
+                    Por isso não depende da alçada de decidir. */}
+                <div className="bx-mini-acoes">
+                  <SignalActions id={tender.id} signal={signal ? { level: signal.level, label: signal.label, color: signal.color, ...(signal.note ? { note: signal.note } : {}) } : undefined}/>
+                </div>
               </div>
             </summary>
 
@@ -260,6 +283,11 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   <h3>Aderência ao perfil — {tender.adherence.undetermined ? "não calculada" : `${tender.adherence.score}%`}</h3>
                   {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
                 </div>
+
+                {signal?.note && <div className="bx-bloco">
+                  <h3>Sinalização — {signal.label}</h3>
+                  <p className="bx-nota">{signal.note}</p>
+                </div>}
 
                 <div className="bx-bloco">
                   <h3>Habilitação técnica</h3>

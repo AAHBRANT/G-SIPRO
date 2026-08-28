@@ -8,6 +8,7 @@ import type {
   ScoutedTenderRecord,
   TriageRepository,
 } from "@/modules/scouting/application/triage-service";
+import type { SignalRecord, SignalRepository } from "@/modules/scouting/application/signal-service";
 import { scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
 
 /** Registro único de configuração dos filtros. */
@@ -200,5 +201,40 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
     // "Em análise" é o estado em que a equipe recebe a oportunidade.
     await this.service.transition(created.id, "QUALIFICATION", actorId, {}, correlationId);
     return created.id;
+  }
+}
+
+/**
+ * Sinalização da fila de triagem.
+ *
+ * `upsert` pela licitação, não pelo par licitação+pessoa: a marca é uma só, e
+ * sinalizar de novo troca a anterior registrando o novo autor.
+ */
+export class PrismaSignalRepository implements SignalRepository {
+  async findTenderStatus(tenderId: string): Promise<{ status: string } | null> {
+    const tender = await getDatabase().scoutedTender.findUnique({ where: { id: tenderId }, select: { status: true } });
+    return tender ? { status: tender.status } : null;
+  }
+
+  async save(record: SignalRecord): Promise<void> {
+    const dados = {
+      level: record.level,
+      label: record.label,
+      color: record.color,
+      note: record.note ?? null,
+      signaledById: record.signaledById,
+    };
+    await getDatabase().scoutedTenderSignal.upsert({
+      where: { tenderId: record.tenderId },
+      create: { tenderId: record.tenderId, ...dados, createdAt: record.signaledAt },
+      update: dados,
+    });
+  }
+
+  async remove(tenderId: string): Promise<boolean> {
+    // deleteMany não estoura quando não há nada: a contagem devolvida é que
+    // diz se existia marca, e é ela que vira o erro na camada de aplicação.
+    const { count } = await getDatabase().scoutedTenderSignal.deleteMany({ where: { tenderId } });
+    return count > 0;
   }
 }

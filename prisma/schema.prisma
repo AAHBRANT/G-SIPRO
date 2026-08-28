@@ -362,6 +362,7 @@ model User {
   supportTicketsAssigned         SupportTicket[]                   @relation("SupportAssignedTo")
   supportTicketsResolved         SupportTicket[]                   @relation("SupportResolvedBy")
   scoutedTenderDecisions         ScoutedTender[]                   @relation("ScoutedTenderDecidedBy")
+  scoutedTenderSignals           ScoutedTenderSignal[]             @relation("ScoutedTenderSignaledBy")
   supportDecisions               SupportTicketDecision[]           @relation("SupportDecidedBy")
   supportUpdates                 SupportTicketUpdate[]             @relation("SupportUpdatedBy")
   accessRequestsMade             UserAccessRequest[]               @relation("AccessRequestRequestedBy")
@@ -2917,6 +2918,13 @@ enum ScoutedTenderStatus {
   EXPIRED
 }
 
+enum ScoutSignalLevel {
+  HIGH
+  MEDIUM
+  LOW
+  CUSTOM
+}
+
 /// Configuração única dos filtros da varredura. Mantida como registro único
 /// (singleton) para que a equipe ajuste os critérios sem versionar cópias.
 model ScoutFilter {
@@ -2989,10 +2997,36 @@ model ScoutedTender {
   opportunity       Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
   runId             String              @db.Uuid
   run               ScoutRun            @relation(fields: [runId], references: [id], onDelete: Cascade)
+  signal            ScoutedTenderSignal?
   createdAt         DateTime            @default(now()) @db.Timestamptz(6)
 
   @@index([status, proposalClosesAt])
   @@index([runId])
   @@index([opportunityId])
   @@map("scouted_tenders")
+}
+
+/// Sinalização que a equipe finca numa licitação da fila. É UMA por licitação,
+/// e não por pessoa: a marca existe para orientar quem abrir a fila depois, e
+/// duas marcas concorrentes na mesma linha só confundiriam.
+model ScoutedTenderSignal {
+  id           String           @id @default(uuid()) @db.Uuid
+  tenderId     String           @unique @db.Uuid
+  tender       ScoutedTender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  level        ScoutSignalLevel
+  /// Texto da etiqueta. Nos níveis fixos vem do próprio nível; no nível livre
+  /// é o que a pessoa escreveu.
+  label        String           @db.VarChar(34)
+  /// Cor escolhida, em #RRGGBB. As variantes clara e escura NÃO são gravadas:
+  /// derivam desta a cada leitura, para acompanharem melhorias na regra de
+  /// contraste sem precisar reescrever o que já está gravado.
+  color        String           @db.Char(7)
+  note         String?          @db.VarChar(400)
+  signaledById String           @db.Uuid
+  signaledBy   User             @relation("ScoutedTenderSignaledBy", fields: [signaledById], references: [id], onDelete: Restrict)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
+
+  @@index([signaledById])
+  @@map("scouted_tender_signals")
 }
