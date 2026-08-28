@@ -141,6 +141,34 @@ describe("PncpClient", () => {
     expect(fetchImpl.mock.calls.length).toBeLessThan(9);
   });
 
+  /**
+   * Regressão do 504 de 28/08/2026: o portal recusava, a página entrava na
+   * escada de novas tentativas e o prazo só era consultado ENTRE páginas, então
+   * uma única página segurava a varredura por minutos. O balanceador encerrava
+   * a conexão antes de qualquer resposta e a semana inteira se perdia.
+   */
+  it("não ultrapassa o prazo quando o portal recusa e as tentativas se acumulam", async () => {
+    let clock = 0;
+    // Cada tentativa gasta 30 s e sempre falha, forçando a escada de reenvio.
+    const fetchImpl = vi.fn(async () => { clock += 30_000; return new Response("indisponível", { status: 503 }); });
+
+    const client = new PncpClient({
+      finalDate: new Date("2027-12-31T00:00:00.000Z"),
+      states: ["CE", "RN", "SP"],
+      budgetMs: 150_000,
+      nowImpl: () => clock,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      sleepImpl: async (ms) => { clock += ms; },
+    });
+
+    const { tenders, failures } = await client.fetchOpenTenders();
+
+    expect(tenders).toHaveLength(0);
+    expect(failures.length).toBeGreaterThan(0);
+    // O essencial: para dentro do prazo em vez de rodar por minutos a fio.
+    expect(clock).toBeLessThanOrEqual(150_000 + 30_000);
+  });
+
   it("segue a varredura quando uma unidade federativa falha", async () => {
     const fetchImpl = vi.fn(async (url: string) => {
       if (String(url).includes("uf=RN")) return new Response("Erro na comunicação com o banco de dados.", { status: 500 });

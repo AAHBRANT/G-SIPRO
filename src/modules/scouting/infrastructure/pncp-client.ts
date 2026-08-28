@@ -28,8 +28,8 @@ export const brazilStates = [
 
 const PAGE_SIZE = 50;
 const MAX_PAGES_PER_MODALITY = 40;
-const REQUEST_TIMEOUT_MS = 90_000;
-const MAX_ATTEMPTS = 8;
+const REQUEST_TIMEOUT_MS = 25_000;
+const MAX_ATTEMPTS = 4;
 /** O portal limita a frequência de requisições e responde 429 quando excedida. */
 const THROTTLE_DELAY_MS = 700;
 
@@ -57,7 +57,7 @@ type PncpPage = Readonly<{ data?: readonly PncpRecord[]; totalPaginas?: number }
  * execução travada. Esgotado o tempo, a varredura para por conta própria e o que
  * ficou de fora é registrado como não consultado.
  */
-const DEFAULT_BUDGET_MS = 200_000;
+const DEFAULT_BUDGET_MS = 150_000;
 
 export type PncpFetchOptions = Readonly<{
   finalDate: Date;
@@ -187,21 +187,36 @@ export class PncpClient {
     return `${PNCP_BASE_URL}?${params.toString()}`;
   }
 
-  /** Reenvia em 429 e 5xx com espera crescente; o portal oscila de desempenho. */
-  private async fetchPage(url: string, attempt = 1): Promise<PncpPage> {
+  /**
+   * Reenvia em 429 e 5xx com espera crescente; o portal oscila de desempenho.
+   *
+   * O prazo da varredura entra aqui de propósito. Antes ele só era consultado
+   * ENTRE páginas, e uma única página que entrasse na escada de novas
+   * tentativas rodava por até 12 minutos sem ninguém segurar — o balanceador
+   * encerrava a conexão com 504 antes de qualquer resposta, e a varredura
+   * inteira se perdia. Nenhuma espera aqui pode ultrapassar o que sobra.
+   */
+  private async fetchPage(url: string, deadline: number, attempt = 1): Promise<PncpPage> {
+    const now = this.options.nowImpl ?? Date.now;
+    const restante = deadline - now();
+    if (restante <= 0) throw new Error("Prazo da varredura esgotado antes da requisição.");
     try {
       const response = await this.fetchImpl(url, {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, restante)),
       });
       if (response.status === 204) return { data: [], totalPaginas: 0 };
       if (response.status === 429 || response.status >= 500) throw new Error(`HTTP ${response.status}`);
       if (!response.ok) return { data: [], totalPaginas: 0 };
       return (await response.json()) as PncpPage;
     } catch (error) {
-      if (attempt >= MAX_ATTEMPTS) throw error instanceof Error ? error : new Error(String(error));
-      await this.sleepImpl(Math.min(1_500 * attempt, 12_000));
-      return this.fetchPage(url, attempt + 1);
+      const espera = Math.min(1_500 * attempt, 12_000);
+      // Não adianta esperar para tentar de novo se a espera já estoura o prazo.
+      if (attempt >= MAX_ATTEMPTS || now() + espera >= deadline) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+      await this.sleepImpl(espera);
+      return this.fetchPage(url, deadline, attempt + 1);
     }
   }
 
@@ -234,7 +249,7 @@ export class PncpClient {
           let page = 1;
           let totalPages = 1;
           do {
-            const payload = await this.fetchPage(this.buildUrl(modality, page, state));
+            const payload = await this.fetchPage(this.buildUrl(modality, page, state), deadline);
             totalPages = Math.min(payload.totalPaginas ?? 0, MAX_PAGES_PER_MODALITY);
             for (const record of payload.data ?? []) {
               if (isMirrorRecord(record)) continue;
