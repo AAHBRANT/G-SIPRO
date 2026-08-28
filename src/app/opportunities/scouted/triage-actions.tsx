@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { type MouseEvent, useState, useTransition } from "react";
 
 /**
  * Decisão humana sobre uma licitação rastreada. Aprovar cria a oportunidade e
@@ -13,6 +13,15 @@ export function TriageActions({ id }: { id: string }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
+
+  /**
+   * O bloco de decisão vive dentro do <summary> da linha, e alternar a sanfona
+   * é a ação padrão do clique ali: sem este guarda, aprovar ou descartar abriria
+   * o detalhe junto. O guarda precisa morar aqui, no cliente — componente de
+   * servidor não pode carregar manipulador de evento, e tentar isso derruba a
+   * renderização da fila inteira.
+   */
+  const stopToggle = (event: MouseEvent<HTMLDivElement>) => { event.preventDefault(); };
 
   function decide(body: Record<string, unknown>, onDone: (payload: { opportunityId?: string }) => void) {
     setError(undefined);
@@ -32,7 +41,7 @@ export function TriageActions({ id }: { id: string }) {
   }
 
   if (discarding) {
-    return <div className="flex flex-col gap-2">
+    return <div className="flex flex-col gap-2" onClick={stopToggle}>
       <label className="sr-only" htmlFor={`reason-${id}`}>Motivo do descarte</label>
       <input
         autoFocus
@@ -55,7 +64,7 @@ export function TriageActions({ id }: { id: string }) {
     </div>;
   }
 
-  return <div className="flex flex-col items-center gap-1">
+  return <div className="flex flex-col items-center gap-1" onClick={stopToggle}>
     <div className="flex justify-center gap-1.5">
       <button
         className="rounded-md bg-brand px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-50"

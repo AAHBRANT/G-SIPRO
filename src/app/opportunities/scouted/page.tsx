@@ -164,7 +164,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   <p className="mt-1 text-[10.5px] tabular-nums text-slate-400">{tender.proposalClosesAt?.toLocaleDateString("pt-BR")}</p>
                 </>}
               </div>
-              <div onClick={(event) => event.preventDefault()}>
+              <div>
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="block text-center text-[10px] text-slate-400">Sem alçada para decidir</span>}
               </div>
             </summary>
