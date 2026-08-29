@@ -3,7 +3,7 @@ import { getCurrentAuthorizationContext } from "@/core/authorization/authorizati
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import { ArchiveWorkspace, type ArchiveItem } from "./archive-workspace";
-import { fieldsFromExtractionOutput, servicesFromExtraction } from "./extraction-view-model";
+import { fieldsFromExtractionOutput, servicesFromExtraction } from "@/modules/technical-archive/domain/extracted-services";
 
 type AuthorizedSource = { documentType?: string };
 

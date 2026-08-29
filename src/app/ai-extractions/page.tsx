@@ -126,7 +126,14 @@ export default async function AiExtractionsPage() {
                   <p className="text-xs font-bold text-purple-700">
                     {item.definition.code} · caso v{item.definition.version}
                   </p>
-                  <h2 className="text-xl font-bold">{item.documentVersion.document.title}</h2>
+                  {/* Execução sobre fonte efêmera não tem documento no acervo:
+                      o que a identifica é o nome do arquivo que foi lido. */}
+                  <h2 className="text-xl font-bold">{item.documentVersion?.document.title ?? item.sourceFilename ?? "Fonte não identificada"}</h2>
+                  {!item.documentVersion && item.sourceUri && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Fonte externa, não preservada · <a className="underline" href={item.sourceUri} rel="noreferrer" target="_blank">{item.sourceUri.slice(0, 80)}</a>
+                    </p>
+                  )}
                 </div>
                 <strong className={item.status === "SUCCEEDED" ? "text-emerald-700" : "text-rose-700"}>
                   {item.status}

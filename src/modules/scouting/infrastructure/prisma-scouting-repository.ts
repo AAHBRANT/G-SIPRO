@@ -8,6 +8,9 @@ import type {
   ScoutedTenderRecord,
   TriageRepository,
 } from "@/modules/scouting/application/triage-service";
+import type { ArchiveEvidence } from "@/modules/scouting/domain/archive-adherence";
+import { fieldsFromExtractionOutput, servicesFromExtraction } from "@/modules/technical-archive/domain/extracted-services";
+import type { SignalRecord, SignalRepository } from "@/modules/scouting/application/signal-service";
 import { scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
 
 /** Registro único de configuração dos filtros. */
@@ -200,5 +203,135 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
     // "Em análise" é o estado em que a equipe recebe a oportunidade.
     await this.service.transition(created.id, "QUALIFICATION", actorId, {}, correlationId);
     return created.id;
+  }
+}
+
+/**
+ * Sinalização da fila de triagem.
+ *
+ * `upsert` pela licitação, não pelo par licitação+pessoa: a marca é uma só, e
+ * sinalizar de novo troca a anterior registrando o novo autor.
+ */
+export class PrismaSignalRepository implements SignalRepository {
+  async findTenderStatus(tenderId: string): Promise<{ status: string } | null> {
+    const tender = await getDatabase().scoutedTender.findUnique({ where: { id: tenderId }, select: { status: true } });
+    return tender ? { status: tender.status } : null;
+  }
+
+  async save(record: SignalRecord): Promise<void> {
+    const dados = {
+      level: record.level,
+      label: record.label,
+      color: record.color,
+      note: record.note ?? null,
+      signaledById: record.signaledById,
+    };
+    await getDatabase().scoutedTenderSignal.upsert({
+      where: { tenderId: record.tenderId },
+      create: { tenderId: record.tenderId, ...dados, createdAt: record.signaledAt },
+      update: dados,
+    });
+  }
+
+  async remove(tenderId: string): Promise<boolean> {
+    // deleteMany não estoura quando não há nada: a contagem devolvida é que
+    // diz se existia marca, e é ela que vira o erro na camada de aplicação.
+    const { count } = await getDatabase().scoutedTenderSignal.deleteMany({ where: { tenderId } });
+    return count > 0;
+  }
+}
+
+/**
+ * Acervo técnico da empresa, no formato que o confronto da fila consome.
+ *
+ * ⚠️ Lê a MESMA fonte que a tela "Acervo técnico" mostra, e não a tabela de
+ * contratos executados como a primeira versão fazia. A tela parte dos atestados
+ * (documento do tipo ATESTADO) e, para cada um, usa os serviços estruturados se
+ * existirem ou, na falta deles, os que a IA extraiu do PDF. Consultar só a
+ * tabela estruturada devolvia ZERO na base real — os 2.209 serviços dos 24
+ * atestados vêm da extração.
+ *
+ * Não há filtro por situação do contrato de propósito: acervo é o que a equipe
+ * vê na tela do acervo. Se um dia a regra mudar, ela muda nos dois lugares
+ * juntos, e não só aqui.
+ */
+export class PrismaArchiveEvidenceRepository {
+  /**
+   * Carrega o acervo inteiro de uma vez.
+   *
+   * Consultar por licitação faria uma consulta por linha — centenas numa fila
+   * de centenas. O acervo é da empresa, não da licitação: muda raramente e cabe
+   * folgado na memória de um pedido.
+   */
+  async loadEvidence(): Promise<ArchiveEvidence[]> {
+    const documents = await getDatabase().managedDocument.findMany({
+      where: { type: "ATESTADO", status: { not: "DELETED" } },
+      select: {
+        id: true,
+        versions: {
+          orderBy: { version: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            technicalEvidenceRecords: {
+              select: {
+                experience: {
+                  select: {
+                    subject: true,
+                    value: true,
+                    services: {
+                      select: {
+                        id: true, discipline: true, originalDescription: true, characteristics: true,
+                        quantities: { select: { value: true, unit: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            aiExtractionExecutions: { orderBy: { startedAt: "desc" }, take: 1, select: { output: true } },
+          },
+        },
+      },
+    });
+
+    return documents.flatMap((document) => {
+      const version = document.versions[0];
+      if (!version) return [];
+
+      const experience = version.technicalEvidenceRecords[0]?.experience;
+      const contractSubject = experience?.subject;
+      const contractValue = experience?.value === null || experience?.value === undefined ? undefined : Number(experience.value);
+
+      // Serviço estruturado tem precedência: alguém já conferiu e organizou.
+      if (experience && experience.services.length > 0) {
+        return experience.services.map((service) => ({
+          serviceId: service.id,
+          discipline: service.discipline,
+          description: service.originalDescription,
+          characteristics: service.characteristics,
+          // Já vem separado em valor e unidade no caminho estruturado.
+          quantities: service.quantities.map((q) => `${q.value.toString()} ${q.unit}`),
+          ...(contractValue !== undefined ? { contractValue } : {}),
+          ...(contractSubject ? { contractSubject } : {}),
+        }));
+      }
+
+      // Caso comum hoje: o que a IA leu da tabela de serviços do atestado.
+      const extracted = servicesFromExtraction(fieldsFromExtractionOutput(version.aiExtractionExecutions[0]?.output));
+      return extracted.map((service, index) => ({
+        serviceId: `${version.id}:${index}`,
+        discipline: service.discipline,
+        description: service.description,
+        // A extração traz quantidade e unidade juntas; elas entram como
+        // característica porque é onde o confronto procura detalhe.
+        characteristics: service.quantities,
+        // A extração devolve quantidade e unidade num texto só, e é dele que a
+        // comparação de quantitativo tira o número.
+        quantities: service.quantities === "Não informada" ? [] : [service.quantities],
+        ...(contractValue !== undefined ? { contractValue } : {}),
+        ...(contractSubject ? { contractSubject } : {}),
+      }));
+    });
   }
 }

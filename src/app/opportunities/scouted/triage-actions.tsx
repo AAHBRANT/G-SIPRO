@@ -41,33 +41,33 @@ export function TriageActions({ id }: { id: string }) {
   }
 
   if (discarding) {
-    return <div className="flex flex-col gap-2" onClick={stopToggle}>
+    return <div className="bx-acao" onClick={stopToggle}>
       <label className="sr-only" htmlFor={`reason-${id}`}>Motivo do descarte</label>
       <input
         autoFocus
-        className="h-8 w-full rounded-md border border-slate-200 px-2 text-[11px] outline-none focus:border-brand"
+        className="bx-campo"
         id={`reason-${id}`}
         onChange={(event) => setReason(event.target.value)}
         placeholder="Motivo do descarte"
         value={reason}
       />
-      <div className="flex gap-1.5">
+      <div className="par">
         <button
-          className="rounded-md bg-slate-800 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+          className="bx-bt sim"
           disabled={pending || reason.trim().length < 3}
           onClick={() => decide({ decision: "DISCARD", reason: reason.trim() }, () => router.refresh())}
           type="button"
         >Confirmar</button>
-        <button className="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600" onClick={() => { setDiscarding(false); setReason(""); }} type="button">Cancelar</button>
+        <button className="bx-bt nao" onClick={() => { setDiscarding(false); setReason(""); }} type="button">Cancelar</button>
       </div>
-      {error && <span className="text-[10px] text-brand">{error}</span>}
+      {error && <span className="bx-erro">{error}</span>}
     </div>;
   }
 
-  return <div className="flex flex-col items-center gap-1" onClick={stopToggle}>
-    <div className="flex justify-center gap-1.5">
+  return <div className="bx-acao" onClick={stopToggle}>
+    <div className="par">
       <button
-        className="rounded-md bg-brand px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-[var(--brand-strong)] disabled:opacity-50"
+        className="bx-bt sim"
         disabled={pending}
         onClick={() => decide({ decision: "APPROVE" }, (payload) => {
           if (payload.opportunityId) router.push(`/opportunities/${payload.opportunityId}`);
@@ -75,8 +75,8 @@ export function TriageActions({ id }: { id: string }) {
         })}
         type="button"
       >{pending ? "…" : "Aprovar"}</button>
-      <button className="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50" disabled={pending} onClick={() => setDiscarding(true)} type="button">Descartar</button>
+      <button className="bx-bt nao" disabled={pending} onClick={() => setDiscarding(true)} type="button">Descartar</button>
     </div>
-    {error && <span className="text-[10px] text-brand">{error}</span>}
+    {error && <span className="bx-erro">{error}</span>}
   </div>;
 }

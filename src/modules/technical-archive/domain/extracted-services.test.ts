@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detailFields, fieldsFromExtractionOutput, servicesFromExtraction } from "./extraction-view-model";
+import { detailFields, fieldsFromExtractionOutput, servicesFromExtraction } from "@/modules/technical-archive/domain/extracted-services";
 
 describe("technical archive extraction view model", () => {
   it("reads the direct array format persisted by the extraction repository", () => {

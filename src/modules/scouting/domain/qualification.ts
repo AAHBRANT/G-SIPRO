@@ -31,7 +31,9 @@ export type QualificationResult =
   | Readonly<{ qualified: true; workTypes: readonly ScoutWorkType[] }>
   | Readonly<{ qualified: false; reason: QualificationRejection }>;
 
-const workTypeTerms: Readonly<Record<ScoutWorkType, readonly string[]>> = {
+/** Termos que denunciam cada tipo de obra num texto livre. Servem tanto para
+ *  ler o objeto da licitação quanto para reconhecer a disciplina no acervo. */
+export const workTypeTerms: Readonly<Record<ScoutWorkType, readonly string[]>> = {
   BUILDING: ["edificac", "edifici", "predio", "escola", "creche", "hospital", "posto de saude", "ginasio", "quadra", "sede", "galpao"],
   SPECIAL_STRUCTURE: ["ponte", "viaduto", "passarela", "tunel", "barragem", "acude", "obra de arte especial"],
   PAVING: ["paviment", "rodovia", "estrada", "asfalt", "recapea", "calcament", "duplicac", "terraplen"],

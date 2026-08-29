@@ -1,17 +1,35 @@
+import type { CSSProperties } from "react";
+
 import Link from "next/link";
 
-import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentAuthorizationContext } from "@/core/authorization/authorization-context";
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
+import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
+import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
+import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
+import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
+import { editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
-import { scoutWorkTypes, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
+import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
+import { themeVariants } from "@/modules/scouting/domain/signal";
+import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
+import { AdherenceGauge } from "./adherence-gauge";
 import { ScoutedFilters, type FilterGroup } from "./scouted-filters";
+import { Flag, SignalActions } from "./signal-actions";
+import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
 import { TriageActions } from "./triage-actions";
+import "./scouted.css";
 
 const PAGE_SIZE = 60;
 const SHORT_DEADLINE_DAYS = 14;
+/** Aderência não existe no banco: filtrar por ela obriga a trazer o conjunto e
+ *  contar aqui. O teto evita que a fila cresça sem limite dentro de um pedido;
+ *  quando ele é atingido a tela diz, em vez de cortar calada. */
+const QUEUE_CAP = 900;
+/** Abaixo disto a licitação contraria o perfil em mais de um critério. */
+const OFF_PROFILE = 50;
 
 const sphereLabels: Record<string, string> = { F: "Federal", E: "Estadual", M: "Municipal", D: "Distrital" };
 const workTypeLabels: Record<ScoutWorkType, string> = {
@@ -24,6 +42,7 @@ const workTypeLabels: Record<ScoutWorkType, string> = {
   RENOVATION: "Reforma e retrofit",
 };
 const sortOptions = [
+  { value: "aderencia", label: "Maior aderência" },
   { value: "prazo", label: "Prazo mais curto" },
   { value: "valor", label: "Maior valor" },
   { value: "recente", label: "Captada mais recentemente" },
@@ -41,33 +60,31 @@ const currency = (value: Prisma.Decimal | null, undisclosed: boolean) =>
   undisclosed || value === null ? null : Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 /**
- * Busca a fila e já resolve o que depende do relógio — dias restantes, prazo
- * curto — fora da renderização, que deve permanecer pura.
+ * O Prisma usa `null` para ausência; o domínio da aderência usa `undefined`.
+ * A conversão fica aqui, na fronteira, para o domínio não precisar conhecer a
+ * convenção do banco.
  */
-async function loadQueue(where: Prisma.ScoutedTenderWhereInput, orderBy: Prisma.ScoutedTenderOrderByWithRelationInput[]) {
-  const database = getDatabase();
-  const now = Date.now();
-  const shortDeadline = new Date(now + SHORT_DEADLINE_DAYS * 86_400_000);
-  const [page, filtered, lastRun, facets] = await Promise.all([
-    database.scoutedTender.findMany({ where, orderBy, take: PAGE_SIZE }),
-    database.scoutedTender.count({ where }),
-    database.scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
-    // Projeção leve da fila inteira: alimenta os contadores dos cartões e das
-    // opções de filtro sem trazer o texto dos objetos.
-    database.scoutedTender.findMany({ where: { status: "PENDING" }, select: { state: true, sphere: true, workTypes: true, valueUndisclosed: true, proposalClosesAt: true, runId: true } }),
-  ]);
+type AdherenceRow = Readonly<{
+  subject: string;
+  sphere: string;
+  workTypes: readonly string[];
+  estimatedValue: Prisma.Decimal | null;
+  valueUndisclosed: boolean;
+  proposalClosesAt: Date | null;
+}>;
 
-  return {
-    filtered, lastRun, facets,
-    total: facets.length,
-    fromLastRun: lastRun ? facets.filter((entry) => entry.runId === lastRun.id).length : 0,
-    urgent: facets.filter((entry) => entry.proposalClosesAt && entry.proposalClosesAt <= shortDeadline).length,
-    undisclosed: facets.filter((entry) => entry.valueUndisclosed).length,
-    tenders: page.map((tender) => ({
-      ...tender,
-      days: tender.proposalClosesAt ? Math.max(0, Math.ceil((tender.proposalClosesAt.getTime() - now) / 86_400_000)) : undefined,
-    })),
-  };
+const toAdherenceInput = (row: AdherenceRow): AdherenceInput => ({
+  subject: row.subject,
+  sphere: row.sphere,
+  workTypes: row.workTypes,
+  estimatedValue: row.estimatedValue === null ? undefined : Number(row.estimatedValue),
+  valueUndisclosed: row.valueUndisclosed,
+  proposalClosesAt: row.proposalClosesAt ?? undefined,
+});
+
+async function loadFilter(): Promise<ScoutFilter> {
+  // O perfil salvo manda; o padrão só cobre a base que nunca foi configurada.
+  return (await new PrismaScoutRepository().loadFilter()) ?? defaultScoutFilter;
 }
 
 export default async function ScoutedTendersPage({ searchParams }: { searchParams: Promise<Filters> }) {
@@ -76,24 +93,34 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     return <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center px-6 py-10"><section className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-8"><p className="text-xs font-bold uppercase tracking-wider text-amber-800">Controle de acesso</p><h1 className="mt-2 text-2xl font-black text-amber-950">Acesso aguardando provisionamento</h1><p className="mt-3 leading-7 text-amber-900">Nenhum perfil aprovado concede consulta às licitações rastreadas.</p></section></main>;
   }
 
-  const filters = await searchParams;
-  const query = one(filters.q)?.trim().slice(0, 120);
-  const selectedRegions = many(filters.reg).filter((entry) => regions.includes(entry as never));
-  const selectedTypes = many(filters.tipo).filter((entry) => scoutWorkTypes.includes(entry as ScoutWorkType));
-  const selectedSpheres = many(filters.esfera).filter((entry) => entry in sphereLabels);
-  const minimumValue = digits(one(filters.vmin));
-  const sort = one(filters.sort) ?? "prazo";
+  const params = await searchParams;
+  const query = one(params.q)?.trim().slice(0, 120);
+  const selectedRegions = many(params.reg).filter((entry) => regions.includes(entry as never));
+  const selectedTypes = many(params.tipo).filter((entry) => scoutWorkTypes.includes(entry as ScoutWorkType));
+  const selectedSpheres = many(params.esfera).filter((entry) => entry in sphereLabels);
+  const minimumValue = digits(one(params.vmin));
+  const adherenceFloor = Math.max(0, Math.min(100, Number(one(params.ader) ?? 0) || 0));
+  const sort = one(params.sort) ?? "aderencia";
+
+  /**
+   * Busca por texto e faixa de valor produzem, cada uma, um grupo OR. Escritas
+   * como dois espalhamentos condicionais no mesmo objeto, a segunda apagava a
+   * primeira em silêncio: quem buscasse texto E valor mínimo perdia a busca sem
+   * nenhum aviso. Reunidas em AND, as duas valem juntas.
+   */
+  const groupsOfOr: Prisma.ScoutedTenderWhereInput[] = [];
+  if (query) groupsOfOr.push({ OR: [{ subject: { contains: query, mode: "insensitive" } }, { authorityName: { contains: query, mode: "insensitive" } }, { city: { contains: query, mode: "insensitive" } }] });
+  // Valor sigiloso nunca é excluído por faixa: o orçamento fechado é comum em
+  // obra grande, e filtrá-lo por valor eliminaria justamente o alvo.
+  if (minimumValue !== undefined) groupsOfOr.push({ OR: [{ estimatedValue: { gte: minimumValue } }, { valueUndisclosed: true }] });
 
   const states = statesOfRegions(selectedRegions);
   const where: Prisma.ScoutedTenderWhereInput = {
     status: "PENDING",
-    ...(query && { OR: [{ subject: { contains: query, mode: "insensitive" } }, { authorityName: { contains: query, mode: "insensitive" } }, { city: { contains: query, mode: "insensitive" } }] }),
     ...(states.length > 0 && { state: { in: [...states] } }),
     ...(selectedTypes.length > 0 && { workTypes: { hasSome: selectedTypes } }),
     ...(selectedSpheres.length > 0 && { sphere: { in: selectedSpheres } }),
-    // Valor sigiloso nunca é excluído por faixa: o orçamento fechado é comum em
-    // obra grande, e filtrá-lo por valor eliminaria justamente o alvo.
-    ...(minimumValue !== undefined && { OR: [{ estimatedValue: { gte: minimumValue } }, { valueUndisclosed: true }] }),
+    ...(groupsOfOr.length > 0 && { AND: groupsOfOr }),
   };
 
   const orderBy: Prisma.ScoutedTenderOrderByWithRelationInput[] =
@@ -101,137 +128,394 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     : sort === "recente" ? [{ createdAt: "desc" }]
     : [{ proposalClosesAt: "asc" }, { createdAt: "desc" }];
 
-  const { tenders, filtered, lastRun, facets, total, fromLastRun, urgent, undisclosed } = await loadQueue(where, orderBy);
+  const database = getDatabase();
+  const now = new Date();
+  const shortDeadline = new Date(now.getTime() + SHORT_DEADLINE_DAYS * 86_400_000);
+  const filter = await loadFilter();
+
+  const [rows, lastRun, facets, archive] = await Promise.all([
+    database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP, include: { signal: true, editalReading: true } }),
+    database.scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
+    // Projeção leve da fila inteira: alimenta os contadores dos cartões e das
+    // opções de filtro sem trazer o registro completo.
+    database.scoutedTender.findMany({
+      where: { status: "PENDING" },
+      select: { subject: true, state: true, sphere: true, workTypes: true, estimatedValue: true, valueUndisclosed: true, proposalClosesAt: true, runId: true },
+    }),
+    // O acervo é da empresa, não da licitação: uma consulta serve a fila
+    // inteira. Buscar por linha faria centenas de idas ao banco por página.
+    new PrismaArchiveEvidenceRepository().loadEvidence(),
+  ]);
+
+  const scored = rows.map((tender) => {
+    // Lida do edital quando existe leitura; deduzida do objeto quando não.
+    // `toArchiveRequirement` devolve nulo se a leitura não achou parcela
+    // nenhuma — e aí volta-se ao objeto, em vez de confrontar contra o vazio.
+    const edital = tender.editalReading ? editalReadingFromRow(tender.editalReading) : undefined;
+    const estimado = tender.valueUndisclosed || tender.estimatedValue === null ? undefined : Number(tender.estimatedValue);
+    const lido = edital ? toArchiveRequirement(edital.requirement, estimado) : null;
+    return {
+    ...tender,
+    edital,
+    // Os dois tons saem da cor gravada a cada leitura: a troca de tema não
+    // consulta nada, e melhorias na regra de contraste valem para o que já
+    // está no banco sem reescrever registro nenhum.
+    signal: tender.signal ? { ...tender.signal, ...themeVariants(tender.signal.color) } : null,
+    adherence: computeAdherence(toAdherenceInput(tender), filter, now),
+    // A pergunta que inabilita: temos acervo para isto? Enquanto o edital não
+    // for lido, o requisito é inferido do objeto — e sai marcado como tal.
+    archive: computeArchiveAdherence(
+      lido ?? {
+        sources: [{ text: tender.subject }],
+        ...(estimado !== undefined ? { estimatedValue: estimado } : {}),
+        inferred: true,
+      },
+      archive,
+    ),
+    days: tender.proposalClosesAt ? Math.max(0, Math.ceil((tender.proposalClosesAt.getTime() - now.getTime()) / 86_400_000)) : undefined,
+  };
+  });
+
+  /**
+   * O corte é pelo ACERVO, que é o critério que inabilita. Licitação cujo
+   * acervo não pôde ser julgado — sem tipo reconhecido ou sem nada cadastrado —
+   * fica de fora do corte em vez de virar zero, e o cabeçalho diz quantas
+   * foram postas de lado. Esconder em silêncio o que não foi medido faria a
+   * equipe perder obra que ela sabe fazer.
+   */
+  const semJulgamento = adherenceFloor > 0 ? scored.filter((tender) => !tender.archive.determined).length : 0;
+  /**
+   * A lista de pré-requisitos é montada aqui porque depende do acervo e do
+   * prazo já calculados. Cada item diz de onde veio a resposta: o que o
+   * sistema conferiu aparece resolvido, e o que só o edital responde aparece
+   * pendente — nunca atendido.
+   */
+  const comRequisitos = scored.map((tender) => ({
+    ...tender,
+    prerequisites: buildPrerequisites({
+      archive: tender.archive,
+      ...(tender.days !== undefined ? { daysToClose: tender.days } : {}),
+      minimumDays: filter.minimumDaysToClose,
+      ...(tender.estimatedValue !== null ? { estimatedValue: Number(tender.estimatedValue) } : {}),
+      valueUndisclosed: tender.valueUndisclosed,
+      ...(filter.minimumValue !== undefined ? { minimumValue: filter.minimumValue } : {}),
+      ...(tender.edital ? { edital: tender.edital.requirement } : {}),
+    }),
+  }));
+
+  const kept = adherenceFloor > 0
+    ? comRequisitos.filter((tender) => tender.archive.determined && tender.archive.score >= adherenceFloor)
+    : comRequisitos;
+  const ordered = sort === "aderencia"
+    // Sem acervo julgado, o perfil serve de desempate: é o que sobra para
+    // ordenar, e vale mais que ordem aleatória.
+    ? [...kept].sort((a, b) => (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1)
+        || b.adherence.score - a.adherence.score)
+    : kept;
+  const tenders = ordered.slice(0, PAGE_SIZE);
+
+  const facetScores = facets.map((entry) => computeAdherence(toAdherenceInput(entry), filter, now));
+  const total = facets.length;
+  const offProfile = facetScores.filter((entry) => entry.score < OFF_PROFILE).length;
 
   const groups: FilterGroup[] = [
     { key: "reg", label: "Região", options: regions.map((region) => ({ value: region, label: region, count: facets.filter((entry) => regionOf(entry.state) === region).length })) },
-    { key: "tipo", label: "Tipo de obra", options: scoutWorkTypes.map((type) => ({ value: type, label: workTypeLabels[type], count: facets.filter((entry) => entry.workTypes.includes(type)).length })) },
+    { key: "tipo", label: "Tipo de obra", options: scoutWorkTypes.map((type) => ({ value: type, label: workTypeLabels[type], count: facetScores.filter((entry) => entry.workTypes.includes(type)).length })) },
     { key: "esfera", label: "Esfera", options: Object.entries(sphereLabels).map(([value, label]) => ({ value, label, count: facets.filter((entry) => entry.sphere === value).length })) },
   ];
 
   const canDecide = authorize(authorization, { permission: "opportunities.create" }).allowed;
+  const truncated = rows.length === QUEUE_CAP;
 
-  return <main className="mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-    <Link className="text-sm font-bold text-brand hover:underline" href="/opportunities">← Voltar às oportunidades</Link>
-    <div className="mt-3">
-      <PageHeader eyebrow="Buscador G-SIPRO" icon="search" subtitle="Captadas na varredura de domingo. Aprovar cadastra a oportunidade automaticamente; descartar guarda no histórico." title="Oportunidades rastreadas" variant="executive"/>
-    </div>
+  return <div className="bx" id={THEME_ROOT_ID}>
+    {/* Aplica o tema salvo antes da pintura, para a tela não piscar no claro
+        antes de virar escura. */}
+    <script dangerouslySetInnerHTML={{ __html: themeBootScript }}/>
 
-    <section aria-label="Resumo da fila" className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard hint="aguardando decisão" label="Na fila" tone="slate" value={total}/>
-      <SummaryCard hint={lastRun ? `varredura de ${lastRun.startedAt.toLocaleDateString("pt-BR")}` : "nenhuma varredura concluída"} label="Novas nesta semana" tone="blue" value={fromLastRun}/>
-      <SummaryCard hint={`encerram em até ${SHORT_DEADLINE_DAYS} dias`} label="Prazo curto" tone="brand" value={urgent}/>
-      <SummaryCard hint="orçamento fechado pelo órgão" label="Valor sigiloso" tone="amber" value={undisclosed}/>
+    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
+    <Link className="bx-voltar" href="/opportunities">← Voltar às oportunidades</Link>
+
+    <header className="bx-topo" style={{ marginTop: 10 }}>
+      <div>
+        <p className="bx-sobrenome">Buscador G-SIPRO</p>
+        <h1 className="bx-titulo">Oportunidades rastreadas</h1>
+        <p className="bx-sub">Captadas na varredura de domingo. Aprovar cadastra a oportunidade automaticamente; descartar guarda no histórico.</p>
+      </div>
+      <ThemeToggle/>
+    </header>
+
+    <section aria-label="Resumo da fila" className="bx-cartoes">
+      <Cartao dica="aguardando decisão" rotulo="Na fila" valor={total}/>
+      <Cartao dica={lastRun ? `varredura de ${lastRun.startedAt.toLocaleDateString("pt-BR")}` : "nenhuma varredura concluída"} rotulo="Novas nesta semana" valor={lastRun ? facets.filter((entry) => entry.runId === lastRun.id).length : 0}/>
+      <Cartao destaque dica={`aderência abaixo de ${OFF_PROFILE}%`} rotulo="Fora do perfil" valor={offProfile}/>
+      <Cartao dica={`encerram em até ${SHORT_DEADLINE_DAYS} dias`} rotulo="Prazo curto" valor={facets.filter((entry) => entry.proposalClosesAt && entry.proposalClosesAt <= shortDeadline).length}/>
+      <Cartao dica="orçamento fechado pelo órgão" rotulo="Valor sigiloso" valor={facets.filter((entry) => entry.valueUndisclosed).length}/>
     </section>
 
-    <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.05)]">
+    <section className="bx-mesa" style={{ marginTop: 14 }}>
       <ScoutedFilters groups={groups} sortOptions={sortOptions}/>
 
-      <header className="flex flex-wrap items-center justify-between gap-3 bg-slate-800 px-4 py-3 text-white">
-        <h2 className="flex items-center gap-2.5 text-xs font-black uppercase tracking-wider">
+      <header className="bx-relacao">
+        <h2>
           Relação de rastreadas
-          <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] tabular-nums">{filtered === total ? total : `${filtered} de ${total}`}</span>
+          <span className="total">{kept.length === total ? total : `${kept.length} de ${total}`}</span>
         </h2>
-        <p className="text-[11px] text-slate-300">
-          {filtered > tenders.length && <>Mostrando as <strong className="text-white">{tenders.length}</strong> primeiras · </>}
-          Ordenado por <strong className="text-white">{sortOptions.find((option) => option.value === sort)?.label.toLowerCase()}</strong>
+        <p>
+          {kept.length > tenders.length && <>Mostrando as <strong>{tenders.length}</strong> primeiras · </>}
+          {semJulgamento > 0 && <><strong>{semJulgamento}</strong> fora do corte por acervo não julgado · </>}
+          {truncated && <>Fila maior que {QUEUE_CAP}; a contagem por aderência considera as {QUEUE_CAP} primeiras · </>}
+          Ordenado por <strong>{sortOptions.find((option) => option.value === sort)?.label.toLowerCase()}</strong>
         </p>
       </header>
 
-      <div className="divide-y divide-slate-100">
+      <div>
         {tenders.map((tender) => {
-          const days = tender.days;
           const value = currency(tender.estimatedValue, tender.valueUndisclosed);
-          return <details className="group" key={tender.id}>
-            <summary className="grid cursor-pointer list-none grid-cols-[18px_minmax(0,1fr)_130px_92px_150px] items-start gap-3 px-4 py-3.5 transition hover:bg-slate-50/70 group-open:bg-slate-50">
-              <svg aria-hidden="true" className="mt-1 h-3.5 w-3.5 text-slate-400 transition group-open:rotate-90 group-open:text-brand" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          const days = tender.days;
+          const signal = tender.signal;
+          return <details
+            className="bx-linha"
+            data-sinalizada={signal ? "sim" : undefined}
+            key={tender.id}
+            style={signal ? ({ "--sig-claro": signal.light, "--sig-escuro": signal.dark } as CSSProperties) : undefined}
+          >
+            <summary className="bx-cab">
+              {/* Faixa e bandeira ficam DENTRO do summary: soltas no details o
+                  navegador as trata como conteúdo do detalhe e joga para o rodapé. */}
+              {signal && <><span className="bx-terreno"/><span className="bx-bandeira"><Flag/></span></>}
+              <svg aria-hidden="true" className="bx-seta h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+
               <div className="min-w-0">
-                <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{tender.subject}</p>
-                <p className="mt-1 text-xs text-slate-500">{tender.authorityName} · {tender.modality} · {sphereLabels[tender.sphere] ?? tender.sphere}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {tender.workTypes.map((type) => <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10.5px] font-semibold text-indigo-900" key={type}>{workTypeLabels[type as ScoutWorkType] ?? type}</span>)}
-                  {tender.valueUndisclosed && <span className="rounded bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-900">valor sigiloso</span>}
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-500">acervo não verificado</span>
+                <p className="bx-objeto">{tender.subject}</p>
+                <p className="bx-orgao">{tender.authorityName} · {tender.modality} · {sphereLabels[tender.sphere] ?? tender.sphere}</p>
+                <div className="bx-etiquetas">
+                  {signal && <span className="bx-marca-p"><Flag size={13}/>{signal.label}</span>}
+                  {tender.adherence.workTypes.map((type) => <span className="bx-eti tipo" key={type}>{workTypeLabels[type] ?? type}</span>)}
+                  {tender.valueUndisclosed && <span className="bx-eti alerta">valor sigiloso</span>}
+                  {tender.adherence.reasons.filter((reason) => !reason.met && !reason.skipped && reason.criterion !== "SPHERE").map((reason) =>
+                    <span className="bx-eti alerta" key={reason.criterion}>{reason.label}</span>)}
+                  {tender.archive.determined
+                    ? <span className="bx-eti">acervo {tender.archive.score}%{tender.archive.requirementInferred ? " (estimado)" : ""}</span>
+                    : <span className="bx-eti">acervo não julgado</span>}
+                  {/* O que falta decide parceria, então aparece na linha e
+                      não escondido dentro do painel. */}
+                  <span className={tender.edital ? (tender.edital.reviewedAt ? "bx-eti" : "bx-eti aviso") : "bx-eti"}>
+                    {tender.edital ? (tender.edital.reviewedAt ? "edital conferido" : "edital lido, a conferir") : "edital não lido"}
+                  </span>
+                  {(() => {
+                    const r = summarize(tender.prerequisites);
+                    return <span className={r.notMet > 0 ? "bx-eti alerta" : "bx-eti"}>
+                      {r.met}/{r.total} pré-requisitos{r.unknown > 0 ? ` · ${r.unknown} a conferir` : ""}
+                    </span>;
+                  })()}
+                  {tender.archive.needsPartner && <span className="bx-eti alerta">
+                    consórcio{tender.archive.missing.length > 0
+                      ? `: falta ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}`
+                      : ": porte"}
+                  </span>}
                 </div>
               </div>
-              <div className="text-right">
-                <p className={`text-[15px] font-bold tabular-nums ${value ? "text-slate-900" : "text-amber-800"}`}>{value ?? "Sigiloso"}</p>
-                <p className="mt-1 text-xs text-slate-500">{tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}</p>
+
+              <div className="bx-num">
+                <p className={value ? "bx-valor" : "bx-valor sigiloso"}>{value ?? "Sigiloso"}</p>
+                <p className="bx-local">{tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}</p>
               </div>
-              <div className="text-right">
-                {days === undefined ? <p className="text-slate-500">—</p> : <>
-                  <p className={`text-[15px] font-bold tabular-nums ${days <= SHORT_DEADLINE_DAYS ? "text-brand" : "text-slate-700"}`}>{days} dias</p>
-                  <p className="mt-1 text-[10.5px] tabular-nums text-slate-400">{tender.proposalClosesAt?.toLocaleDateString("pt-BR")}</p>
+
+              <div className="bx-num bx-prazo">
+                {days === undefined ? <p className="bx-local">—</p> : <>
+                  <p className={days <= SHORT_DEADLINE_DAYS ? "bx-dias curto" : "bx-dias"}>{days} dias</p>
+                  <p className="bx-data">{tender.proposalClosesAt?.toLocaleDateString("pt-BR")}</p>
                 </>}
               </div>
-              <div>
-                {canDecide ? <TriageActions id={tender.id}/> : <span className="block text-center text-[10px] text-slate-400">Sem alçada para decidir</span>}
+
+              <div className="bx-medidor-caixa">
+                <AdherenceGauge score={tender.archive.score} undetermined={!tender.archive.determined}/>
+                {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
+                {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
+                    Por isso não depende da alçada de decidir. */}
+                <div className="bx-mini-acoes">
+                  <SignalActions id={tender.id} signal={signal ? { level: signal.level, label: signal.label, color: signal.color, ...(signal.note ? { note: signal.note } : {}) } : undefined}/>
+                </div>
               </div>
             </summary>
 
-            <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4 pl-11">
-              <dl className="grid gap-3 md:grid-cols-3">
-                <Panel title="Identificação">
-                  <Row label="Órgão" value={tender.authorityName}/>
-                  <Row label="Esfera" value={sphereLabels[tender.sphere] ?? tender.sphere}/>
-                  <Row label="Modalidade" value={tender.modality}/>
-                  <Row label="Processo" value={tender.processNumber ?? "—"}/>
-                  <Row label="Localidade" value={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}/>
-                </Panel>
-                <Panel title="Prazos">
-                  <Row label="Abertura das propostas" value={tender.proposalOpensAt?.toLocaleDateString("pt-BR") ?? "—"}/>
-                  <Row label="Encerramento" value={tender.proposalClosesAt?.toLocaleDateString("pt-BR") ?? "—"}/>
-                  <Row label="Dias restantes" value={days === undefined ? "—" : `${days} dias`}/>
-                  <Row label="Captada em" value={tender.createdAt.toLocaleDateString("pt-BR")}/>
-                </Panel>
-                <Panel title="Habilitação técnica">
-                  <p className="px-3 py-3 text-xs leading-5 text-slate-500">
-                    O edital ainda não foi analisado. Acervo exigido, consórcio, garantia de proposta e visita técnica passam a aparecer aqui quando a leitura automática do edital entrar em operação.
+            <div className="bx-painel">
+              <dl className="bx-paineis">
+                <div className="bx-bloco">
+                  <h3>Identificação</h3>
+                  <Linha rotulo="Órgão" valor={tender.authorityName}/>
+                  <Linha rotulo="Esfera" valor={sphereLabels[tender.sphere] ?? tender.sphere}/>
+                  <Linha rotulo="Modalidade" valor={tender.modality}/>
+                  <Linha rotulo="Processo" valor={tender.processNumber ?? "—"}/>
+                  <Linha rotulo="Localidade" valor={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}/>
+                </div>
+
+                <div className="bx-bloco">
+                  <h3>Prazos</h3>
+                  <Linha rotulo="Abertura das propostas" valor={tender.proposalOpensAt?.toLocaleDateString("pt-BR") ?? "—"}/>
+                  <Linha rotulo="Encerramento" valor={tender.proposalClosesAt?.toLocaleDateString("pt-BR") ?? "—"}/>
+                  <Linha rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
+                  <Linha rotulo="Captada em" valor={tender.createdAt.toLocaleDateString("pt-BR")}/>
+                </div>
+
+                <div className="bx-bloco">
+                  <h3>Pré-requisitos</h3>
+                  {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
+                  <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    {!tender.edital
+                      ? <>O que está marcado como <strong>a conferir</strong> depende de ler o edital. Este ainda não foi lido, e por isso o sistema não afirma que atende.</>
+                      : tender.edital.reviewedAt
+                        ? <>Edital lido e <strong>conferido</strong> por uma pessoa em {tender.edital.reviewedAt.toLocaleDateString("pt-BR")}.</>
+                        : <>Edital lido automaticamente e <strong>ainda não conferido</strong> por uma pessoa. Antes de montar proposta ou consórcio, confira as parcelas contra o PDF.</>}
                   </p>
-                  {tender.noticeUrl && <a className="mx-3 mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline" href={tender.noticeUrl} rel="noreferrer" target="_blank">
-                    Abrir o edital no PNCP
-                    <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
-                  </a>}
-                </Panel>
+                </div>
+
+                {tender.edital && <div className="bx-bloco">
+                  <h3>Parcelas exigidas pelo edital</h3>
+                  {tender.edital.requirement.services.length > 0
+                    ? <div className="bx-parcelas">
+                      {tender.edital.requirement.services.map((parcela, indice) => <div className="bx-parcela" key={indice}>
+                        <span className="bx-parcela-nome">{parcela.description}</span>
+                        <span className="bx-parcela-qtd">
+                          {parcela.quantity === undefined
+                            ? "—"
+                            : `${parcela.quantity.toLocaleString("pt-BR")}${parcela.unit ? ` ${parcela.unit}` : ""}`}
+                        </span>
+                      </div>)}
+                    </div>
+                    : <p className="bx-nota">A leitura não localizou lista de parcelas de maior relevância neste edital.</p>}
+                  {tender.archive.unreadable.length > 0 && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    <strong>Não conferido contra o acervo:</strong> {tender.archive.unreadable.join("; ")}. O sistema não soube classificar esta(s) parcela(s) — confira à mão.
+                  </p>}
+                  {tender.edital.requirement.limitations.length > 0 && <p className="bx-nota">
+                    <strong>A leitura não conseguiu determinar:</strong> {tender.edital.requirement.limitations.join("; ")}.
+                  </p>}
+                </div>}
+
+                <div className="bx-bloco">
+                  <h3>Acervo técnico — {tender.archive.determined ? `${tender.archive.score}%` : "não julgado"}</h3>
+                  {/* Serviço a serviço: é a lista do que falta que vira a
+                      conversa de consórcio. */}
+                  {tender.archive.required.map((item) => <Motivo
+                    key={item.categoryId}
+                    met={item.covered}
+                    rotulo={item.quantity
+                      ? `${item.label} — ${item.quantity.explanation}`
+                      : item.covered ? `${item.label} — ${item.evidenceCount} no acervo` : `${item.label} — sem acervo`}
+                    skipped={false}
+                  />)}
+                  {!tender.archive.determined && tender.archive.reasons.map((reason) =>
+                    <Motivo key={reason} met={false} rotulo={reason} skipped/>)}
+                  {tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined && <Motivo
+                    met={false}
+                    rotulo={`porte: maior obra executada foi R$ ${(tender.archive.largestExecuted / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`}
+                    skipped={false}
+                  />}
+                  {tender.archive.needsPartner && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    <strong>Indica consórcio.</strong>{" "}
+                    {tender.archive.missing.length > 0
+                      ? `O acervo não comprova ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}.`
+                      : "A obra é maior que qualquer uma já executada."}
+                  </p>}
+                  {tender.archive.requirementInferred && tender.archive.determined && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    Serviços <strong>estimados a partir do objeto</strong>. As parcelas de maior relevância exigidas de fato só constam do edital, que ainda não é lido automaticamente.
+                  </p>}
+                </div>
+
+                <div className="bx-bloco">
+                  <h3>Aderência ao perfil — {tender.adherence.undetermined ? "não calculada" : `${tender.adherence.score}%`}</h3>
+                  {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
+                </div>
+
+                {signal?.note && <div className="bx-bloco">
+                  <h3>Sinalização — {signal.label}</h3>
+                  <p className="bx-nota">{signal.note}</p>
+                </div>}
+
+                <div className="bx-bloco">
+                  <h3>{tender.edital ? "Edital lido" : "Edital"}</h3>
+                  {tender.edital
+                    ? <>
+                      {/* Procedência: sem cópia guardada, é isto que diz QUAL
+                          arquivo foi lido — e o hash é o que denuncia edital
+                          retificado depois da leitura. */}
+                      <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
+                      <Linha rotulo="Lido em" valor={tender.edital.source.fetchedAt.toLocaleDateString("pt-BR")}/>
+                      <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
+                      {tender.edital.requirement.confidence !== undefined
+                        && <Linha rotulo="Confiança da leitura" valor={`${Math.round(tender.edital.requirement.confidence * 100)}%`}/>}
+                    </>
+                    : <p className="bx-nota">
+                      Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
+                    </p>}
+                  <div className="bx-links">
+                    {tender.edital && <a className="bx-link forte" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
+                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+                      Baixar o edital
+                    </a>}
+                    {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
+                      Abrir no PNCP
+                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
+                    </a>}
+                  </div>
+                  {tender.edital && <p className="bx-nota">
+                    O arquivo não fica guardado no G-SIPRO: o link busca direto na origem, e por isso pode responder erro se o órgão o tirar do ar.
+                  </p>}
+                </div>
               </dl>
             </div>
           </details>;
         })}
 
-        {tenders.length === 0 && <div className="px-4 py-14 text-center">
-          <p className="text-sm font-bold text-slate-700">{total === 0 ? "Nenhuma licitação aguardando triagem" : "Nada com esses filtros"}</p>
-          <p className="mt-1.5 text-[13px] text-slate-500">{total === 0 ? "A próxima varredura ocorre no domingo." : "Desmarque alguma região ou tipo de obra para ver mais."}</p>
+        {tenders.length === 0 && <div className="bx-vazio">
+          <p>{total === 0 ? "Nenhuma licitação aguardando triagem" : "Nada com esses filtros"}</p>
+          <span>{total === 0 ? "A próxima varredura ocorre no domingo." : "Baixe a aderência mínima ou desmarque alguma região."}</span>
         </div>}
       </div>
     </section>
-  </main>;
-}
-
-const tones: Record<string, string> = {
-  slate: "border-slate-200 bg-slate-50 text-slate-700",
-  blue: "border-blue-100 bg-blue-50/70 text-blue-800",
-  brand: "border-red-100 bg-red-50/70 text-[color:var(--brand)]",
-  amber: "border-amber-100 bg-amber-50/70 text-amber-800",
-};
-
-function SummaryCard({ label, value, hint, tone }: { label: string; value: number; hint: string; tone: keyof typeof tones }) {
-  return <article className={`rounded-xl border p-4 ${tones[tone]}`}>
-    <p className="text-xs font-bold">{label}</p>
-    <p className="mt-1.5 text-[30px] font-black leading-none tracking-tight tabular-nums">{value}</p>
-    <p className="mt-2 text-[11px] text-slate-500">{hint}</p>
-  </article>;
-}
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-    <h3 className="border-b border-slate-100 bg-slate-50/60 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500">{title}</h3>
-    {children}
+    </div>
   </div>;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return <div className="flex justify-between gap-3 border-b border-slate-100 px-3 py-1.5 text-xs last:border-b-0">
-    <dt className="text-slate-500">{label}</dt>
-    <dd className="text-right font-semibold text-slate-800">{value}</dd>
+function Cartao({ rotulo, valor, dica, destaque }: { rotulo: string; valor: number; dica: string; destaque?: boolean }) {
+  return <article className={destaque && valor > 0 ? "bx-cartao destaque" : "bx-cartao"}>
+    <p className="rot">{rotulo}</p>
+    <p className="num">{valor}</p>
+    <p className="dica">{dica}</p>
+  </article>;
+}
+
+function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return <div className="bx-item"><dt>{rotulo}</dt><dd>{valor}</dd></div>;
+}
+
+const tick = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>;
+const cross = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>;
+const dash = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>;
+const bang = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M12 6v8M12 18h.01"/></svg>;
+
+const marcaDoEstado = {
+  MET: { icone: tick, classe: "atende" },
+  NOT_MET: { icone: cross, classe: "falha" },
+  ATTENTION: { icone: bang, classe: "atencao" },
+  UNKNOWN: { icone: dash, classe: "pulado" },
+} as const;
+
+function PreRequisito({ requisito }: { requisito: Prerequisite }) {
+  const marca = marcaDoEstado[requisito.status];
+  return <div className={`bx-motivo ${marca.classe}`}>
+    {marca.icone}
+    <span>
+      <strong>{requisito.label}</strong>
+      {" — "}{requisito.detail}
+    </span>
+  </div>;
+}
+
+function Motivo({ rotulo, met, skipped }: { rotulo: string; met: boolean; skipped: boolean }) {
+  const estado = skipped ? "pulado" : met ? "atende" : "falha";
+  return <div className={`bx-motivo ${estado}`}>
+    {skipped ? dash : met ? tick : cross}
+    <span>{rotulo}</span>
   </div>;
 }

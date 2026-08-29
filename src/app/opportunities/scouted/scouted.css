@@ -1,0 +1,956 @@
+/*
+ * Identidade visual da fila de triagem do Buscador.
+ *
+ * Segue o MAN-COM-001 Rev. 01 (Manual de Identidade Visual AAHBRANT):
+ *   3.1 primária  — preto #000000, vinho #670000, cinza #787878
+ *   3.2 destaque  — bege #EDE9AB, vinho escuro #7A0101, branco #FFFFFF
+ *   5.1           — o vinho é REALCE, não fundo dominante
+ *   5.4           — sem sombra ou efeito decorativo; profundidade só onde
+ *                   existe camada de verdade (menu sobre a página, linha sobre
+ *                   a mesa). Nenhum tom fora da paleta foi inventado: os
+ *                   neutros saem todos do cinza oficial com opacidade.
+ *
+ * O escopo é a classe .bx — nada aqui vaza para o resto do G-SIPRO, que ainda
+ * roda com o vermelho #a61918 e Segoe UI herdados. Trocar isso é decisão de
+ * outra conversa; aqui a ordem foi mexer só nesta tela.
+ */
+
+.bx {
+  --preto: #000000;
+  --vinho: #670000;
+  --vinho-escuro: #7a0101;
+  --cinza: #787878;
+  --bege: #ede9ab;
+  --branco: #ffffff;
+
+  /* Neutros derivados do cinza oficial — nenhum tom novo. */
+  --cinza-04: rgba(120, 120, 120, 0.04);
+  --cinza-08: rgba(120, 120, 120, 0.08);
+  --cinza-16: rgba(120, 120, 120, 0.16);
+  --cinza-28: rgba(120, 120, 120, 0.28);
+  --vinho-06: rgba(103, 0, 0, 0.06);
+  --vinho-14: rgba(103, 0, 0, 0.14);
+
+  /* Papéis — o modo claro é o padrão. */
+  --fundo: #f7f6f2;
+  --mesa: var(--branco);
+  --mesa-2: rgba(255, 255, 255, 0.72);
+  --texto: #16130f;
+  --texto-2: rgba(22, 19, 15, 0.68);
+  --texto-3: rgba(22, 19, 15, 0.46);
+  --fio: var(--cinza-16);
+  --fio-forte: var(--cinza-28);
+  --acento: var(--vinho);
+  --acento-fundo: var(--vinho-06);
+  --acento-fio: var(--vinho-14);
+  --campo: rgba(255, 255, 255, 0.86);
+  --sobre: var(--branco);
+  --vidro: saturate(160%) blur(18px);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --elev-2: 0 8px 28px -12px rgba(0, 0, 0, 0.24);
+  --r-g: 16px;
+  --r-m: 11px;
+  --r-p: 7px;
+
+  color: var(--texto);
+  font-family: Arial, Aptos, Calibri, "Segoe UI", Helvetica, sans-serif;
+}
+
+.bx[data-tema="escuro"] {
+  --fundo: #0d0b0b;
+  --mesa: rgba(255, 255, 255, 0.05);
+  --mesa-2: rgba(255, 255, 255, 0.08);
+  --texto: var(--branco);
+  --texto-2: rgba(255, 255, 255, 0.72);
+  --texto-3: rgba(255, 255, 255, 0.48);
+  --fio: rgba(255, 255, 255, 0.12);
+  --fio-forte: rgba(255, 255, 255, 0.22);
+  /* Sobre preto o vinho perde contraste: quem realça vira o bege (§3.2). */
+  --acento: var(--bege);
+  --acento-fundo: rgba(237, 233, 171, 0.1);
+  --acento-fio: rgba(237, 233, 171, 0.24);
+  --campo: rgba(0, 0, 0, 0.3);
+  --sobre: #171313;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elev-2: 0 10px 34px -14px rgba(0, 0, 0, 0.9);
+}
+
+.bx {
+  background: var(--fundo);
+  min-height: 100vh;
+}
+
+/* ---------- superfícies ---------- */
+
+.bx-mesa {
+  background: var(--mesa);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-g);
+  box-shadow: var(--elev-1);
+  overflow: hidden;
+}
+
+.bx[data-tema="escuro"] .bx-mesa {
+  backdrop-filter: var(--vidro);
+  -webkit-backdrop-filter: var(--vidro);
+}
+
+/* ---------- cabeçalho ---------- */
+
+.bx-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bx-sobrenome {
+  color: var(--acento);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bx-titulo {
+  font-size: clamp(26px, 3.2vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-top: 6px;
+}
+
+.bx-sub {
+  color: var(--texto-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin-top: 8px;
+  max-width: 68ch;
+}
+
+.bx-voltar {
+  color: var(--acento);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.bx-voltar:hover { text-decoration: underline; }
+
+/* ---------- botão de tema ---------- */
+
+.bx-tema {
+  align-items: center;
+  background: var(--mesa);
+  border: 1px solid var(--fio);
+  border-radius: 999px;
+  color: var(--texto-2);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  height: 38px;
+  padding: 0 14px;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.bx-tema:hover { border-color: var(--fio-forte); color: var(--texto); }
+
+/* Sol e lua ocupam a mesma casa; quem aparece é o CSS que decide, a partir do
+   data-tema do contêiner. O botão não guarda estado nenhum. */
+.bx-tema-icone { display: grid; height: 16px; place-items: center; width: 16px; }
+.bx-tema-icone svg { grid-area: 1 / 1; height: 16px; transition: opacity 0.2s, transform 0.2s; width: 16px; }
+.bx-tema-rot span { display: none; }
+
+.bx .bx-tema .lua { opacity: 0; transform: rotate(-70deg) scale(0.5); }
+.bx .bx-tema .sol { opacity: 1; transform: none; }
+.bx .bx-tema-rot .claro { display: inline; }
+
+.bx[data-tema="escuro"] .bx-tema .sol { opacity: 0; transform: rotate(70deg) scale(0.5); }
+.bx[data-tema="escuro"] .bx-tema .lua { opacity: 1; transform: none; }
+.bx[data-tema="escuro"] .bx-tema-rot .claro { display: none; }
+.bx[data-tema="escuro"] .bx-tema-rot .escuro { display: inline; }
+
+/* ---------- cartões de resumo ---------- */
+
+.bx-cartoes {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 20px;
+}
+
+.bx-cartao {
+  background: var(--mesa);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-m);
+  padding: 13px 15px;
+}
+
+.bx-cartao.destaque {
+  background: var(--acento-fundo);
+  border-color: var(--acento-fio);
+}
+
+.bx-cartao .rot {
+  color: var(--texto-2);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.bx-cartao.destaque .rot { color: var(--acento); }
+
+.bx-cartao .num {
+  font-size: 27px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-top: 7px;
+}
+
+.bx-cartao .dica {
+  color: var(--texto-3);
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* ---------- barra de filtros ---------- */
+
+.bx-barra {
+  align-items: center;
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.bx-busca {
+  align-items: center;
+  background: var(--campo);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-m);
+  display: flex;
+  flex: 1 1 260px;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+}
+
+.bx-busca:focus-within { border-color: var(--acento); }
+.bx-busca svg { color: var(--texto-3); flex-shrink: 0; height: 15px; width: 15px; }
+
+.bx-busca input {
+  background: none;
+  border: 0;
+  color: var(--texto);
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  min-width: 0;
+  outline: none;
+}
+
+.bx-busca input::placeholder { color: var(--texto-3); }
+
+.bx-chip {
+  align-items: center;
+  background: var(--mesa);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-m);
+  color: var(--texto-2);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  transition: border-color 0.16s, color 0.16s;
+  white-space: nowrap;
+}
+
+.bx-chip:hover { border-color: var(--fio-forte); color: var(--texto); }
+
+.bx-chip[data-ativo="sim"] {
+  background: var(--acento-fundo);
+  border-color: var(--acento-fio);
+  color: var(--acento);
+}
+
+.bx-chip .qtd {
+  background: var(--acento);
+  border-radius: 999px;
+  color: var(--fundo);
+  display: grid;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 17px;
+  padding: 1px 5px;
+  place-items: center;
+}
+
+.bx-chip .seta { transition: transform 0.18s; }
+.bx-chip[aria-expanded="true"] .seta { transform: rotate(180deg); }
+
+.bx-menu {
+  background: var(--sobre);
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--r-m);
+  box-shadow: var(--elev-2);
+  left: 0;
+  min-width: 246px;
+  padding: 6px;
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 40;
+}
+
+.bx-menu-cab {
+  align-items: center;
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 7px 7px;
+}
+
+.bx-menu-cab span {
+  color: var(--texto-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bx-menu-cab button {
+  background: none;
+  border: 0;
+  color: var(--acento);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bx-op {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: var(--r-p);
+  color: var(--texto);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  gap: 9px;
+  padding: 6px 7px;
+  text-align: left;
+  width: 100%;
+}
+
+.bx-op:hover:not(:disabled) { background: var(--cinza-08); }
+.bx-op:disabled { cursor: default; opacity: 0.36; }
+.bx-op .cx {
+  border: 1.6px solid var(--fio-forte);
+  border-radius: 4px;
+  color: transparent;
+  display: grid;
+  flex-shrink: 0;
+  height: 15px;
+  place-items: center;
+  width: 15px;
+}
+.bx-op[aria-pressed="true"] .cx { background: var(--acento); border-color: var(--acento); color: var(--fundo); }
+.bx-op .n { color: var(--texto-3); font-size: 11px; font-variant-numeric: tabular-nums; margin-left: auto; }
+
+/* ---------- controle de aderência ---------- */
+
+.bx-ader {
+  align-items: center;
+  background: var(--mesa);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-m);
+  display: flex;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px;
+}
+
+.bx-ader[data-ativo="sim"] { background: var(--acento-fundo); border-color: var(--acento-fio); }
+
+.bx-ader label {
+  color: var(--texto-2);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bx-ader[data-ativo="sim"] label { color: var(--acento); }
+
+.bx-ader input[type="range"] {
+  accent-color: var(--acento);
+  cursor: pointer;
+  width: 108px;
+}
+
+.bx-ader .pc {
+  color: var(--texto);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* ---------- selecionados ---------- */
+
+.bx-selo {
+  align-items: center;
+  background: var(--acento-fundo);
+  border: 1px solid var(--acento-fio);
+  border-radius: 999px;
+  color: var(--acento);
+  display: inline-flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 6px;
+  padding: 3px 5px 3px 11px;
+}
+
+.bx-selo button {
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  height: 16px;
+  place-items: center;
+  width: 16px;
+}
+
+.bx-selo button:hover { background: var(--acento-fio); }
+
+.bx-limpar {
+  background: none;
+  border: 0;
+  color: var(--texto-3);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.bx-limpar:hover { color: var(--texto); }
+
+/* ---------- cabeçalho da relação ---------- */
+
+.bx-relacao {
+  align-items: center;
+  background: var(--preto);
+  color: var(--branco);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 11px 15px;
+}
+
+.bx[data-tema="escuro"] .bx-relacao { background: rgba(0, 0, 0, 0.42); }
+
+.bx-relacao h2 {
+  align-items: center;
+  display: flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.bx-relacao .total {
+  background: var(--vinho);
+  border-radius: 999px;
+  color: var(--branco);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  padding: 3px 9px;
+}
+
+.bx[data-tema="escuro"] .bx-relacao .total { background: var(--bege); color: var(--preto); }
+
+.bx-relacao p { color: rgba(255, 255, 255, 0.62); font-size: 11px; }
+.bx-relacao strong { color: var(--branco); }
+
+/* ---------- linha da licitação ---------- */
+
+.bx-linha { border-bottom: 1px solid var(--fio); }
+.bx-linha:last-child { border-bottom: 0; }
+
+.bx-cab {
+  align-items: start;
+  cursor: pointer;
+  display: grid;
+  gap: 13px;
+  grid-template-columns: 16px minmax(0, 1fr) 128px 92px 156px;
+  list-style: none;
+  padding: 13px 15px;
+  transition: background 0.16s;
+}
+
+.bx-cab::-webkit-details-marker { display: none; }
+.bx-cab:hover { background: var(--cinza-04); }
+.bx-linha[open] > .bx-cab { background: var(--cinza-08); }
+
+.bx-seta {
+  color: var(--texto-3);
+  margin-top: 3px;
+  transition: transform 0.18s, color 0.18s;
+}
+
+.bx-linha[open] .bx-seta { color: var(--acento); transform: rotate(90deg); }
+
+.bx-objeto {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.bx-orgao {
+  color: var(--texto-2);
+  font-size: 11.5px;
+  margin-top: 4px;
+}
+
+.bx-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.bx-eti {
+  background: var(--cinza-08);
+  border-radius: var(--r-p);
+  color: var(--texto-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+}
+
+.bx-eti.tipo { background: var(--acento-fundo); color: var(--acento); }
+.bx-eti.alerta { background: var(--vinho-14); color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-eti.alerta { background: rgba(237, 233, 171, 0.14); color: var(--bege); }
+
+.bx-num { text-align: right; }
+
+.bx-valor {
+  font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.bx-valor.sigiloso { color: var(--texto-2); font-size: 13px; }
+
+.bx-local { color: var(--texto-3); font-size: 11.5px; margin-top: 4px; }
+
+.bx-dias {
+  font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.bx-dias.curto { color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-dias.curto { color: var(--bege); }
+
+.bx-data { color: var(--texto-3); font-size: 10.5px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+
+/* ---------- velocímetro de aderência ---------- */
+
+.bx-medidor { display: block; margin: 0 auto; }
+.bx-medidor .trilha { stroke: var(--cinza-16); }
+.bx-medidor .arco { stroke: var(--acento); transition: stroke-dasharray 0.4s ease; }
+.bx-medidor .agulha { stroke: var(--texto); }
+.bx-medidor .pino { fill: var(--texto); }
+.bx-medidor .marca { stroke: var(--cinza-28); }
+
+.bx-medidor-n {
+  fill: var(--texto);
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.bx-medidor-rot {
+  fill: var(--texto-3);
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+/* ---------- ações de triagem ---------- */
+
+.bx-acao { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 2px; }
+.bx-acao .par { display: flex; gap: 6px; }
+
+.bx-bt {
+  border-radius: var(--r-p);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  transition: background 0.16s, border-color 0.16s, color 0.16s;
+  white-space: nowrap;
+}
+
+.bx-bt:disabled { cursor: default; opacity: 0.5; }
+.bx-bt.sim { background: var(--vinho); border: 0; color: var(--branco); }
+.bx-bt.sim:hover:not(:disabled) { background: var(--vinho-escuro); }
+.bx-bt.nao { background: transparent; border: 1px solid var(--fio-forte); color: var(--texto-2); }
+.bx-bt.nao:hover:not(:disabled) { border-color: var(--texto-3); color: var(--texto); }
+
+.bx-campo {
+  background: var(--campo);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-p);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 11px;
+  height: 30px;
+  outline: none;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.bx-campo:focus { border-color: var(--acento); }
+.bx-erro { color: var(--vinho); font-size: 10px; }
+.bx[data-tema="escuro"] .bx-erro { color: var(--bege); }
+
+/* ---------- painel aberto ---------- */
+
+.bx-painel {
+  background: var(--cinza-04);
+  border-top: 1px solid var(--fio);
+  padding: 15px 15px 15px 44px;
+}
+
+.bx-paineis {
+  display: grid;
+  gap: 11px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.bx-bloco {
+  background: var(--mesa);
+  border: 1px solid var(--fio);
+  border-radius: var(--r-m);
+  overflow: hidden;
+}
+
+.bx-bloco h3 {
+  background: var(--cinza-04);
+  border-bottom: 1px solid var(--fio);
+  color: var(--texto-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 7px 11px;
+  text-transform: uppercase;
+}
+
+.bx-item {
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  font-size: 11.5px;
+  gap: 11px;
+  justify-content: space-between;
+  padding: 6px 11px;
+}
+
+.bx-item:last-child { border-bottom: 0; }
+.bx-item dt { color: var(--texto-3); }
+.bx-item dd { font-weight: 600; text-align: right; }
+
+.bx-motivo {
+  align-items: center;
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  font-size: 11.5px;
+  gap: 8px;
+  padding: 6px 11px;
+}
+
+.bx-motivo:last-child { border-bottom: 0; }
+.bx-motivo .marca { flex-shrink: 0; height: 13px; width: 13px; }
+.bx-motivo.atende .marca { color: var(--acento); }
+.bx-motivo.falha .marca { color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-motivo.falha .marca { color: rgba(255, 255, 255, 0.5); }
+.bx-motivo.pulado { color: var(--texto-3); }
+.bx-motivo.pulado .marca { color: var(--texto-3); }
+
+.bx-nota { color: var(--texto-2); font-size: 11.5px; line-height: 1.55; padding: 10px 11px; }
+
+.bx-link {
+  align-items: center;
+  color: var(--acento);
+  display: inline-flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 5px;
+  margin: 0 11px 11px;
+  text-decoration: none;
+}
+
+.bx-link:hover { text-decoration: underline; }
+
+/* ---------- vazio ---------- */
+
+.bx-vazio { padding: 52px 16px; text-align: center; }
+.bx-vazio p { font-size: 13.5px; font-weight: 700; }
+.bx-vazio span { color: var(--texto-3); display: block; font-size: 12.5px; margin-top: 6px; }
+
+@media (max-width: 900px) {
+  .bx-cab { grid-template-columns: 16px minmax(0, 1fr); }
+  .bx-num, .bx-prazo, .bx-medidor-caixa { grid-column: 2; text-align: left; }
+  .bx-painel { padding-left: 15px; }
+}
+
+/* ---------- sinalização: faixa no topo com a bandeira fincada ---------- */
+
+/* Cada linha sinalizada carrega as DUAS variantes da cor — uma para fundo
+   claro, outra para escuro — e o CSS escolhe pelo tema. Assim a troca de tema
+   é instantânea, sem nova consulta, e nenhuma cor escolhida fica ilegível. */
+.bx-linha[data-sinalizada="sim"] {
+  --sig: var(--sig-claro);
+  background: color-mix(in srgb, var(--sig) 7%, transparent);
+}
+
+.bx[data-tema="escuro"] .bx-linha[data-sinalizada="sim"] { --sig: var(--sig-escuro); }
+
+/* A faixa e a bandeira vivem DENTRO do <summary>. Soltas no <details> o
+   navegador as trata como conteúdo do detalhe e joga tudo para o rodapé. */
+.bx-cab { position: relative; }
+
+/* O terreno onde a bandeira é fincada. */
+.bx-terreno { background: var(--sig); height: 4px; left: 0; position: absolute; right: 0; top: 0; }
+
+/* O mastro nasce dentro da faixa: é o que faz a bandeira parecer cravada em
+   vez de apoiada. */
+.bx-bandeira { left: 13px; line-height: 0; position: absolute; top: 1px; }
+.bx-bandeira .mastro { stroke: var(--sig); }
+.bx-bandeira .pano { fill: var(--sig); }
+.bx-bandeira .chao { fill: var(--sig); opacity: 0.42; }
+
+.bx-linha[data-sinalizada="sim"] > .bx-cab { padding-top: 17px; }
+.bx-linha[data-sinalizada="sim"] > .bx-cab > .min-w-0 { padding-left: 27px; }
+
+.bx-marca-p {
+  align-items: center;
+  background: color-mix(in srgb, var(--sig) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sig) 55%, transparent);
+  border-radius: var(--r-p);
+  color: var(--sig);
+  display: inline-flex;
+  font-size: 10.5px;
+  font-weight: 700;
+  gap: 5px;
+  padding: 2px 8px;
+}
+
+/* ---------- caixa de sinalização ---------- */
+
+.bx-fundo {
+  align-items: center; background: rgba(20, 6, 6, 0.46); display: flex; inset: 0;
+  justify-content: center; padding: 20px; position: fixed; z-index: 90;
+}
+
+.bx-modal {
+  background: var(--sobre); border: 1px solid var(--fio-forte); border-radius: var(--r-g);
+  box-shadow: var(--elev-2); display: flex; flex-direction: column; max-height: 88vh;
+  max-width: 470px; width: 100%;
+}
+
+.bx-modal-cab {
+  align-items: flex-start; border-bottom: 1px solid var(--fio); display: flex;
+  gap: 12px; justify-content: space-between; padding: 15px 17px;
+}
+.bx-modal-cab h2 { font-size: 16px; font-weight: 700; }
+.bx-modal-cab p { color: var(--texto-3); font-size: 11.5px; line-height: 1.45; margin-top: 4px; }
+.bx-modal-cab .fechar { background: none; border: 0; color: var(--texto-3); cursor: pointer; font-size: 20px; line-height: 1; padding: 0 3px; }
+.bx-modal-cab .fechar:hover { color: var(--texto); }
+.bx-modal-corpo { overflow-y: auto; padding: 15px 17px; }
+.bx-modal-pe { border-top: 1px solid var(--fio); display: flex; gap: 8px; justify-content: flex-end; padding: 13px 17px; }
+
+.bx-rot {
+  color: var(--texto-3); display: block; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; margin-bottom: 7px; text-transform: uppercase;
+}
+
+.bx-op-p { display: flex; gap: 6px; }
+.bx-op-p button {
+  background: transparent; border: 1px solid var(--fio); border-radius: var(--r-p);
+  color: var(--texto-2); cursor: pointer; flex: 1; font-family: inherit;
+  font-size: 11.5px; font-weight: 700; padding: 8px 6px; transition: all 0.15s;
+}
+.bx-op-p button:hover[aria-pressed="false"] { border-color: var(--fio-forte); color: var(--texto); }
+.bx-op-p button[aria-pressed="true"] {
+  background: var(--acento-fundo); border-color: var(--acento); color: var(--acento);
+}
+
+.bx-livre {
+  background: color-mix(in srgb, var(--acento) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--acento) 45%, transparent);
+  border-radius: var(--r-p); margin-top: 11px; padding: 11px;
+}
+
+.bx-campo-g {
+  background: var(--campo); border: 1px solid var(--fio); border-radius: var(--r-p);
+  color: var(--texto); font-family: inherit; font-size: 12.5px; line-height: 1.55;
+  min-height: 72px; outline: none; padding: 9px 11px; resize: vertical; width: 100%;
+}
+.bx-campo-g:focus { border-color: var(--acento); }
+
+.bx-cores { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; }
+.bx-cor {
+  border: 2px solid transparent; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--fio-forte);
+  cursor: pointer; height: 26px; padding: 0; width: 26px;
+}
+.bx-cor[aria-pressed="true"] { border-color: var(--texto); }
+
+/* O seletor nativo fica escondido atrás do disco colorido: o controle padrão
+   do sistema não aceita estilo e destoaria da tela. */
+.bx-cor-livre {
+  background: conic-gradient(#e74c3c, #f1c40f, #2ecc71, #3498db, #9b59b6, #e74c3c);
+  border-radius: 50%; cursor: pointer; display: inline-block; height: 28px;
+  overflow: hidden; position: relative; width: 28px;
+}
+.bx-cor-livre input { cursor: pointer; height: 100%; opacity: 0; position: absolute; inset: 0; width: 100%; }
+
+/* Pré-requisito em atenção: atende com ressalva, ou depende de providência.
+   Não é reprovação — reprovar o que só precisa de cuidado faria a equipe
+   descartar obra boa. */
+.bx-motivo.atencao .marca { color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-motivo.atencao .marca { color: var(--bege); }
+.bx-motivo strong { font-weight: 700; }
+.bx-motivo span { line-height: 1.45; }
+
+/* Etiqueta de leitura ainda não conferida por uma pessoa.
+   Contorno tracejado em vez de mais uma cor: diz "provisório" sem competir com
+   `.alerta`, que é problema, não pendência — e sem sair da paleta da marca.
+   O padding compensa a borda, para a etiqueta não crescer ao lado das outras. */
+.bx-eti.aviso {
+  background: transparent;
+  border: 1px dashed var(--fio-forte);
+  color: var(--texto-2);
+  padding: 1px 6px;
+}
+
+/* Parcelas de maior relevância exigidas pelo edital.
+   Duas colunas: o texto do órgão à esquerda, o quantitativo à direita. Não é
+   tabela porque a folha inteira não tem nenhuma, e uma linha flex resolve com
+   menos regra. `tabular-nums` alinha os números na vertical, que é o que faz a
+   coluna de quantitativo ser lida de relance. */
+.bx-parcelas {
+  border-top: 1px solid var(--fio);
+  margin-top: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-top: 6px;
+}
+
+/* Edital com 30 parcelas esticaria a linha inteira da grade; a rolagem prende
+   o bloco na altura dos vizinhos. */
+.bx-parcela {
+  align-items: baseline;
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  font-size: 11.5px;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.bx-parcela:last-child { border-bottom: 0; }
+
+/* Texto livre do órgão: descrição sem espaço quebra o cartão sem isto. */
+.bx-parcela-nome {
+  color: var(--texto-2);
+  overflow-wrap: anywhere;
+}
+
+.bx-parcela-qtd {
+  color: var(--texto);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Dois links no mesmo bloco: sem invólucro eles encostam, porque `.bx-link` é
+   inline-flex com margem própria. */
+.bx-links {
+  border-top: 1px solid var(--fio);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 10px;
+}
+
+.bx-links .bx-link { margin: 0; }
+
+/* Baixar o edital é a ação primária do bloco; abrir no PNCP é a secundária. */
+.bx-link.forte {
+  background: var(--acento-fundo);
+  border: 1px solid var(--acento-fio);
+  border-radius: var(--r-p);
+  padding: 5px 10px;
+}
+
+/* ---------------------------------------------------------------------------
+   Correção: três classes usadas no TSX que nunca tiveram regra nesta folha.
+   O botão da bandeira estava saindo com o visual padrão do navegador dentro de
+   um cartão que não tem nenhum outro controle assim.
+   --------------------------------------------------------------------------- */
+
+/* Botão só de ícone, na linha da fila. */
+.bx-ic {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--fio);
+  border-radius: var(--r-p);
+  color: var(--texto-2);
+  cursor: pointer;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  transition: border-color 120ms ease, color 120ms ease;
+  width: 26px;
+}
+
+.bx-ic:hover { border-color: var(--fio-forte); color: var(--acento); }
+.bx-ic:disabled { cursor: default; opacity: 0.45; }
+
+.bx-mini-acoes {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+/* A coluna do medidor: só existia na consulta de tela estreita. */
+.bx-medidor-caixa {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}

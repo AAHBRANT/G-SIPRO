@@ -6,7 +6,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { GsIcon } from "@/components/ui/gs-icon";
 import { browserRandomUuid } from "@/core/browser/browser-random-uuid";
-import { detailFields } from "./extraction-view-model";
+import { detailFields } from "@/modules/technical-archive/domain/extracted-services";
 
 type Field = { field: string; value: string };
 type Service = { discipline: string; description: string; quantities: string };
