@@ -363,6 +363,8 @@ model User {
   supportTicketsResolved         SupportTicket[]                   @relation("SupportResolvedBy")
   scoutedTenderDecisions         ScoutedTender[]                   @relation("ScoutedTenderDecidedBy")
   scoutedTenderSignals           ScoutedTenderSignal[]             @relation("ScoutedTenderSignaledBy")
+  editalReadingsRead             ScoutedTenderEditalReading[]      @relation("EditalReadingReadBy")
+  editalReadingsReviewed         ScoutedTenderEditalReading[]      @relation("EditalReadingReviewedBy")
   supportDecisions               SupportTicketDecision[]           @relation("SupportDecidedBy")
   supportUpdates                 SupportTicketUpdate[]             @relation("SupportUpdatedBy")
   accessRequestsMade             UserAccessRequest[]               @relation("AccessRequestRequestedBy")
@@ -2182,6 +2184,7 @@ model ManagedDocumentVersion {
   createdAt                DateTime                        @default(now()) @db.Timestamptz(6)
   createdBy                String                          @db.Uuid
   technicalExperiences     ExecutedContract[]
+  editalReadings           ScoutedTenderEditalReading[]
   technicalEvidenceRecords TechnicalEvidence[]
   professionalLinks        ProfessionalLink[]
   complianceEvidenceLinks  ComplianceMatrixEvidence[]
@@ -2998,6 +3001,7 @@ model ScoutedTender {
   runId             String              @db.Uuid
   run               ScoutRun            @relation(fields: [runId], references: [id], onDelete: Cascade)
   signal            ScoutedTenderSignal?
+  editalReading     ScoutedTenderEditalReading?
   createdAt         DateTime            @default(now()) @db.Timestamptz(6)
 
   @@index([status, proposalClosesAt])
@@ -3029,4 +3033,39 @@ model ScoutedTenderSignal {
 
   @@index([signaledById])
   @@map("scouted_tender_signals")
+}
+
+/// O que a leitura do edital extraiu de qualificação técnica.
+///
+/// Uma por licitação: reler substitui. O documento de onde a leitura saiu fica
+/// referenciado, para qualquer conferência posterior partir da mesma fonte.
+model ScoutedTenderEditalReading {
+  id                String                 @id @default(uuid()) @db.Uuid
+  tenderId          String                 @unique @db.Uuid
+  tender            ScoutedTender          @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  /// Arquivo do edital preservado no acervo documental.
+  documentVersionId String                 @db.Uuid
+  documentVersion   ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  /// Parcelas de maior relevância, como a leitura as devolveu.
+  services          Json
+  consortiumAllowed Boolean?
+  requiresCat       Boolean?
+  requiresSiteVisit Boolean?
+  confidence        Decimal?               @db.Decimal(5, 4)
+  /// O que a leitura declarou não ter conseguido determinar.
+  limitations       Json
+  readById          String                 @db.Uuid
+  readBy            User                   @relation("EditalReadingReadBy", fields: [readById], references: [id], onDelete: Restrict)
+  /// ⚠️ A leitura é ASSISTIVA até alguém conferir contra o PDF. Enquanto
+  /// `reviewedAt` for nulo, a tela mostra os pré-requisitos do edital com a
+  /// ressalva de que ninguém validou — parcela lida errado manda a equipe
+  /// montar consórcio que não precisa, ou disputar sozinha o que não pode.
+  reviewedAt        DateTime?              @db.Timestamptz(6)
+  reviewedById      String?                @db.Uuid
+  reviewedBy        User?                  @relation("EditalReadingReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
+
+  @@index([readById])
+  @@map("scouted_tender_edital_readings")
 }

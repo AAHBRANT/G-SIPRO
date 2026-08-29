@@ -9,6 +9,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
 import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
+import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
+import { editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
 import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
 import { themeVariants } from "@/modules/scouting/domain/signal";
@@ -132,7 +134,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   const filter = await loadFilter();
 
   const [rows, lastRun, facets, archive] = await Promise.all([
-    database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP, include: { signal: true } }),
+    database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP, include: { signal: true, editalReading: true } }),
     database.scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
     // Projeção leve da fila inteira: alimenta os contadores dos cartões e das
     // opções de filtro sem trazer o registro completo.
@@ -145,8 +147,16 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     new PrismaArchiveEvidenceRepository().loadEvidence(),
   ]);
 
-  const scored = rows.map((tender) => ({
+  const scored = rows.map((tender) => {
+    // Lida do edital quando existe leitura; deduzida do objeto quando não.
+    // `toArchiveRequirement` devolve nulo se a leitura não achou parcela
+    // nenhuma — e aí volta-se ao objeto, em vez de confrontar contra o vazio.
+    const edital = tender.editalReading ? editalReadingFromRow(tender.editalReading) : undefined;
+    const estimado = tender.valueUndisclosed || tender.estimatedValue === null ? undefined : Number(tender.estimatedValue);
+    const lido = edital ? toArchiveRequirement(edital.requirement, estimado) : null;
+    return {
     ...tender,
+    edital,
     // Os dois tons saem da cor gravada a cada leitura: a troca de tema não
     // consulta nada, e melhorias na regra de contraste valem para o que já
     // está no banco sem reescrever registro nenhum.
@@ -155,15 +165,16 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // A pergunta que inabilita: temos acervo para isto? Enquanto o edital não
     // for lido, o requisito é inferido do objeto — e sai marcado como tal.
     archive: computeArchiveAdherence(
-      {
+      lido ?? {
         sources: [{ text: tender.subject }],
-        ...(tender.valueUndisclosed || tender.estimatedValue === null ? {} : { estimatedValue: Number(tender.estimatedValue) }),
+        ...(estimado !== undefined ? { estimatedValue: estimado } : {}),
         inferred: true,
       },
       archive,
     ),
     days: tender.proposalClosesAt ? Math.max(0, Math.ceil((tender.proposalClosesAt.getTime() - now.getTime()) / 86_400_000)) : undefined,
-  }));
+  };
+  });
 
   /**
    * O corte é pelo ACERVO, que é o critério que inabilita. Licitação cujo
@@ -188,6 +199,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       ...(tender.estimatedValue !== null ? { estimatedValue: Number(tender.estimatedValue) } : {}),
       valueUndisclosed: tender.valueUndisclosed,
       ...(filter.minimumValue !== undefined ? { minimumValue: filter.minimumValue } : {}),
+      ...(tender.edital ? { edital: tender.edital.requirement } : {}),
     }),
   }));
 
@@ -287,6 +299,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                     : <span className="bx-eti">acervo não julgado</span>}
                   {/* O que falta decide parceria, então aparece na linha e
                       não escondido dentro do painel. */}
+                  <span className={tender.edital ? (tender.edital.reviewedAt ? "bx-eti" : "bx-eti aviso") : "bx-eti"}>
+                    {tender.edital ? (tender.edital.reviewedAt ? "edital conferido" : "edital lido, a conferir") : "edital não lido"}
+                  </span>
                   {(() => {
                     const r = summarize(tender.prerequisites);
                     return <span className={r.notMet > 0 ? "bx-eti alerta" : "bx-eti"}>
@@ -347,7 +362,11 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   <h3>Pré-requisitos</h3>
                   {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
                   <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
-                    O que está marcado como <strong>a conferir</strong> depende de ler o edital. O sistema não o lê ainda, e por isso não afirma que atende.
+                    {!tender.edital
+                      ? <>O que está marcado como <strong>a conferir</strong> depende de ler o edital. Este ainda não foi lido, e por isso o sistema não afirma que atende.</>
+                      : tender.edital.reviewedAt
+                        ? <>Edital lido e <strong>conferido</strong> por uma pessoa em {tender.edital.reviewedAt.toLocaleDateString("pt-BR")}.</>
+                        : <>Edital lido automaticamente e <strong>ainda não conferido</strong> por uma pessoa. Antes de montar proposta ou consórcio, confira as parcelas contra o PDF.</>}
                   </p>
                 </div>
 

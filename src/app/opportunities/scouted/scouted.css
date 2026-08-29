@@ -842,3 +842,14 @@
 .bx[data-tema="escuro"] .bx-motivo.atencao .marca { color: var(--bege); }
 .bx-motivo strong { font-weight: 700; }
 .bx-motivo span { line-height: 1.45; }
+
+/* Etiqueta de leitura ainda não conferida por uma pessoa.
+   Contorno tracejado em vez de mais uma cor: diz "provisório" sem competir com
+   `.alerta`, que é problema, não pendência — e sem sair da paleta da marca.
+   O padding compensa a borda, para a etiqueta não crescer ao lado das outras. */
+.bx-eti.aviso {
+  background: transparent;
+  border: 1px dashed var(--fio-forte);
+  color: var(--texto-2);
+  padding: 1px 6px;
+}

@@ -1,5 +1,5 @@
 import type { ArchiveRequirement } from "@/modules/scouting/domain/archive-adherence";
-import { normalizeUnit } from "@/modules/scouting/domain/quantity";
+import { normalizeUnit, parseQuantity as parseQuantityText } from "@/modules/scouting/domain/quantity";
 
 /**
  * O que o edital exige de qualificação técnica.
@@ -69,6 +69,27 @@ export function parseQuantity(value: unknown): number | undefined {
   return Number.isFinite(numero) && numero > 0 ? numero : undefined;
 }
 
+/**
+ * Quantitativo escrito no meio da frase: "Ponte em concreto armado — 15 m".
+ *
+ * Existe porque a regra que dá sentido a tudo isto — acervo de 30 m cobre
+ * exigência de 15 m — depende do número. Perdê-lo quando a leitura devolve
+ * prosa em vez de tabela rebaixaria todo confronto a "tem ou não tem a
+ * disciplina", que era exatamente a limitação que a leitura veio remover.
+ *
+ * Vale o PRIMEIRO número cuja unidade é reconhecida, e só ele. Palavra que não
+ * é unidade não vira quantitativo: em "2 pontes de 15 m", "pontes" não é
+ * unidade, então o 2 é descartado e fica o 15 m. Quantitativo errado é pior do
+ * que nenhum — ele decide habilitação parecendo certeza.
+ */
+function quantityFromProse(text: string): { quantity?: number; unit?: string } {
+  for (const match of text.matchAll(/(-?[\d][\d.,]*)\s*([a-zA-ZçÇãÃáÁéÉíÍóÓúÚâÂêÊôÔµ²³]+[23]?)/g)) {
+    const lida = parseQuantityText(`${match[1]} ${match[2]}`);
+    if (lida) return { quantity: lida.value, unit: lida.unit };
+  }
+  return {};
+}
+
 function parseServices(value: string | undefined): readonly RequiredService[] {
   if (!value) return [];
   let bruto: unknown;
@@ -76,12 +97,12 @@ function parseServices(value: string | undefined): readonly RequiredService[] {
     bruto = JSON.parse(value);
   } catch {
     // A leitura pode devolver texto corrido quando o edital não traz tabela.
-    // Cada linha vira um serviço sem quantitativo — pior que nada não é.
+    // Cada linha vira um serviço, com o quantitativo que der para reconhecer.
     return value
       .split(/\r?\n/)
       .map((linha) => linha.replace(/^[\s\-•*\d.)]+/, "").trim())
       .filter((linha) => linha.length > 4)
-      .map((description) => ({ description }));
+      .map((description) => ({ description, ...quantityFromProse(description) }));
   }
   if (!Array.isArray(bruto)) return [];
 
