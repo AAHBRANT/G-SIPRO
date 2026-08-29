@@ -6,7 +6,7 @@ import { buildPrerequisites, summarize, type PrerequisiteInput } from "@/modules
 const acervo = (parcial: Partial<ArchiveAdherence> = {}): ArchiveAdherence => ({
   score: 100, determined: true, requirementInferred: true,
   required: [{ categoryId: "obra-de-arte", label: "Obra de arte especial", covered: true, evidenceCount: 2, examples: [] }],
-  missing: [], needsPartner: false, scale: "COVERED", largestExecuted: 62_000_000, reasons: [],
+  missing: [], unreadable: [], needsPartner: false, scale: "COVERED", largestExecuted: 62_000_000, reasons: [],
   ...parcial,
 });
 
@@ -136,5 +136,22 @@ describe("summarize", () => {
     expect(resumo.met).toBeGreaterThan(0);
     // Os quatro do edital seguem pendentes enquanto ninguém lê.
     expect(resumo.unknown).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("parcela que o sistema não soube classificar", () => {
+  /**
+   * O par do defeito consertado em archive-adherence: cobrir tudo o que se
+   * soube ler NÃO é atender, quando sobrou parcela sem conferir. "Atende" aqui
+   * faria a equipe montar proposta contando com acervo que ninguém olhou.
+   */
+  it("acervo vira atenção, e não atendido", () => {
+    const p = acha(buildPrerequisites(entrada({ archive: acervo({ unreadable: ["Linha de transmissão 138 kV"] }) })), "acervo");
+    expect(p?.status).toBe("ATTENTION");
+    expect(p?.detail).toContain("Linha de transmissão");
+  });
+
+  it("sem parcela obscura, segue atendido", () => {
+    expect(acha(buildPrerequisites(entrada()), "acervo")?.status).toBe("MET");
   });
 });

@@ -211,3 +211,40 @@ describe("quantitativo: acervo maior cobre exigência menor", () => {
     expect(a.required[0]?.covered).toBe(false);
   });
 });
+
+describe("parcela que o catálogo não sabe classificar", () => {
+  const acervo = [{ serviceId: "1", discipline: "Obras de arte", description: "Ponte em concreto armado", characteristics: "30 m", quantities: ["30 m"] }];
+  const exigir = (textos: string[]) => computeArchiveAdherence({ sources: textos.map((text) => ({ text })), inferred: false }, acervo);
+
+  /**
+   * O defeito que este teste tranca: a parcela não classificada sumia, e
+   * "Ponte + Linha de transmissão 138 kV" saía como cobertura total. A tela
+   * afirmava acervo que a empresa não tem, na direção que faz perder licitação
+   * por inabilitação.
+   */
+  it("não desaparece: fica registrada como não conferida", () => {
+    const r = exigir(["Ponte em concreto armado", "Linha de transmissão 138 kV"]);
+    expect(r.unreadable).toEqual(["Linha de transmissão 138 kV"]);
+    expect(r.reasons.some((m) => m.includes("não soube classificar"))).toBe(true);
+  });
+
+  /**
+   * E não vira "faltando", que seria o erro oposto: mandaria procurar consórcio
+   * para um serviço que a empresa talvez execute.
+   */
+  it("não é contada como faltando, nem dispara consórcio", () => {
+    const r = exigir(["Ponte em concreto armado", "Linha de transmissão 138 kV"]);
+    expect(r.missing).toHaveLength(0);
+    expect(r.needsPartner).toBe(false);
+  });
+
+  it("exigência inteiramente desconhecida continua sem julgamento", () => {
+    const r = exigir(["Barragem de terra compactada com núcleo argiloso"]);
+    expect(r.determined).toBe(false);
+    expect(r.score).toBe(0);
+  });
+
+  it("sem parcela obscura, a lista sai vazia", () => {
+    expect(exigir(["Ponte em concreto armado"]).unreadable).toEqual([]);
+  });
+});

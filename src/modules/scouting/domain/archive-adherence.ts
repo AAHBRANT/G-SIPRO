@@ -83,6 +83,17 @@ export type ArchiveAdherence = Readonly<{
   required: readonly CoverageItem[];
   /** As que o acervo não comprova — o que se busca em consórcio. */
   missing: readonly CoverageItem[];
+  /**
+   * Parcelas exigidas que o catálogo não soube classificar.
+   *
+   * ⚠️ Não são "cobertas" nem "faltando": são NÃO CONFERIDAS. Antes elas
+   * sumiam em silêncio, e "Ponte + Linha de transmissão 138 kV" saía como
+   * "2 de 2 comprovado" — a tela afirmava acervo que a empresa não tem.
+   * Marcá-las como faltando seria o erro oposto, e mandaria a equipe procurar
+   * consórcio para algo que ela talvez execute. Aparecem à parte, para a pessoa
+   * decidir olhando.
+   */
+  unreadable: readonly string[];
   needsPartner: boolean;
   scale: ScaleVerdict;
   largestExecuted?: number;
@@ -114,6 +125,7 @@ const naoJulgado = (requirement: ArchiveRequirement, motivo: string): ArchiveAdh
   requirementInferred: requirement.inferred,
   required: [],
   missing: [],
+  unreadable: [],
   needsPartner: false,
   scale: "UNKNOWN",
   reasons: [motivo],
@@ -133,8 +145,13 @@ export function computeArchiveAdherence(
   // mesmo ramo não valem por duas exigências. O maior quantitativo entre elas
   // manda: exigir 10 km e 3 km do mesmo serviço significa exigir 10 km.
   const porCategoria = new Map<string, { categoria: ServiceCategory; quantity?: Quantity }>();
+  const unreadable: string[] = [];
   for (const fonte of requirement.sources) {
-    for (const categoria of categoriesIn(fonte.text)) {
+    const categorias = categoriesIn(fonte.text);
+    // Parcela que o catálogo não conhece não pode evaporar: sem isto, exigir
+    // "linha de transmissão" ao lado de "ponte" devolveria cobertura total.
+    if (categorias.length === 0) { unreadable.push(fonte.text.trim().slice(0, 160)); continue; }
+    for (const categoria of categorias) {
       const atual = porCategoria.get(categoria.id);
       const maior = !atual?.quantity || (fonte.quantity && fonte.quantity.value > atual.quantity.value)
         ? fonte.quantity
@@ -205,6 +222,9 @@ export function computeArchiveAdherence(
     reasons.push(`acervo comprova ${cobertas.length} de ${required.length}: ${cobertas.map((c) => c.label.toLowerCase()).join(", ")}`);
   }
   if (missing.length > 0) reasons.push(`falta acervo de ${missing.map((m) => m.label.toLowerCase()).join(", ")}`);
+  if (unreadable.length > 0) {
+    reasons.push(`${unreadable.length} parcela(s) que o sistema não soube classificar, e portanto não conferiu: ${unreadable.join("; ")}`);
+  }
   // O confronto de número é o que sustenta a habilitação: vai por extenso.
   for (const item of required) {
     if (item.quantity) reasons.push(`${item.label.toLowerCase()}: ${item.quantity.explanation}`);
@@ -225,8 +245,10 @@ export function computeArchiveAdherence(
     requirementInferred: requirement.inferred,
     required,
     missing,
+    unreadable,
     // O sinal que decide parceria: falta serviço, ou o porte executado não
-    // chega perto do da obra.
+    // chega perto do da obra. Parcela não classificada NÃO entra aqui — não se
+    // sabe se falta, e mandar montar consórcio por desconhecimento seria pior.
     needsPartner: missing.length > 0 || scale === "BELOW",
     scale,
     ...(largestExecuted !== undefined ? { largestExecuted } : {}),

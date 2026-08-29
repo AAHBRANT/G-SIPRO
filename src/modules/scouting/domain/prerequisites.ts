@@ -82,6 +82,14 @@ export function buildPrerequisites(input: PrerequisiteInput): readonly Prerequis
   /* ---------- acervo: o que inabilita ---------- */
   if (!input.archive.determined) {
     lista.push(item("acervo", "Acervo técnico", "UNKNOWN", "SISTEMA", input.archive.reasons[0] ?? "não foi possível julgar"));
+  } else if (input.archive.missing.length === 0 && input.archive.unreadable.length > 0) {
+    // Cobriu tudo o que soube ler, mas sobrou parcela que não classificou.
+    // Dizer "atende" aqui é o "atende" mais perigoso que existe: a equipe monta
+    // proposta contando com acervo que ninguém conferiu.
+    lista.push(item(
+      "acervo", "Acervo técnico", "ATTENTION", "SISTEMA",
+      `${input.archive.required.length} serviço(s) comprovados, mas ${input.archive.unreadable.length} parcela(s) do edital o sistema não soube classificar: ${input.archive.unreadable.join("; ")}`,
+    ));
   } else if (input.archive.missing.length === 0) {
     const comQuantitativo = input.archive.required.filter((r) => r.quantity);
     lista.push(item(

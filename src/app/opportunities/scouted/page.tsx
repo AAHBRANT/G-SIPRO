@@ -384,6 +384,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                       </div>)}
                     </div>
                     : <p className="bx-nota">A leitura não localizou lista de parcelas de maior relevância neste edital.</p>}
+                  {tender.archive.unreadable.length > 0 && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    <strong>Não conferido contra o acervo:</strong> {tender.archive.unreadable.join("; ")}. O sistema não soube classificar esta(s) parcela(s) — confira à mão.
+                  </p>}
                   {tender.edital.requirement.limitations.length > 0 && <p className="bx-nota">
                     <strong>A leitura não conseguiu determinar:</strong> {tender.edital.requirement.limitations.join("; ")}.
                   </p>}
