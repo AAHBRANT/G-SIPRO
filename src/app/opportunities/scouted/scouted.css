@@ -834,3 +834,11 @@
   overflow: hidden; position: relative; width: 28px;
 }
 .bx-cor-livre input { cursor: pointer; height: 100%; opacity: 0; position: absolute; inset: 0; width: 100%; }
+
+/* Pré-requisito em atenção: atende com ressalva, ou depende de providência.
+   Não é reprovação — reprovar o que só precisa de cuidado faria a equipe
+   descartar obra boa. */
+.bx-motivo.atencao .marca { color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-motivo.atencao .marca { color: var(--bege); }
+.bx-motivo strong { font-weight: 700; }
+.bx-motivo span { line-height: 1.45; }

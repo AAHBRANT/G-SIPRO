@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
+import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
 import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
 import { themeVariants } from "@/modules/scouting/domain/signal";
@@ -172,9 +173,27 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
    * equipe perder obra que ela sabe fazer.
    */
   const semJulgamento = adherenceFloor > 0 ? scored.filter((tender) => !tender.archive.determined).length : 0;
+  /**
+   * A lista de pré-requisitos é montada aqui porque depende do acervo e do
+   * prazo já calculados. Cada item diz de onde veio a resposta: o que o
+   * sistema conferiu aparece resolvido, e o que só o edital responde aparece
+   * pendente — nunca atendido.
+   */
+  const comRequisitos = scored.map((tender) => ({
+    ...tender,
+    prerequisites: buildPrerequisites({
+      archive: tender.archive,
+      ...(tender.days !== undefined ? { daysToClose: tender.days } : {}),
+      minimumDays: filter.minimumDaysToClose,
+      ...(tender.estimatedValue !== null ? { estimatedValue: Number(tender.estimatedValue) } : {}),
+      valueUndisclosed: tender.valueUndisclosed,
+      ...(filter.minimumValue !== undefined ? { minimumValue: filter.minimumValue } : {}),
+    }),
+  }));
+
   const kept = adherenceFloor > 0
-    ? scored.filter((tender) => tender.archive.determined && tender.archive.score >= adherenceFloor)
-    : scored;
+    ? comRequisitos.filter((tender) => tender.archive.determined && tender.archive.score >= adherenceFloor)
+    : comRequisitos;
   const ordered = sort === "aderencia"
     // Sem acervo julgado, o perfil serve de desempate: é o que sobra para
     // ordenar, e vale mais que ordem aleatória.
@@ -268,6 +287,12 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                     : <span className="bx-eti">acervo não julgado</span>}
                   {/* O que falta decide parceria, então aparece na linha e
                       não escondido dentro do painel. */}
+                  {(() => {
+                    const r = summarize(tender.prerequisites);
+                    return <span className={r.notMet > 0 ? "bx-eti alerta" : "bx-eti"}>
+                      {r.met}/{r.total} pré-requisitos{r.unknown > 0 ? ` · ${r.unknown} a conferir` : ""}
+                    </span>;
+                  })()}
                   {tender.archive.needsPartner && <span className="bx-eti alerta">
                     consórcio{tender.archive.missing.length > 0
                       ? `: falta ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}`
@@ -316,6 +341,14 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   <Linha rotulo="Encerramento" valor={tender.proposalClosesAt?.toLocaleDateString("pt-BR") ?? "—"}/>
                   <Linha rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
                   <Linha rotulo="Captada em" valor={tender.createdAt.toLocaleDateString("pt-BR")}/>
+                </div>
+
+                <div className="bx-bloco">
+                  <h3>Pré-requisitos</h3>
+                  {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
+                  <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    O que está marcado como <strong>a conferir</strong> depende de ler o edital. O sistema não o lê ainda, e por isso não afirma que atende.
+                  </p>
                 </div>
 
                 <div className="bx-bloco">
@@ -398,6 +431,25 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
 const tick = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>;
 const cross = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>;
 const dash = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>;
+const bang = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M12 6v8M12 18h.01"/></svg>;
+
+const marcaDoEstado = {
+  MET: { icone: tick, classe: "atende" },
+  NOT_MET: { icone: cross, classe: "falha" },
+  ATTENTION: { icone: bang, classe: "atencao" },
+  UNKNOWN: { icone: dash, classe: "pulado" },
+} as const;
+
+function PreRequisito({ requisito }: { requisito: Prerequisite }) {
+  const marca = marcaDoEstado[requisito.status];
+  return <div className={`bx-motivo ${marca.classe}`}>
+    {marca.icone}
+    <span>
+      <strong>{requisito.label}</strong>
+      {" — "}{requisito.detail}
+    </span>
+  </div>;
+}
 
 function Motivo({ rotulo, met, skipped }: { rotulo: string; met: boolean; skipped: boolean }) {
   const estado = skipped ? "pulado" : met ? "atende" : "falha";
