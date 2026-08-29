@@ -1,9 +1,11 @@
 /**
- * Verificação da aderência de acervo contra o PostgreSQL de verdade.
+ * Verificação da leitura do acervo e do confronto, contra o PostgreSQL de
+ * verdade.
  *
- * Não faz parte da suíte — a suíte roda sem banco. O que ela prova e o teste
- * com dublê não consegue: que a consulta atravessa as relações certas, que só
- * contrato VALIDADO entra no acervo, e que o valor Decimal chega como número.
+ * Não faz parte da suíte — a suíte roda sem banco. O que ela prova e o teste com
+ * dublê não consegue: que a travessia documento → versão → evidência →
+ * experiência → serviços existe de fato, e que o valor Decimal chega como
+ * número.
  *
  * Uso, com o Postgres descartável no ar em 5433:
  *   DATABASE_URL=... ./node_modules/.bin/tsx scripts/verificar-acervo-fila.mts
@@ -23,78 +25,71 @@ async function main(): Promise<void> {
   const autoria = crypto.randomUUID();
 
   const dono = await db.user.create({
-    data: { entraObjectId: crypto.randomUUID(), displayName: "Conferência acervo", email: `${marca}@exemplo.invalido`, createdBy: autoria, updatedBy: autoria },
+    data: { entraObjectId: crypto.randomUUID(), displayName: "Conferência", email: `${marca}@exemplo.invalido`, createdBy: autoria, updatedBy: autoria },
   });
   const documento = await db.managedDocument.create({
-    data: {
-      type: "ATESTADO", title: `Atestado ${marca}`, classification: "INTERNO",
-      ownerId: dono.id, createdBy: dono.id, updatedBy: dono.id,
-    },
+    data: { type: "ATESTADO", title: `Atestado ${marca}`, classification: "INTERNO", ownerId: dono.id, createdBy: dono.id, updatedBy: dono.id },
   });
   const versao = await db.managedDocumentVersion.create({
     data: {
-      documentId: documento.id, version: 1, uri: `local://${marca}`, fileHash: "0".repeat(64),
-      mimeType: "application/pdf", sizeBytes: BigInt(1024), origin: "conferência", createdBy: dono.id,
+      documentId: documento.id, version: 1, uri: `local://${marca}`, fileHash: "2".repeat(64),
+      mimeType: "application/pdf", sizeBytes: BigInt(2048), origin: "conferência", createdBy: dono.id,
+    },
+  });
+  const contrato = await db.executedContract.create({
+    data: {
+      code: `${marca}-c1`, contractorName: "CONTRATANTE", contractorSource: "conferência",
+      subject: "Duplicação de rodovia estadual", startedAt: new Date("2022-01-01"), endedAt: new Date("2024-01-01"),
+      value: 62_000_000, currency: "BRL", status: "VALIDATED", ownerId: dono.id,
+      evidenceDocumentVersionId: versao.id, createdBy: dono.id, updatedBy: dono.id,
+    },
+  });
+  for (const [disciplina, descricao] of [
+    ["Terraplenagem", `Escavação e aterro compactado ${marca}`],
+    ["Pavimentação asfáltica", `Revestimento em CBUQ ${marca}`],
+  ] as const) {
+    await db.executedService.create({
+      data: { contractId: contrato.id, discipline: disciplina, originalDescription: descricao, characteristics: "", createdBy: dono.id },
+    });
+  }
+  await db.technicalEvidence.create({
+    data: {
+      experience: { connect: { id: contrato.id } }, type: "ATTESTATION", number: `${marca}-n1`, issuingBody: "CREA",
+      issuedAt: new Date("2024-02-01"), subjectActivity: "Obras rodoviárias",
+      documentVersion: { connect: { id: versao.id } }, correlationId: crypto.randomUUID(),
+      createdBy: { connect: { id: dono.id } },
     },
   });
 
-  const criarContrato = async (codigo: string, status: "VALIDATED" | "DRAFT", valor: number) =>
-    db.executedContract.create({
-      data: {
-        code: `${marca}-${codigo}`, contractorName: "ÓRGÃO", contractorSource: "conferência",
-        subject: "Duplicação de rodovia estadual", startedAt: new Date("2023-01-01"), endedAt: new Date("2024-01-01"),
-        value: valor, currency: "BRL", status, ownerId: dono.id, evidenceDocumentVersionId: versao.id,
-        createdBy: dono.id, updatedBy: dono.id,
-      },
-    });
+  const acervo = await new PrismaArchiveEvidenceRepository().loadEvidence();
+  const meus = acervo.filter((e) => e.description.includes(marca));
 
-  const validado = await criarContrato("val", "VALIDATED", 62_000_000);
-  const rascunho = await criarContrato("dra", "DRAFT", 900_000_000);
-
-  await db.executedService.create({
-    data: { contractId: validado.id, discipline: "Pavimentação asfáltica", originalDescription: `Revestimento em CBUQ ${marca}`, characteristics: "espessura 5 cm", createdBy: dono.id },
-  });
-  await db.executedService.create({
-    data: { contractId: rascunho.id, discipline: "Pavimentação asfáltica", originalDescription: `Base e sub-base ${marca}`, characteristics: "", createdBy: dono.id },
-  });
-
-  const acervoCompleto = await new PrismaArchiveEvidenceRepository().loadValidatedEvidence();
-
-  // A verificação olha os PRÓPRIOS registros, não o total do banco: presumir
-  // banco vazio faz o roteiro quebrar assim que alguém semear qualquer coisa.
-  const meuValidado = acervoCompleto.find((e) => e.description === `Revestimento em CBUQ ${marca}`);
-  const meuRascunho = acervoCompleto.find((e) => e.description === `Base e sub-base ${marca}`);
-
-  checar("o serviço do contrato validado entra no acervo", meuValidado !== undefined);
-  checar("o serviço do contrato em rascunho NÃO entra", meuRascunho === undefined);
+  checar("a travessia até os serviços do atestado funciona", meus.length === 2, `${meus.length} de 2`);
+  checar("disciplina e descrição vieram juntas",
+    meus.some((e) => e.discipline === "Pavimentação asfáltica" && e.description.includes("CBUQ")),
+    meus.map((e) => e.discipline).join(" | "));
   checar("o valor do contrato chega como número, não como Decimal",
-    typeof meuValidado?.contractValue === "number" && meuValidado?.contractValue === 62_000_000,
-    `${typeof meuValidado?.contractValue} ${meuValidado?.contractValue}`);
-  checar("disciplina, descrição e características vieram juntas",
-    meuValidado?.discipline === "Pavimentação asfáltica" && meuValidado?.characteristics === "espessura 5 cm",
-    `${meuValidado?.discipline} · ${meuValidado?.characteristics}`);
+    meus.every((e) => typeof e.contractValue === "number" && e.contractValue === 62_000_000),
+    `${typeof meus[0]?.contractValue} ${meus[0]?.contractValue}`);
+  checar("o objeto do contrato acompanha o serviço",
+    meus.every((e) => e.contractSubject === "Duplicação de rodovia estadual"));
 
-  // O confronto usa só o que este roteiro semeou, para a nota não depender do
-  // que houver no banco.
-  const acervo = meuValidado ? [meuValidado] : [];
+  /* O confronto, usando só o que este roteiro semeou. */
+  const cobre = computeArchiveAdherence({ subject: "Terraplenagem e pavimentação asfáltica da rodovia", estimatedValue: 30_000_000, inferred: true }, meus);
+  checar("objeto coberto e porte alcançado dá nota cheia", cobre.score === 100 && !cobre.needsPartner, `${cobre.score}% · consórcio: ${cobre.needsPartner}`);
 
-  // O confronto de ponta a ponta, com o acervo lido do banco.
-  const cabe = computeArchiveAdherence({ workTypes: ["PAVING"], estimatedValue: 30_000_000, inferred: true }, acervo);
-  checar("obra menor que o já executado sai como porte coberto", cabe.determined && cabe.scale === "COVERED" && cabe.score === 100, `${cabe.score}% · ${cabe.scale}`);
+  const falta = computeArchiveAdherence({ subject: "Construção de ponte e terraplenagem de acesso", inferred: true }, meus);
+  checar("objeto com serviço faltando indica consórcio", falta.needsPartner && falta.missing.some((m) => m.label === "Obra de arte especial"),
+    falta.missing.map((m) => m.label).join(", "));
+  checar("e a nota reflete a fração coberta", falta.score > 0 && falta.score < 80, `${falta.score}%`);
 
-  const grande = computeArchiveAdherence({ workTypes: ["PAVING"], estimatedValue: 200_000_000, inferred: true }, acervo);
-  checar("obra muito maior que o executado desconta o porte", grande.scale === "BELOW" && grande.score < 100, `${grande.score}% · ${grande.scale}`);
-  checar("e a razão diz o tamanho do que já se executou",
-    grande.reasons.some((r) => r.includes("62")), grande.reasons.join(" | "));
+  const grande = computeArchiveAdherence({ subject: "Pavimentação asfáltica", estimatedValue: 300_000_000, inferred: true }, meus);
+  checar("obra muito maior que o executado também indica consórcio", grande.scale === "BELOW" && grande.needsPartner, `${grande.score}% · ${grande.scale}`);
 
-  const outroRamo = computeArchiveAdherence({ workTypes: ["SANITATION"], estimatedValue: 30_000_000, inferred: true }, acervo);
-  checar("ramo sem acervo cai para zero, mas segue julgado", outroRamo.determined && outroRamo.score === 0, `${outroRamo.score}%`);
-
-  // Limpeza do que é apagável. Documento e versão NÃO são: o banco tem trava
-  // de somente-acréscimo sobre evidência documental, e está certo — acervo não
-  // se apaga. O rastro fica no banco descartável, que existe para isso.
-  await db.executedService.deleteMany({ where: { contractId: { in: [validado.id, rascunho.id] } } });
-  await db.executedContract.deleteMany({ where: { id: { in: [validado.id, rascunho.id] } } });
+  /* Sem limpeza, de propósito. O banco tem trava de somente-acréscimo sobre
+     documento e evidência técnica — e está certo: acervo não se apaga. Tentar
+     remover aqui derrubava a verificação DEPOIS de todos os casos passarem.
+     O rastro fica no banco descartável, que existe exatamente para isso. */
 }
 
 let estouro: unknown;
@@ -112,7 +107,5 @@ for (const c of casos) {
   console.log(`${c.ok ? "  ok  " : " FALHA"} ${c.nome}${c.detalhe ? "  — " + c.detalhe : ""}`);
 }
 console.log(`\n${casos.length - falhas}/${casos.length} passaram`);
-if (estouro) {
-  console.error("\ninterrompida por erro:", estouro instanceof Error ? estouro.message : estouro);
-}
+if (estouro) console.error("\ninterrompida por erro:", estouro instanceof Error ? estouro.message : estouro);
 process.exit(falhas || estouro ? 1 : 0);

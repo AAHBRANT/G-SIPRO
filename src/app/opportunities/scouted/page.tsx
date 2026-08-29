@@ -6,7 +6,7 @@ import { getCurrentAuthorizationContext } from "@/core/authorization/authorizati
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { computeAdherence, resolveWorkTypes, type AdherenceInput } from "@/modules/scouting/domain/adherence";
+import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
 import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
@@ -141,7 +141,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     }),
     // O acervo é da empresa, não da licitação: uma consulta serve a fila
     // inteira. Buscar por linha faria centenas de idas ao banco por página.
-    new PrismaArchiveEvidenceRepository().loadValidatedEvidence(),
+    new PrismaArchiveEvidenceRepository().loadEvidence(),
   ]);
 
   const scored = rows.map((tender) => ({
@@ -155,7 +155,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // for lido, o requisito é inferido do objeto — e sai marcado como tal.
     archive: computeArchiveAdherence(
       {
-        workTypes: resolveWorkTypes(toAdherenceInput(tender)),
+        subject: tender.subject,
         ...(tender.valueUndisclosed || tender.estimatedValue === null ? {} : { estimatedValue: Number(tender.estimatedValue) }),
         inferred: true,
       },
@@ -266,6 +266,13 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   {tender.archive.determined
                     ? <span className="bx-eti">acervo {tender.archive.score}%{tender.archive.requirementInferred ? " (estimado)" : ""}</span>
                     : <span className="bx-eti">acervo não julgado</span>}
+                  {/* O que falta decide parceria, então aparece na linha e
+                      não escondido dentro do painel. */}
+                  {tender.archive.needsPartner && <span className="bx-eti alerta">
+                    consórcio{tender.archive.missing.length > 0
+                      ? `: falta ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}`
+                      : ": porte"}
+                  </span>}
                 </div>
               </div>
 
@@ -313,9 +320,29 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
 
                 <div className="bx-bloco">
                   <h3>Acervo técnico — {tender.archive.determined ? `${tender.archive.score}%` : "não julgado"}</h3>
-                  {tender.archive.reasons.map((reason) => <Motivo key={reason} met={!/^sem acervo|^nenhum acervo|^tipo de obra n|maior obra executada/.test(reason)} rotulo={reason} skipped={/^porte não|^nenhum acervo|^tipo de obra n/.test(reason)}/>)}
-                  {tender.archive.requirementInferred && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
-                    Requisito <strong>estimado a partir do objeto</strong>. As parcelas de maior relevância exigidas de fato só constam do edital, que ainda não é lido automaticamente.
+                  {/* Serviço a serviço: é a lista do que falta que vira a
+                      conversa de consórcio. */}
+                  {tender.archive.required.map((item) => <Motivo
+                    key={item.categoryId}
+                    met={item.covered}
+                    rotulo={item.covered ? `${item.label} — ${item.evidenceCount} no acervo` : `${item.label} — sem acervo`}
+                    skipped={false}
+                  />)}
+                  {!tender.archive.determined && tender.archive.reasons.map((reason) =>
+                    <Motivo key={reason} met={false} rotulo={reason} skipped/>)}
+                  {tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined && <Motivo
+                    met={false}
+                    rotulo={`porte: maior obra executada foi R$ ${(tender.archive.largestExecuted / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`}
+                    skipped={false}
+                  />}
+                  {tender.archive.needsPartner && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    <strong>Indica consórcio.</strong>{" "}
+                    {tender.archive.missing.length > 0
+                      ? `O acervo não comprova ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}.`
+                      : "A obra é maior que qualquer uma já executada."}
+                  </p>}
+                  {tender.archive.requirementInferred && tender.archive.determined && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    Serviços <strong>estimados a partir do objeto</strong>. As parcelas de maior relevância exigidas de fato só constam do edital, que ainda não é lido automaticamente.
                   </p>}
                 </div>
 

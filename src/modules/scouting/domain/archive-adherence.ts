@@ -1,25 +1,27 @@
-import { normalizeText, workTypeTerms } from "@/modules/scouting/domain/qualification";
-import type { ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
+import { categoriesIn, type ServiceCategory } from "@/modules/scouting/domain/service-catalog";
 
 /**
- * Aderência do ACERVO: a empresa já executou obra deste tipo, e deste porte?
+ * Aderência do ACERVO: dos serviços que este objeto exige, quantos a empresa já
+ * comprovou ter executado — e quais faltam.
  *
- * É pergunta diferente da aderência ao perfil. Perfil responde "isto cabe no
- * que a gente decidiu disputar" — uma lista configurada. Acervo responde "a
- * gente tem prova de já ter feito" — o que está no acervo técnico. É o acervo
- * que inabilita numa licitação; o perfil só filtra.
+ * É pergunta diferente da aderência ao perfil. Perfil responde "isto cabe no que
+ * a gente decidiu disputar", uma lista configurada. Acervo responde "a gente tem
+ * prova de já ter feito". É o acervo que inabilita; o perfil só filtra.
  *
- * ⚠️ LIMITE CONHECIDO. O que o edital exige como parcela de maior relevância só
- * existe no PDF do edital, que o sistema ainda não lê. Enquanto isso, o
- * requisito é INFERIDO do objeto da licitação e do valor estimado. Por isso
- * toda leitura sai marcada como estimada, e a tela precisa dizer isso. Quando a
- * leitura do edital entrar, troca-se a origem do requisito e o confronto
- * continua igual — é essa a razão de `ArchiveRequirement` ser um tipo à parte.
+ * O que FALTA é a informação mais útil da tela: é exatamente o que se procura
+ * num parceiro de consórcio. Por isso `missing` e `needsPartner` são resultado
+ * de primeira classe, e não dedução que alguém faz de cabeça olhando a nota.
+ *
+ * ⚠️ LIMITE. O que o edital EXIGE como parcela de maior relevância só existe no
+ * PDF, que o sistema ainda não lê. Enquanto isso o requisito é inferido do
+ * objeto, e toda leitura sai marcada como estimada. `ArchiveRequirement` é um
+ * tipo à parte justamente para que a leitura do edital, quando entrar, troque
+ * só a origem do requisito — o confronto continua igual.
  */
 
-/** O que se exige da empresa. Hoje inferido do objeto; amanhã lido do edital. */
 export type ArchiveRequirement = Readonly<{
-  workTypes: readonly ScoutWorkType[];
+  /** Texto do objeto, de onde as categorias de serviço são reconhecidas. */
+  subject: string;
   /** Porte da obra a disputar, quando o órgão revela. */
   estimatedValue?: number;
   /** Falso quando o requisito veio do edital, e não de inferência. */
@@ -32,26 +34,18 @@ export type ArchiveEvidence = Readonly<{
   discipline: string;
   description: string;
   characteristics: string;
-  /** Valor do contrato de onde veio o serviço, quando registrado. */
   contractValue?: number;
   contractSubject?: string;
 }>;
 
-/**
- * Quanta confiança a correspondência merece. A distinção existe porque
- * apresentar palpite como certeza faz alguém gastar proposta e ser inabilitado
- * na entrega do envelope.
- */
-export const matchCertainties = ["IDENTICAL", "LIKELY", "NONE"] as const;
-export type MatchCertainty = (typeof matchCertainties)[number];
-
-export type WorkTypeMatch = Readonly<{
-  workType: ScoutWorkType;
-  certainty: MatchCertainty;
-  /** Serviços do acervo que sustentam a correspondência. */
-  evidence: readonly ArchiveEvidence[];
-  /** Maior contrato entre as evidências, quando há valor registrado. */
-  largestContractValue?: number;
+export type CoverageItem = Readonly<{
+  categoryId: string;
+  label: string;
+  covered: boolean;
+  /** Quantos serviços do acervo sustentam esta categoria. */
+  evidenceCount: number;
+  /** Até três exemplos, para conferir se a leitura faz sentido. */
+  examples: readonly string[];
 }>;
 
 export type ScaleVerdict = "COVERED" | "BELOW" | "UNKNOWN";
@@ -59,146 +53,117 @@ export type ScaleVerdict = "COVERED" | "BELOW" | "UNKNOWN";
 export type ArchiveAdherence = Readonly<{
   /** 0 a 100. Só significa alguma coisa quando `determined` é verdadeiro. */
   score: number;
-  /** Falso quando não há acervo cadastrado que permita julgar. */
   determined: boolean;
-  /** Verdadeiro enquanto o requisito for inferido do objeto. */
   requirementInferred: boolean;
-  matches: readonly WorkTypeMatch[];
+  /** Todas as categorias que o objeto exige, cobertas ou não. */
+  required: readonly CoverageItem[];
+  /** As que o acervo não comprova — o que se busca em consórcio. */
+  missing: readonly CoverageItem[];
+  needsPartner: boolean;
   scale: ScaleVerdict;
-  /** Maior obra já executada entre as que casaram, para comparar de porte. */
   largestExecuted?: number;
   reasons: readonly string[];
 }>;
 
-/** Nome do ramo em português: a razão vai para a tela, não para o log. */
-const rotuloDoTipo: Readonly<Record<ScoutWorkType, string>> = {
-  BUILDING: "edificação",
-  SPECIAL_STRUCTURE: "obra de arte especial",
-  PAVING: "pavimentação",
-  URBAN_INFRASTRUCTURE: "infraestrutura urbana",
-  SANITATION: "saneamento",
-  EARTHWORKS: "contenção e terraplenagem",
-  RENOVATION: "reforma",
-};
-
 const dinheiro = (value: number) =>
   `R$ ${(value / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
 
-/**
- * Reconhece o tipo de obra dentro de um serviço do acervo.
- *
- * A disciplina vale mais que a descrição: "Pavimentação" no campo de disciplina
- * é declaração; a mesma palavra perdida no meio de uma descrição pode ser
- * menção de passagem. Por isso o resultado carrega o grau de certeza em vez de
- * um sim ou não.
- */
-export function certaintyFor(evidence: ArchiveEvidence, workType: ScoutWorkType): MatchCertainty {
-  const termos = workTypeTerms[workType];
-  const disciplina = normalizeText(evidence.discipline);
-  if (termos.some((termo) => disciplina.includes(termo))) return "IDENTICAL";
-
-  // O objeto do CONTRATO fica de fora de propósito. Incluí-lo faria um serviço
-  // de drenagem executado dentro de um contrato de rodovia contar como acervo
-  // de pavimentação — e parcela de maior relevância se prova pelo serviço, não
-  // pelo contrato que o abrigou.
-  const resto = normalizeText(`${evidence.description} ${evidence.characteristics}`);
-  return termos.some((termo) => resto.includes(termo)) ? "LIKELY" : "NONE";
+/** Categorias que cada serviço do acervo comprova, com o serviço que as sustenta. */
+function indexarAcervo(archive: readonly ArchiveEvidence[]): Map<string, ArchiveEvidence[]> {
+  const indice = new Map<string, ArchiveEvidence[]>();
+  for (const evidence of archive) {
+    // Disciplina, descrição e características juntas: a nomenclatura de atestado
+    // varia, e o que falta num campo costuma estar no outro.
+    const texto = `${evidence.discipline} ${evidence.description} ${evidence.characteristics}`;
+    for (const categoria of categoriesIn(texto)) {
+      const atual = indice.get(categoria.id);
+      if (atual) atual.push(evidence);
+      else indice.set(categoria.id, [evidence]);
+    }
+  }
+  return indice;
 }
 
-const pesoDaCerteza: Readonly<Record<MatchCertainty, number>> = { IDENTICAL: 1, LIKELY: 0.6, NONE: 0 };
+const naoJulgado = (requirement: ArchiveRequirement, motivo: string): ArchiveAdherence => ({
+  score: 0,
+  determined: false,
+  requirementInferred: requirement.inferred,
+  required: [],
+  missing: [],
+  needsPartner: false,
+  scale: "UNKNOWN",
+  reasons: [motivo],
+});
 
 /**
- * Confronta o que se exige com o que a empresa executou.
+ * Confronta o que o objeto exige com o que a empresa comprovou executar.
  *
- * A nota pesa o tipo de obra em 70 e o porte em 30: executar o tipo certo é
- * pré-requisito, e porte insuficiente costuma ser contornável por consórcio —
- * o inverso não é verdade.
+ * A cobertura de serviços pesa 80 e o porte 20: consórcio resolve porte com
+ * frequência, enquanto falta de acervo do serviço inabilita direto.
  */
 export function computeArchiveAdherence(
   requirement: ArchiveRequirement,
   archive: readonly ArchiveEvidence[],
 ): ArchiveAdherence {
-  const reasons: string[] = [];
+  const exigidas = categoriesIn(requirement.subject);
 
-  if (requirement.workTypes.length === 0) {
-    return {
-      score: 0, determined: false, requirementInferred: requirement.inferred, matches: [], scale: "UNKNOWN",
-      reasons: ["tipo de obra não reconhecido no objeto"],
-    };
+  if (exigidas.length === 0) {
+    // Objeto genérico demais para dizer o que exige. Chutar aqui seria pior do
+    // que admitir que não deu para ler.
+    return naoJulgado(requirement, "objeto não descreve serviços reconhecíveis");
   }
-
   if (archive.length === 0) {
-    // Acervo vazio não é acervo insuficiente. Dizer 0% aqui faria a equipe
-    // descartar obra que ela sabe fazer, só porque ninguém cadastrou a CAT.
-    return {
-      score: 0, determined: false, requirementInferred: requirement.inferred, matches: [], scale: "UNKNOWN",
-      reasons: ["nenhum acervo cadastrado para confrontar"],
-    };
+    // Acervo vazio não é acervo insuficiente. Dizer 0% faria a equipe descartar
+    // obra que sabe fazer só porque ninguém importou os atestados.
+    return naoJulgado(requirement, "nenhum acervo cadastrado para confrontar");
   }
 
-  const matches: WorkTypeMatch[] = requirement.workTypes.map((workType) => {
-    const avaliadas = archive
-      .map((evidence) => ({ evidence, certainty: certaintyFor(evidence, workType) }))
-      .filter((item) => item.certainty !== "NONE");
+  const indice = indexarAcervo(archive);
 
-    const melhor: MatchCertainty = avaliadas.some((item) => item.certainty === "IDENTICAL") ? "IDENTICAL"
-      : avaliadas.length > 0 ? "LIKELY" : "NONE";
-
-    const valores = avaliadas.map((item) => item.evidence.contractValue).filter((v): v is number => v !== undefined);
-
+  const required: CoverageItem[] = exigidas.map((categoria: ServiceCategory) => {
+    const evidencias = indice.get(categoria.id) ?? [];
     return {
-      workType,
-      certainty: melhor,
-      evidence: avaliadas.map((item) => item.evidence),
-      ...(valores.length > 0 ? { largestContractValue: Math.max(...valores) } : {}),
+      categoryId: categoria.id,
+      label: categoria.label,
+      covered: evidencias.length > 0,
+      evidenceCount: evidencias.length,
+      examples: evidencias.slice(0, 3).map((e) => e.description.trim().slice(0, 120)),
     };
   });
 
-  const notaTipo = matches.reduce((total, m) => total + pesoDaCerteza[m.certainty], 0) / matches.length;
+  const missing = required.filter((item) => !item.covered);
+  const cobertura = (required.length - missing.length) / required.length;
 
-  const maiores = matches.map((m) => m.largestContractValue).filter((v): v is number => v !== undefined);
-  const largestExecuted = maiores.length > 0 ? Math.max(...maiores) : undefined;
+  // Porte: o maior contrato entre os serviços que sustentam as categorias
+  // cobertas. Contrato alheio ao objeto não comprova capacidade para este.
+  const valores = required
+    .filter((item) => item.covered)
+    .flatMap((item) => (indice.get(item.categoryId) ?? []).map((e) => e.contractValue))
+    .filter((valor): valor is number => valor !== undefined);
+  const largestExecuted = valores.length > 0 ? Math.max(...valores) : undefined;
 
   let scale: ScaleVerdict = "UNKNOWN";
   let notaPorte = 0;
-  if (requirement.estimatedValue === undefined || largestExecuted === undefined) {
-    // Sem um dos dois lados não há comparação. O critério sai da conta em vez
-    // de virar zero — zerar aqui puniria a licitação de orçamento sigiloso.
-    scale = "UNKNOWN";
-  } else if (largestExecuted >= requirement.estimatedValue) {
-    scale = "COVERED";
-    notaPorte = 1;
-  } else {
-    scale = "BELOW";
-    // Porte parcial conta proporcionalmente: já ter feito metade do tamanho é
-    // muito diferente de nunca ter chegado perto.
-    notaPorte = Math.max(0, Math.min(1, largestExecuted / requirement.estimatedValue));
+  if (requirement.estimatedValue !== undefined && largestExecuted !== undefined) {
+    if (largestExecuted >= requirement.estimatedValue) { scale = "COVERED"; notaPorte = 1; }
+    else { scale = "BELOW"; notaPorte = Math.max(0, Math.min(1, largestExecuted / requirement.estimatedValue)); }
   }
 
-  /**
-   * Sem comparação de porte a nota fica limitada aos 70 pontos do tipo.
-   *
-   * A primeira versão devolvia 100 aqui, e o diagnóstico contra dados reais
-   * mostrou o estrago: 57 de 61 licitações saíram entre 90 e 100%, porque ter
-   * UM serviço do ramo no acervo bastava. Cem por cento tem de significar
-   * "ramo comprovado E porte coberto"; qualquer coisa menos que isso é uma
-   * afirmação que não se sustenta na hora da habilitação.
-   */
-  const score = Math.round(notaTipo * 70 + notaPorte * 30);
+  // Sem comparação de porte a nota para nos 80 pontos da cobertura. Cem por
+  // cento tem de significar "todo serviço comprovado E porte coberto".
+  const score = Math.round(cobertura * 80 + notaPorte * 20);
 
-  for (const m of matches) {
-    const rot = rotuloDoTipo[m.workType];
-    if (m.certainty === "IDENTICAL") reasons.push(`acervo comprova ${rot} (${m.evidence.length} serviço${m.evidence.length > 1 ? "s" : ""})`);
-    else if (m.certainty === "LIKELY") reasons.push(`acervo sugere ${rot}, mas a disciplina não bate — conferir`);
-    else reasons.push(`sem acervo de ${rot}`);
+  const reasons: string[] = [];
+  const cobertas = required.filter((item) => item.covered);
+  if (cobertas.length > 0) {
+    reasons.push(`acervo comprova ${cobertas.length} de ${required.length}: ${cobertas.map((c) => c.label.toLowerCase()).join(", ")}`);
   }
+  if (missing.length > 0) reasons.push(`falta acervo de ${missing.map((m) => m.label.toLowerCase()).join(", ")}`);
   if (scale === "COVERED" && largestExecuted !== undefined) reasons.push(`já executou obra de ${dinheiro(largestExecuted)}`);
   if (scale === "BELOW" && largestExecuted !== undefined && requirement.estimatedValue !== undefined) {
     reasons.push(`maior obra executada foi ${dinheiro(largestExecuted)}, contra ${dinheiro(requirement.estimatedValue)} desta`);
   }
   if (scale === "UNKNOWN") {
-    // Dizer POR QUE não deu para comparar é o que torna o aviso acionável:
-    // um caso é da licitação, o outro é cadastro que falta preencher.
     reasons.push(requirement.estimatedValue === undefined
       ? "porte não comparável: orçamento sigiloso"
       : "porte não comparável: acervo sem valor de contrato");
@@ -208,7 +173,11 @@ export function computeArchiveAdherence(
     score,
     determined: true,
     requirementInferred: requirement.inferred,
-    matches,
+    required,
+    missing,
+    // O sinal que decide parceria: falta serviço, ou o porte executado não
+    // chega perto do da obra.
+    needsPartner: missing.length > 0 || scale === "BELOW",
     scale,
     ...(largestExecuted !== undefined ? { largestExecuted } : {}),
     reasons,

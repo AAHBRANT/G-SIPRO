@@ -9,6 +9,7 @@ import type {
   TriageRepository,
 } from "@/modules/scouting/application/triage-service";
 import type { ArchiveEvidence } from "@/modules/scouting/domain/archive-adherence";
+import { fieldsFromExtractionOutput, servicesFromExtraction } from "@/modules/technical-archive/domain/extracted-services";
 import type { SignalRecord, SignalRepository } from "@/modules/scouting/application/signal-service";
 import { scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
 
@@ -243,38 +244,84 @@ export class PrismaSignalRepository implements SignalRepository {
 /**
  * Acervo técnico da empresa, no formato que o confronto da fila consome.
  *
- * Só entram contratos VALIDADOS. Rascunho ainda não foi conferido, vencido não
- * serve mais e restrito tem limitação de uso — nenhum dos três é acervo que se
- * põe dentro de um envelope, e contá-los inflaria a nota justamente no critério
- * que inabilita.
+ * ⚠️ Lê a MESMA fonte que a tela "Acervo técnico" mostra, e não a tabela de
+ * contratos executados como a primeira versão fazia. A tela parte dos atestados
+ * (documento do tipo ATESTADO) e, para cada um, usa os serviços estruturados se
+ * existirem ou, na falta deles, os que a IA extraiu do PDF. Consultar só a
+ * tabela estruturada devolvia ZERO na base real — os 2.209 serviços dos 24
+ * atestados vêm da extração.
+ *
+ * Não há filtro por situação do contrato de propósito: acervo é o que a equipe
+ * vê na tela do acervo. Se um dia a regra mudar, ela muda nos dois lugares
+ * juntos, e não só aqui.
  */
 export class PrismaArchiveEvidenceRepository {
   /**
    * Carrega o acervo inteiro de uma vez.
    *
-   * Consultar por licitação faria uma consulta por linha — 453 numa fila de
-   * 453. O acervo é da empresa, não da licitação: muda raramente, é da ordem
-   * de centenas de serviços e cabe folgado na memória de um pedido.
+   * Consultar por licitação faria uma consulta por linha — centenas numa fila
+   * de centenas. O acervo é da empresa, não da licitação: muda raramente e cabe
+   * folgado na memória de um pedido.
    */
-  async loadValidatedEvidence(): Promise<ArchiveEvidence[]> {
-    const services = await getDatabase().executedService.findMany({
-      where: { contract: { status: "VALIDATED" } },
+  async loadEvidence(): Promise<ArchiveEvidence[]> {
+    const documents = await getDatabase().managedDocument.findMany({
+      where: { type: "ATESTADO", status: { not: "DELETED" } },
       select: {
         id: true,
-        discipline: true,
-        originalDescription: true,
-        characteristics: true,
-        contract: { select: { value: true, subject: true } },
+        versions: {
+          orderBy: { version: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            technicalEvidenceRecords: {
+              select: {
+                experience: {
+                  select: {
+                    subject: true,
+                    value: true,
+                    services: { select: { id: true, discipline: true, originalDescription: true, characteristics: true } },
+                  },
+                },
+              },
+            },
+            aiExtractionExecutions: { orderBy: { startedAt: "desc" }, take: 1, select: { output: true } },
+          },
+        },
       },
     });
 
-    return services.map((service) => ({
-      serviceId: service.id,
-      discipline: service.discipline,
-      description: service.originalDescription,
-      characteristics: service.characteristics,
-      ...(service.contract.value !== null ? { contractValue: Number(service.contract.value) } : {}),
-      contractSubject: service.contract.subject,
-    }));
+    return documents.flatMap((document) => {
+      const version = document.versions[0];
+      if (!version) return [];
+
+      const experience = version.technicalEvidenceRecords[0]?.experience;
+      const contractSubject = experience?.subject;
+      const contractValue = experience?.value === null || experience?.value === undefined ? undefined : Number(experience.value);
+
+      // Serviço estruturado tem precedência: alguém já conferiu e organizou.
+      if (experience && experience.services.length > 0) {
+        return experience.services.map((service) => ({
+          serviceId: service.id,
+          discipline: service.discipline,
+          description: service.originalDescription,
+          characteristics: service.characteristics,
+          ...(contractValue !== undefined ? { contractValue } : {}),
+          ...(contractSubject ? { contractSubject } : {}),
+        }));
+      }
+
+      // Caso comum hoje: o que a IA leu da tabela de serviços do atestado.
+      const extracted = servicesFromExtraction(fieldsFromExtractionOutput(version.aiExtractionExecutions[0]?.output));
+      return extracted.map((service, index) => ({
+        serviceId: `${version.id}:${index}`,
+        discipline: service.discipline,
+        description: service.description,
+        // A extração traz quantidade e unidade juntas; elas entram como
+        // característica porque é onde o confronto procura detalhe.
+        characteristics: service.quantities,
+        ...(contractValue !== undefined ? { contractValue } : {}),
+        ...(contractSubject ? { contractSubject } : {}),
+      }));
+    });
   }
 }
