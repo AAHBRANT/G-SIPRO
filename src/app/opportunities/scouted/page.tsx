@@ -6,11 +6,12 @@ import { getCurrentAuthorizationContext } from "@/core/authorization/authorizati
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
+import { computeAdherence, resolveWorkTypes, type AdherenceInput } from "@/modules/scouting/domain/adherence";
+import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
 import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
 import { themeVariants } from "@/modules/scouting/domain/signal";
-import { PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
+import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { AdherenceGauge } from "./adherence-gauge";
 import { ScoutedFilters, type FilterGroup } from "./scouted-filters";
 import { Flag, SignalActions } from "./signal-actions";
@@ -129,7 +130,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   const shortDeadline = new Date(now.getTime() + SHORT_DEADLINE_DAYS * 86_400_000);
   const filter = await loadFilter();
 
-  const [rows, lastRun, facets] = await Promise.all([
+  const [rows, lastRun, facets, archive] = await Promise.all([
     database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP, include: { signal: true } }),
     database.scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
     // Projeção leve da fila inteira: alimenta os contadores dos cartões e das
@@ -138,6 +139,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       where: { status: "PENDING" },
       select: { subject: true, state: true, sphere: true, workTypes: true, estimatedValue: true, valueUndisclosed: true, proposalClosesAt: true, runId: true },
     }),
+    // O acervo é da empresa, não da licitação: uma consulta serve a fila
+    // inteira. Buscar por linha faria centenas de idas ao banco por página.
+    new PrismaArchiveEvidenceRepository().loadValidatedEvidence(),
   ]);
 
   const scored = rows.map((tender) => ({
@@ -147,11 +151,36 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // está no banco sem reescrever registro nenhum.
     signal: tender.signal ? { ...tender.signal, ...themeVariants(tender.signal.color) } : null,
     adherence: computeAdherence(toAdherenceInput(tender), filter, now),
+    // A pergunta que inabilita: temos acervo para isto? Enquanto o edital não
+    // for lido, o requisito é inferido do objeto — e sai marcado como tal.
+    archive: computeArchiveAdherence(
+      {
+        workTypes: resolveWorkTypes(toAdherenceInput(tender)),
+        ...(tender.valueUndisclosed || tender.estimatedValue === null ? {} : { estimatedValue: Number(tender.estimatedValue) }),
+        inferred: true,
+      },
+      archive,
+    ),
     days: tender.proposalClosesAt ? Math.max(0, Math.ceil((tender.proposalClosesAt.getTime() - now.getTime()) / 86_400_000)) : undefined,
   }));
 
-  const kept = scored.filter((tender) => tender.adherence.score >= adherenceFloor);
-  const ordered = sort === "aderencia" ? [...kept].sort((a, b) => b.adherence.score - a.adherence.score) : kept;
+  /**
+   * O corte é pelo ACERVO, que é o critério que inabilita. Licitação cujo
+   * acervo não pôde ser julgado — sem tipo reconhecido ou sem nada cadastrado —
+   * fica de fora do corte em vez de virar zero, e o cabeçalho diz quantas
+   * foram postas de lado. Esconder em silêncio o que não foi medido faria a
+   * equipe perder obra que ela sabe fazer.
+   */
+  const semJulgamento = adherenceFloor > 0 ? scored.filter((tender) => !tender.archive.determined).length : 0;
+  const kept = adherenceFloor > 0
+    ? scored.filter((tender) => tender.archive.determined && tender.archive.score >= adherenceFloor)
+    : scored;
+  const ordered = sort === "aderencia"
+    // Sem acervo julgado, o perfil serve de desempate: é o que sobra para
+    // ordenar, e vale mais que ordem aleatória.
+    ? [...kept].sort((a, b) => (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1)
+        || b.adherence.score - a.adherence.score)
+    : kept;
   const tenders = ordered.slice(0, PAGE_SIZE);
 
   const facetScores = facets.map((entry) => computeAdherence(toAdherenceInput(entry), filter, now));
@@ -202,6 +231,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
         </h2>
         <p>
           {kept.length > tenders.length && <>Mostrando as <strong>{tenders.length}</strong> primeiras · </>}
+          {semJulgamento > 0 && <><strong>{semJulgamento}</strong> fora do corte por acervo não julgado · </>}
           {truncated && <>Fila maior que {QUEUE_CAP}; a contagem por aderência considera as {QUEUE_CAP} primeiras · </>}
           Ordenado por <strong>{sortOptions.find((option) => option.value === sort)?.label.toLowerCase()}</strong>
         </p>
@@ -233,7 +263,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   {tender.valueUndisclosed && <span className="bx-eti alerta">valor sigiloso</span>}
                   {tender.adherence.reasons.filter((reason) => !reason.met && !reason.skipped && reason.criterion !== "SPHERE").map((reason) =>
                     <span className="bx-eti alerta" key={reason.criterion}>{reason.label}</span>)}
-                  <span className="bx-eti">acervo não verificado</span>
+                  {tender.archive.determined
+                    ? <span className="bx-eti">acervo {tender.archive.score}%{tender.archive.requirementInferred ? " (estimado)" : ""}</span>
+                    : <span className="bx-eti">acervo não julgado</span>}
                 </div>
               </div>
 
@@ -250,7 +282,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
               </div>
 
               <div className="bx-medidor-caixa">
-                <AdherenceGauge score={tender.adherence.score} undetermined={tender.adherence.undetermined}/>
+                <AdherenceGauge score={tender.archive.score} undetermined={!tender.archive.determined}/>
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
                 {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
                     Por isso não depende da alçada de decidir. */}
@@ -277,6 +309,14 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   <Linha rotulo="Encerramento" valor={tender.proposalClosesAt?.toLocaleDateString("pt-BR") ?? "—"}/>
                   <Linha rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
                   <Linha rotulo="Captada em" valor={tender.createdAt.toLocaleDateString("pt-BR")}/>
+                </div>
+
+                <div className="bx-bloco">
+                  <h3>Acervo técnico — {tender.archive.determined ? `${tender.archive.score}%` : "não julgado"}</h3>
+                  {tender.archive.reasons.map((reason) => <Motivo key={reason} met={!/^sem acervo|^nenhum acervo|^tipo de obra n|maior obra executada/.test(reason)} rotulo={reason} skipped={/^porte não|^nenhum acervo|^tipo de obra n/.test(reason)}/>)}
+                  {tender.archive.requirementInferred && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                    Requisito <strong>estimado a partir do objeto</strong>. As parcelas de maior relevância exigidas de fato só constam do edital, que ainda não é lido automaticamente.
+                  </p>}
                 </div>
 
                 <div className="bx-bloco">

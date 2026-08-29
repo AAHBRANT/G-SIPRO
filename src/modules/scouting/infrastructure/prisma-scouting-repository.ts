@@ -8,6 +8,7 @@ import type {
   ScoutedTenderRecord,
   TriageRepository,
 } from "@/modules/scouting/application/triage-service";
+import type { ArchiveEvidence } from "@/modules/scouting/domain/archive-adherence";
 import type { SignalRecord, SignalRepository } from "@/modules/scouting/application/signal-service";
 import { scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
 
@@ -236,5 +237,44 @@ export class PrismaSignalRepository implements SignalRepository {
     // diz se existia marca, e é ela que vira o erro na camada de aplicação.
     const { count } = await getDatabase().scoutedTenderSignal.deleteMany({ where: { tenderId } });
     return count > 0;
+  }
+}
+
+/**
+ * Acervo técnico da empresa, no formato que o confronto da fila consome.
+ *
+ * Só entram contratos VALIDADOS. Rascunho ainda não foi conferido, vencido não
+ * serve mais e restrito tem limitação de uso — nenhum dos três é acervo que se
+ * põe dentro de um envelope, e contá-los inflaria a nota justamente no critério
+ * que inabilita.
+ */
+export class PrismaArchiveEvidenceRepository {
+  /**
+   * Carrega o acervo inteiro de uma vez.
+   *
+   * Consultar por licitação faria uma consulta por linha — 453 numa fila de
+   * 453. O acervo é da empresa, não da licitação: muda raramente, é da ordem
+   * de centenas de serviços e cabe folgado na memória de um pedido.
+   */
+  async loadValidatedEvidence(): Promise<ArchiveEvidence[]> {
+    const services = await getDatabase().executedService.findMany({
+      where: { contract: { status: "VALIDATED" } },
+      select: {
+        id: true,
+        discipline: true,
+        originalDescription: true,
+        characteristics: true,
+        contract: { select: { value: true, subject: true } },
+      },
+    });
+
+    return services.map((service) => ({
+      serviceId: service.id,
+      discipline: service.discipline,
+      description: service.originalDescription,
+      characteristics: service.characteristics,
+      ...(service.contract.value !== null ? { contractValue: Number(service.contract.value) } : {}),
+      contractSubject: service.contract.subject,
+    }));
   }
 }
