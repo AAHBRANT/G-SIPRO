@@ -175,9 +175,16 @@ export function computeArchiveAdherence(
     notaPorte = Math.max(0, Math.min(1, largestExecuted / requirement.estimatedValue));
   }
 
-  const score = scale === "UNKNOWN"
-    ? Math.round(notaTipo * 100)
-    : Math.round((notaTipo * 70 + notaPorte * 30) / 100 * 100);
+  /**
+   * Sem comparação de porte a nota fica limitada aos 70 pontos do tipo.
+   *
+   * A primeira versão devolvia 100 aqui, e o diagnóstico contra dados reais
+   * mostrou o estrago: 57 de 61 licitações saíram entre 90 e 100%, porque ter
+   * UM serviço do ramo no acervo bastava. Cem por cento tem de significar
+   * "ramo comprovado E porte coberto"; qualquer coisa menos que isso é uma
+   * afirmação que não se sustenta na hora da habilitação.
+   */
+  const score = Math.round(notaTipo * 70 + notaPorte * 30);
 
   for (const m of matches) {
     const rot = rotuloDoTipo[m.workType];
@@ -189,7 +196,13 @@ export function computeArchiveAdherence(
   if (scale === "BELOW" && largestExecuted !== undefined && requirement.estimatedValue !== undefined) {
     reasons.push(`maior obra executada foi ${dinheiro(largestExecuted)}, contra ${dinheiro(requirement.estimatedValue)} desta`);
   }
-  if (scale === "UNKNOWN") reasons.push("porte não comparável");
+  if (scale === "UNKNOWN") {
+    // Dizer POR QUE não deu para comparar é o que torna o aviso acionável:
+    // um caso é da licitação, o outro é cadastro que falta preencher.
+    reasons.push(requirement.estimatedValue === undefined
+      ? "porte não comparável: orçamento sigiloso"
+      : "porte não comparável: acervo sem valor de contrato");
+  }
 
   return {
     score,

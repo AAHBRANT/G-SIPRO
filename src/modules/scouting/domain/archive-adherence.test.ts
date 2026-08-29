@@ -99,17 +99,34 @@ describe("computeArchiveAdherence", () => {
     expect(computeArchiveAdherence(exigencia({ inferred: false }), [servico()]).requirementInferred).toBe(false);
   });
 
-  it("tira o porte da conta quando o orçamento é sigiloso, em vez de zerar", () => {
-    // Zerar puniria justamente a obra grande, que é onde o sigilo é comum.
+  /**
+   * Sem comparação de porte a nota para nos 70 pontos do tipo.
+   *
+   * Não é castigo, é limite do que se mediu — e a primeira versão errava nos
+   * dois sentidos. Zerar puniria a obra grande, que é onde o sigilo é comum.
+   * Dar 100 foi pior: no diagnóstico contra dados reais, 57 de 61 licitações
+   * saíram entre 90 e 100% porque um único serviço do ramo bastava.
+   */
+  it("limita a nota a 70 quando o orçamento é sigiloso: nem zero, nem cheia", () => {
     const semValor = computeArchiveAdherence(exigencia({ estimatedValue: undefined }), [servico()]);
     expect(semValor.scale).toBe("UNKNOWN");
-    expect(semValor.score).toBe(100);
+    expect(semValor.score).toBe(70);
+    expect(semValor.reasons.join(" ")).toContain("orçamento sigiloso");
   });
 
-  it("tira o porte da conta quando o acervo não registra valor de contrato", () => {
+  it("limita igual quando o acervo não registra valor, e diz que é do cadastro", () => {
     const a = computeArchiveAdherence(exigencia(), [servico({ contractValue: undefined })]);
     expect(a.scale).toBe("UNKNOWN");
+    expect(a.score).toBe(70);
     expect(a.largestExecuted).toBeUndefined();
+    // O motivo distingue o que é da licitação do que é cadastro faltando.
+    expect(a.reasons.join(" ")).toContain("acervo sem valor de contrato");
+  });
+
+  it("cem por cento só sai com ramo comprovado E porte coberto", () => {
+    const cheia = computeArchiveAdherence(exigencia(), [servico()]);
+    expect(cheia.score).toBe(100);
+    expect(cheia.scale).toBe("COVERED");
   });
 
   it("exige os dois tipos quando a obra é mista", () => {

@@ -52,23 +52,31 @@ async function main(): Promise<void> {
   const rascunho = await criarContrato("dra", "DRAFT", 900_000_000);
 
   await db.executedService.create({
-    data: { contractId: validado.id, discipline: "Pavimentação asfáltica", originalDescription: "Revestimento em CBUQ", characteristics: "espessura 5 cm", createdBy: dono.id },
+    data: { contractId: validado.id, discipline: "Pavimentação asfáltica", originalDescription: `Revestimento em CBUQ ${marca}`, characteristics: "espessura 5 cm", createdBy: dono.id },
   });
   await db.executedService.create({
-    data: { contractId: rascunho.id, discipline: "Pavimentação asfáltica", originalDescription: "Base e sub-base", characteristics: "", createdBy: dono.id },
+    data: { contractId: rascunho.id, discipline: "Pavimentação asfáltica", originalDescription: `Base e sub-base ${marca}`, characteristics: "", createdBy: dono.id },
   });
 
-  const acervo = await new PrismaArchiveEvidenceRepository().loadValidatedEvidence();
+  const acervoCompleto = await new PrismaArchiveEvidenceRepository().loadValidatedEvidence();
 
-  checar("a consulta traz só o serviço do contrato validado", acervo.length === 1, `${acervo.length} serviço(s)`);
-  checar("o rascunho de R$ 900 mi não entra no acervo",
-    !acervo.some((e) => e.contractValue === 900_000_000),
-    acervo.map((e) => e.contractValue).join(", "));
+  // A verificação olha os PRÓPRIOS registros, não o total do banco: presumir
+  // banco vazio faz o roteiro quebrar assim que alguém semear qualquer coisa.
+  const meuValidado = acervoCompleto.find((e) => e.description === `Revestimento em CBUQ ${marca}`);
+  const meuRascunho = acervoCompleto.find((e) => e.description === `Base e sub-base ${marca}`);
+
+  checar("o serviço do contrato validado entra no acervo", meuValidado !== undefined);
+  checar("o serviço do contrato em rascunho NÃO entra", meuRascunho === undefined);
   checar("o valor do contrato chega como número, não como Decimal",
-    typeof acervo[0]?.contractValue === "number" && acervo[0]?.contractValue === 62_000_000,
-    `${typeof acervo[0]?.contractValue} ${acervo[0]?.contractValue}`);
+    typeof meuValidado?.contractValue === "number" && meuValidado?.contractValue === 62_000_000,
+    `${typeof meuValidado?.contractValue} ${meuValidado?.contractValue}`);
   checar("disciplina, descrição e características vieram juntas",
-    acervo[0]?.discipline === "Pavimentação asfáltica" && acervo[0]?.description === "Revestimento em CBUQ" && acervo[0]?.characteristics === "espessura 5 cm");
+    meuValidado?.discipline === "Pavimentação asfáltica" && meuValidado?.characteristics === "espessura 5 cm",
+    `${meuValidado?.discipline} · ${meuValidado?.characteristics}`);
+
+  // O confronto usa só o que este roteiro semeou, para a nota não depender do
+  // que houver no banco.
+  const acervo = meuValidado ? [meuValidado] : [];
 
   // O confronto de ponta a ponta, com o acervo lido do banco.
   const cabe = computeArchiveAdherence({ workTypes: ["PAVING"], estimatedValue: 30_000_000, inferred: true }, acervo);
