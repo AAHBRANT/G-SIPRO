@@ -20,8 +20,14 @@ import { categoriesIn, type ServiceCategory } from "@/modules/scouting/domain/se
  */
 
 export type ArchiveRequirement = Readonly<{
-  /** Texto do objeto, de onde as categorias de serviço são reconhecidas. */
-  subject: string;
+  /**
+   * Textos de onde as categorias de serviço são reconhecidas.
+   *
+   * Enquanto o edital não é lido, é o objeto da licitação — uma fonte só.
+   * Depois da leitura, é a lista de parcelas de maior relevância, cada uma um
+   * texto. O confronto não muda: a régua é a mesma nos dois casos.
+   */
+  sources: readonly string[];
   /** Porte da obra a disputar, quando o órgão revela. */
   estimatedValue?: number;
   /** Falso quando o requisito veio do edital, e não de inferência. */
@@ -105,7 +111,11 @@ export function computeArchiveAdherence(
   requirement: ArchiveRequirement,
   archive: readonly ArchiveEvidence[],
 ): ArchiveAdherence {
-  const exigidas = categoriesIn(requirement.subject);
+  // União das categorias de todas as fontes, sem repetir: duas parcelas do
+  // mesmo ramo não valem por duas exigências.
+  const exigidas = [...new Map(
+    requirement.sources.flatMap((fonte) => categoriesIn(fonte)).map((c) => [c.id, c]),
+  ).values()];
 
   if (exigidas.length === 0) {
     // Objeto genérico demais para dizer o que exige. Chutar aqui seria pior do

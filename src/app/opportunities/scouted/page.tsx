@@ -155,7 +155,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // for lido, o requisito é inferido do objeto — e sai marcado como tal.
     archive: computeArchiveAdherence(
       {
-        subject: tender.subject,
+        sources: [tender.subject],
         ...(tender.valueUndisclosed || tender.estimatedValue === null ? {} : { estimatedValue: Number(tender.estimatedValue) }),
         inferred: true,
       },

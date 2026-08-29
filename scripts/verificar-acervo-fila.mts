@@ -75,15 +75,15 @@ async function main(): Promise<void> {
     meus.every((e) => e.contractSubject === "Duplicação de rodovia estadual"));
 
   /* O confronto, usando só o que este roteiro semeou. */
-  const cobre = computeArchiveAdherence({ subject: "Terraplenagem e pavimentação asfáltica da rodovia", estimatedValue: 30_000_000, inferred: true }, meus);
+  const cobre = computeArchiveAdherence({ sources: ["Terraplenagem e pavimentação asfáltica da rodovia"], estimatedValue: 30_000_000, inferred: true }, meus);
   checar("objeto coberto e porte alcançado dá nota cheia", cobre.score === 100 && !cobre.needsPartner, `${cobre.score}% · consórcio: ${cobre.needsPartner}`);
 
-  const falta = computeArchiveAdherence({ subject: "Construção de ponte e terraplenagem de acesso", inferred: true }, meus);
+  const falta = computeArchiveAdherence({ sources: ["Construção de ponte e terraplenagem de acesso"], inferred: true }, meus);
   checar("objeto com serviço faltando indica consórcio", falta.needsPartner && falta.missing.some((m) => m.label === "Obra de arte especial"),
     falta.missing.map((m) => m.label).join(", "));
   checar("e a nota reflete a fração coberta", falta.score > 0 && falta.score < 80, `${falta.score}%`);
 
-  const grande = computeArchiveAdherence({ subject: "Pavimentação asfáltica", estimatedValue: 300_000_000, inferred: true }, meus);
+  const grande = computeArchiveAdherence({ sources: ["Pavimentação asfáltica"], estimatedValue: 300_000_000, inferred: true }, meus);
   checar("obra muito maior que o executado também indica consórcio", grande.scale === "BELOW" && grande.needsPartner, `${grande.score}% · ${grande.scale}`);
 
   /* Sem limpeza, de propósito. O banco tem trava de somente-acréscimo sobre

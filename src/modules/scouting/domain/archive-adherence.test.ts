@@ -11,7 +11,7 @@ const servico = (discipline: string, description = "", parcial: Partial<ArchiveE
 });
 
 const exige = (subject: string, parcial: Partial<ArchiveRequirement> = {}): ArchiveRequirement =>
-  ({ subject, inferred: true, ...parcial });
+  ({ sources: [subject], inferred: true, ...parcial });
 
 /** Acervo de uma empresa que faz rodovia, mas nunca fez ponte. */
 const acervoRodoviario = [
