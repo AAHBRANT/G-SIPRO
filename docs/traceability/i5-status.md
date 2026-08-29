@@ -40,7 +40,8 @@ BL-503: implementar busca semântica e similaridade como apoio, preservando filt
 - Chave `OPENAI_API_KEY` exclusivamente no ambiente do servidor; segredo não é persistido, auditado ou exibido.
 - Execução exige versão mais recente e aprovada do caso de uso, modelo OpenAI ativo, serviço Responses API e fonte documental autorizada.
 - Acesso à fonte nunca supera as permissões do usuário; `ai.execute`, `documents.read` e a permissão declarada no caso são verificadas.
-- Fonte enviada por versão imutável e SHA-256 novamente conferido no armazenamento antes do processamento.
+- Fonte enviada por versão imutável e SHA-256 novamente conferido no armazenamento antes do processamento, quando o arquivo é preservado no acervo.
+- Desde 29/08/2026 existe também a procedência **efêmera**, para arquivo público que o sistema lê sem guardar (edital do PNCP no Buscador). Nela a execução grava endereço de origem, nome, tipo, tamanho, data de captura e o SHA-256 calculado sobre os próprios bytes enviados ao modelo; o banco exige exatamente uma das duas procedências e recusa identificação incompleta. O que se perde está registrado na migração `20260829120000_ai_extraction_fonte_efemera`: sem cópia local, conferir um trecho depende de rebaixar da origem, e o hash deixa de ter segunda testemunha — em troca, a evidência com trecho e localizador passa a ser a prova retida. Caminho não exposto na API pública, para que endereço e tipo documental nunca venham de fora.
 - Resultado é explicitamente assistivo e registra conteúdo estruturado, confiança, limitações, evidências, modelo, prompt, usuário, horários, idempotência e correlação.
 - Falhas são persistidas com código sanitizado; transição de estado e evidências possuem guardas no PostgreSQL.
 - Interface `/ai-extractions` e API `/api/ai-extractions` incorporadas.

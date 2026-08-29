@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { AuthorizationContext } from "@/core/authorization/policy";
 import {
   EditalReadingService,
-  type EditalArchivePort,
   type EditalExtractionPort,
   type EditalReadingRepository,
   type TenderFilesPort,
@@ -20,14 +19,17 @@ const baixado = (parcial: Partial<DownloadedFile> = {}): DownloadedFile => ({
   filename: "edital.pdf", mimeType: "application/pdf", bytes: Buffer.from("conteudo do edital"), ...parcial,
 });
 
-/** Saída da extração no formato que o repositório real devolve. */
-const saida = (campos: Array<{ field: string; value: string }>, extras: Record<string, unknown> = {}) => ({
-  output: { content: campos, confidence: 0.82, limitations: [], ...extras },
+/** Execução como o repositório real a devolve: id, saída, confiança, limitações. */
+const execucao = (campos: Array<{ field: string; value: string }>, extras: Record<string, unknown> = {}) => ({
+  id: "exec-1",
+  output: { content: campos },
+  confidence: 0.82,
+  limitations: [],
+  ...extras,
 });
 
 function montar(ajustes: {
   files?: Partial<TenderFilesPort>;
-  archive?: Partial<EditalArchivePort>;
   extraction?: Partial<EditalExtractionPort>;
   readings?: Partial<EditalReadingRepository>;
 } = {}) {
@@ -36,14 +38,9 @@ function montar(ajustes: {
     download: vi.fn(async () => baixado()),
     ...ajustes.files,
   };
-  const archive: EditalArchivePort = {
-    findVersionByHash: vi.fn(async () => undefined),
-    archive: vi.fn(async () => ({ versionId: "v-1" })),
-    ...ajustes.archive,
-  };
   const extraction: EditalExtractionPort = {
     approvedDefinition: vi.fn(async () => ({ id: "def-1", promptHash: "a".repeat(64) })),
-    run: vi.fn(async () => saida([
+    runEphemeral: vi.fn(async () => execucao([
       { field: "Parcelas de maior relevância e quantitativos mínimos", value: "Ponte em concreto armado — 15 m" },
       { field: "Consórcio", value: "Permitido" },
     ])),
@@ -55,11 +52,11 @@ function montar(ajustes: {
     save: vi.fn(async (input) => ({ ...input })),
     ...ajustes.readings,
   };
-  return { service: new EditalReadingService(files, archive, extraction, readings), files, archive, extraction, readings };
+  return { service: new EditalReadingService(files, extraction, readings), files, extraction, readings };
 }
 
 describe("leitura que dá certo", () => {
-  it("baixa, arquiva, extrai e grava a exigência", async () => {
+  it("baixa, lê e grava a exigência", async () => {
     const { service, readings } = montar();
     const outcome = await service.read("t-1", auth);
 
@@ -71,21 +68,25 @@ describe("leitura que dá certo", () => {
     expect(readings.save).toHaveBeenCalledOnce();
   });
 
-  it("aproveita o arquivo já no acervo em vez de duplicá-lo", async () => {
-    const { service, archive } = montar({ archive: { findVersionByHash: vi.fn(async () => ({ id: "v-antiga" })) } });
-    await service.read("t-1", auth);
+  /**
+   * O PDF não é preservado: o que fica é o endereço — que é o link de download
+   * do cartão — e o SHA-256 do que foi lido, que denuncia edital retificado.
+   */
+  it("guarda a origem e o hash, e nenhum arquivo", async () => {
+    const { service } = montar();
+    const outcome = await service.read("t-1", auth);
 
-    expect(archive.archive).not.toHaveBeenCalled();
+    if (outcome.status !== "READ") throw new Error(outcome.status);
+    expect(outcome.reading.source.uri).toBe("https://pncp.gov.br/arquivos/1");
+    expect(outcome.reading.source.filename).toBe("edital.pdf");
+    expect(outcome.reading.source.fileHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(outcome.reading.executionId).toBe("exec-1");
   });
 
-  /**
-   * O primeiro da lista é o termo de referência, mas nem sempre é PDF. Parar
-   * nele deixaria a licitação sem leitura tendo o edital logo abaixo.
-   */
-  it("pula o que não é PDF e fica com o próximo", async () => {
-    const { service, archive } = montar({
+  it("o endereço gravado é o do arquivo escolhido, não o do primeiro da lista", async () => {
+    const { service } = montar({
       files: {
-        list: vi.fn(async () => [arquivo({ title: "Projeto" }), arquivo({ title: "Edital", sequence: 2 })]),
+        list: vi.fn(async () => [arquivo({ title: "Projeto", url: "https://pncp.gov.br/arquivos/9" }), arquivo({ title: "Edital", url: "https://pncp.gov.br/arquivos/2", sequence: 2 })]),
         download: vi.fn(async (file: TenderFile) => file.title === "Projeto"
           ? baixado({ filename: "projeto.zip", mimeType: "application/zip" })
           : baixado()),
@@ -93,36 +94,47 @@ describe("leitura que dá certo", () => {
     });
     const outcome = await service.read("t-1", auth);
 
-    expect(outcome.status).toBe("READ");
-    expect(vi.mocked(archive.archive).mock.calls[0]?.[0].filename).toBe("edital.pdf");
+    if (outcome.status !== "READ") throw new Error(outcome.status);
+    expect(outcome.reading.source.uri).toBe("https://pncp.gov.br/arquivos/2");
+  });
+
+  it("declara o tipo documental à governança, e não deixa vir de fora", async () => {
+    const { service, extraction } = montar();
+    await service.read("t-1", auth);
+    expect(vi.mocked(extraction.runEphemeral).mock.calls[0]?.[0].source.documentType).toBe("EDITAL");
   });
 });
 
 describe("o que impede a leitura devolve motivo, e não exceção", () => {
   it("licitação já lida não é lida de novo", async () => {
     const { service, files, extraction } = montar({
-      readings: { find: vi.fn(async () => ({ tenderId: "t-1", documentVersionId: "v-1", requirement: { services: [], limitations: [] } })) },
+      readings: {
+        find: vi.fn(async () => ({
+          tenderId: "t-1", executionId: "exec-0",
+          source: { uri: "https://x", filename: "e.pdf", fileHash: "a".repeat(64), fetchedAt: new Date() },
+          requirement: { services: [], limitations: [] },
+        })),
+      },
     });
     const outcome = await service.read("t-1", auth);
 
     expect(outcome.status).toBe("ALREADY_READ");
     // O ponto do teste: nem PNCP nem IA são acionados. Reler custa dinheiro.
     expect(files.list).not.toHaveBeenCalled();
-    expect(extraction.run).not.toHaveBeenCalled();
+    expect(extraction.runEphemeral).not.toHaveBeenCalled();
   });
 
   /**
    * Sem caso de uso aprovado a leitura não pode acontecer — e não pode nem
-   * começar: baixar o edital para descobrir depois que não há autorização
-   * gastaria banda e gravaria arquivo sem amparo.
+   * começar: baixar 12 MB para descobrir depois que não há autorização
+   * gastaria banda à toa.
    */
   it("sem caso de uso aprovado, para antes de baixar qualquer coisa", async () => {
-    const { service, files, archive } = montar({ extraction: { approvedDefinition: vi.fn(async () => undefined) } });
+    const { service, files } = montar({ extraction: { approvedDefinition: vi.fn(async () => undefined) } });
     const outcome = await service.read("t-1", auth);
 
     expect(outcome.status).toBe("NOT_CONFIGURED");
     expect(files.list).not.toHaveBeenCalled();
-    expect(archive.archive).not.toHaveBeenCalled();
   });
 
   it("número de controle fora do padrão não vira pedido ao PNCP", async () => {
@@ -155,10 +167,19 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
    * parcela exigida" e daria 100% de aderência para qualquer empresa.
    */
   it("extração que não achou nada não vira leitura gravada", async () => {
-    const { service, readings } = montar({ extraction: { run: vi.fn(async () => saida([{ field: "Objeto", value: "—" }])) } });
+    const { service, readings } = montar({ extraction: { runEphemeral: vi.fn(async () => execucao([{ field: "Objeto", value: "—" }])) } });
     const outcome = await service.read("t-1", auth);
 
     expect(outcome.status).toBe("NOTHING_EXTRACTED");
+    expect(readings.save).not.toHaveBeenCalled();
+  });
+
+  /** Sem identificador da execução não há como reencontrar a fonte depois. */
+  it("execução sem identificador não vira leitura gravada", async () => {
+    const { service, readings } = montar({ extraction: { runEphemeral: vi.fn(async () => ({ output: { content: [{ field: "Consórcio", value: "Permitido" }] } })) } });
+    const outcome = await service.read("t-1", auth);
+
+    expect(outcome.status).toBe("FAILED");
     expect(readings.save).not.toHaveBeenCalled();
   });
 
@@ -180,7 +201,7 @@ describe("chave de idempotência", () => {
   const chaveDe = async (ajustes: Parameters<typeof montar>[0] = {}) => {
     const { service, extraction } = montar(ajustes);
     await service.read("t-1", auth);
-    return vi.mocked(extraction.run).mock.calls[0]?.[0].idempotencyKey ?? "";
+    return vi.mocked(extraction.runEphemeral).mock.calls[0]?.[0].idempotencyKey ?? "";
   };
 
   it("cabe no limite de 120 caracteres do schema", async () => {

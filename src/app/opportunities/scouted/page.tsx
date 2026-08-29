@@ -370,6 +370,25 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   </p>
                 </div>
 
+                {tender.edital && <div className="bx-bloco">
+                  <h3>Parcelas exigidas pelo edital</h3>
+                  {tender.edital.requirement.services.length > 0
+                    ? <div className="bx-parcelas">
+                      {tender.edital.requirement.services.map((parcela, indice) => <div className="bx-parcela" key={indice}>
+                        <span className="bx-parcela-nome">{parcela.description}</span>
+                        <span className="bx-parcela-qtd">
+                          {parcela.quantity === undefined
+                            ? "—"
+                            : `${parcela.quantity.toLocaleString("pt-BR")}${parcela.unit ? ` ${parcela.unit}` : ""}`}
+                        </span>
+                      </div>)}
+                    </div>
+                    : <p className="bx-nota">A leitura não localizou lista de parcelas de maior relevância neste edital.</p>}
+                  {tender.edital.requirement.limitations.length > 0 && <p className="bx-nota">
+                    <strong>A leitura não conseguiu determinar:</strong> {tender.edital.requirement.limitations.join("; ")}.
+                  </p>}
+                </div>}
+
                 <div className="bx-bloco">
                   <h3>Acervo técnico — {tender.archive.determined ? `${tender.archive.score}%` : "não julgado"}</h3>
                   {/* Serviço a serviço: é a lista do que falta que vira a
@@ -411,14 +430,34 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                 </div>}
 
                 <div className="bx-bloco">
-                  <h3>Habilitação técnica</h3>
-                  <p className="bx-nota">
-                    A aderência acima mede o <strong>perfil</strong> da empresa, não o acervo. Acervo exigido, consórcio, garantia de proposta e visita técnica só constam do edital, e passam a aparecer aqui quando a leitura automática entrar em operação.
-                  </p>
-                  {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
-                    Abrir o edital no PNCP
-                    <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
-                  </a>}
+                  <h3>{tender.edital ? "Edital lido" : "Edital"}</h3>
+                  {tender.edital
+                    ? <>
+                      {/* Procedência: sem cópia guardada, é isto que diz QUAL
+                          arquivo foi lido — e o hash é o que denuncia edital
+                          retificado depois da leitura. */}
+                      <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
+                      <Linha rotulo="Lido em" valor={tender.edital.source.fetchedAt.toLocaleDateString("pt-BR")}/>
+                      <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
+                      {tender.edital.requirement.confidence !== undefined
+                        && <Linha rotulo="Confiança da leitura" valor={`${Math.round(tender.edital.requirement.confidence * 100)}%`}/>}
+                    </>
+                    : <p className="bx-nota">
+                      Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
+                    </p>}
+                  <div className="bx-links">
+                    {tender.edital && <a className="bx-link forte" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
+                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+                      Baixar o edital
+                    </a>}
+                    {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
+                      Abrir no PNCP
+                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
+                    </a>}
+                  </div>
+                  {tender.edital && <p className="bx-nota">
+                    O arquivo não fica guardado no G-SIPRO: o link busca direto na origem, e por isso pode responder erro se o órgão o tirar do ar.
+                  </p>}
                 </div>
               </dl>
             </div>

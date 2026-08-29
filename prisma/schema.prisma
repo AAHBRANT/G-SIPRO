@@ -1603,9 +1603,19 @@ model AiExtractionExecution {
   definition         AiUseCaseDefinition    @relation(fields: [definitionId], references: [id], onDelete: Restrict)
   modelVersionId     String                 @db.Uuid
   modelVersion       AiModelVersion         @relation(fields: [modelVersionId], references: [id], onDelete: Restrict)
-  documentVersionId  String                 @db.Uuid
-  documentVersion    ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
-  documentFileHash   String                 @db.Char(64)
+  /// Arquivo preservado no acervo. Nulo quando a leitura partiu de fonte
+  /// efêmera — o banco exige exatamente uma das duas procedências.
+  documentVersionId  String?                 @db.Uuid
+  documentVersion    ManagedDocumentVersion? @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  /// SHA-256 dos bytes que o modelo leu. Obrigatório nos dois caminhos: é ele,
+  /// e não a existência do arquivo, que prova QUAL conteúdo foi lido.
+  documentFileHash   String                  @db.Char(64)
+  /// Endereço externo de onde os bytes vieram, quando não são preservados.
+  sourceUri          String?                 @db.VarChar(1000)
+  sourceFilename     String?                 @db.VarChar(255)
+  sourceMimeType     String?                 @db.VarChar(160)
+  sourceSizeBytes    BigInt?
+  sourceFetchedAt    DateTime?               @db.Timestamptz(6)
   requestedFields    Json
   instructions       String?                @db.Text
   inputHash          String                 @db.Char(64)
@@ -1622,6 +1632,7 @@ model AiExtractionExecution {
   correlationId      String                 @db.Uuid
   createdAt          DateTime               @default(now()) @db.Timestamptz(6)
   evidence           AiExtractionEvidence[]
+  editalReadings     ScoutedTenderEditalReading[]
 
   @@index([definitionId, startedAt])
   @@index([documentVersionId, startedAt])
@@ -1634,10 +1645,12 @@ model AiExtractionEvidence {
   id                String                 @id @default(uuid()) @db.Uuid
   executionId       String                 @db.Uuid
   execution         AiExtractionExecution  @relation(fields: [executionId], references: [id], onDelete: Restrict)
-  documentVersionId String                 @db.Uuid
-  documentVersion   ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
-  documentFileHash  String                 @db.Char(64)
-  excerpt           String                 @db.Text
+  /// Acompanha a procedência da execução: nulo quando a fonte foi efêmera.
+  /// O que sustenta a citação nos dois casos é o hash, conferido pelo gatilho.
+  documentVersionId String?                 @db.Uuid
+  documentVersion   ManagedDocumentVersion? @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  documentFileHash  String                  @db.Char(64)
+  excerpt           String                  @db.Text
   locator           String                 @db.VarChar(500)
   createdAt         DateTime               @default(now()) @db.Timestamptz(6)
 
@@ -2184,7 +2197,6 @@ model ManagedDocumentVersion {
   createdAt                DateTime                        @default(now()) @db.Timestamptz(6)
   createdBy                String                          @db.Uuid
   technicalExperiences     ExecutedContract[]
-  editalReadings           ScoutedTenderEditalReading[]
   technicalEvidenceRecords TechnicalEvidence[]
   professionalLinks        ProfessionalLink[]
   complianceEvidenceLinks  ComplianceMatrixEvidence[]
@@ -3043,9 +3055,17 @@ model ScoutedTenderEditalReading {
   id                String                 @id @default(uuid()) @db.Uuid
   tenderId          String                 @unique @db.Uuid
   tender            ScoutedTender          @relation(fields: [tenderId], references: [id], onDelete: Cascade)
-  /// Arquivo do edital preservado no acervo documental.
-  documentVersionId String                 @db.Uuid
-  documentVersion   ManagedDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
+  /// Execução de IA que produziu esta leitura. É por ela que se chega ao
+  /// modelo, à versão do prompt e aos trechos citados — o rastro que antes
+  /// passava pelo arquivo guardado.
+  executionId       String                 @db.Uuid
+  execution         AiExtractionExecution  @relation(fields: [executionId], references: [id], onDelete: Restrict)
+  /// Endereço público do arquivo lido. É o link de download que a fila oferece.
+  sourceUri         String                 @db.VarChar(1000)
+  sourceFilename    String                 @db.VarChar(255)
+  /// SHA-256 dos bytes lidos: denuncia edital retificado depois da leitura.
+  sourceFileHash    String                 @db.Char(64)
+  sourceFetchedAt   DateTime               @db.Timestamptz(6)
   /// Parcelas de maior relevância, como a leitura as devolveu.
   services          Json
   consortiumAllowed Boolean?
@@ -3067,5 +3087,6 @@ model ScoutedTenderEditalReading {
   updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
 
   @@index([readById])
+  @@index([executionId])
   @@map("scouted_tender_edital_readings")
 }

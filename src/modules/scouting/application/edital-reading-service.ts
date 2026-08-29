@@ -8,8 +8,14 @@
  * "estimado" em toda linha.
  *
  * O encadeamento é: número de controle → arquivos no PNCP → o arquivo mais
- * provável de trazer a qualificação técnica → acervo documental → extração com
- * o caso de uso aprovado → exigência interpretada → gravada.
+ * provável de trazer a qualificação técnica → leitura com o caso de uso
+ * aprovado → exigência interpretada → gravada com o endereço de origem.
+ *
+ * ⚠️ O PDF NÃO É GUARDADO. São ~453 editais de ~12 MB por varredura, perto de
+ * 5 GB de arquivo público que o PNCP já hospeda e serve por URL direta. O que
+ * fica é a informação lida, o SHA-256 do que foi lido, e o endereço — que é
+ * também o link de download que o cartão oferece, para a pessoa baixar sem
+ * navegar o portal.
  *
  * ⚠️ Nada aqui lança quando a leitura não sai. Uma licitação sem edital
  * publicado, um anexo de 200 MB ou um PNCP fora do ar são rotina, e derrubar o
@@ -29,12 +35,22 @@ import { parsePncpIdentifier } from "@/modules/scouting/domain/pncp-identifier";
 import type { DownloadedFile, TenderFile } from "@/modules/scouting/infrastructure/pncp-files-client";
 import { fieldsFromExtractionOutput } from "@/modules/technical-archive/domain/extracted-services";
 
-/** Tipo documental sob o qual o edital é arquivado, e que o caso de uso autoriza. */
+/** Tipo documental declarado à governança. Constante de propósito: é o que
+ *  casa o caso de uso aprovado, e não pode vir de fora. */
 export const EDITAL_DOCUMENT_TYPE = "EDITAL";
+
+/** De onde os bytes vieram, e para onde o cartão manda a pessoa baixar. */
+export type EditalSource = Readonly<{
+  uri: string;
+  filename: string;
+  fileHash: string;
+  fetchedAt: Date;
+}>;
 
 export type StoredEditalReading = Readonly<{
   tenderId: string;
-  documentVersionId: string;
+  executionId: string;
+  source: EditalSource;
   requirement: EditalRequirement;
   reviewedAt?: Date;
 }>;
@@ -52,7 +68,7 @@ export type EditalReadingOutcome =
   | Readonly<{ status: "NO_IDENTIFIER"; externalId: string }>
   | Readonly<{ status: "NO_FILE" }>
   | Readonly<{ status: "FILE_TOO_LARGE"; title: string }>
-  | Readonly<{ status: "NOTHING_EXTRACTED"; documentVersionId: string }>
+  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId: string }>
   | Readonly<{ status: "FAILED"; reason: string }>;
 
 export interface TenderFilesPort {
@@ -60,35 +76,23 @@ export interface TenderFilesPort {
   download(file: TenderFile): Promise<DownloadedFile | null>;
 }
 
-export interface EditalArchivePort {
-  /** Versão já arquivada com este conteúdo, se houver. O acervo é endereçado
-   *  pelo hash, então o mesmo edital baixado duas vezes não vira dois arquivos. */
-  findVersionByHash(fileHash: string): Promise<Readonly<{ id: string }> | undefined>;
-  archive(
-    input: Readonly<{
-      tenderId: string;
-      title: string;
-      filename: string;
-      mimeType: string;
-      bytes: Buffer;
-      origin: string;
-    }>,
-    actorId: string,
-    correlationId: string,
-  ): Promise<Readonly<{ versionId: string }>>;
-}
-
 export interface EditalExtractionPort {
   /** Caso de uso aprovado, na versão vigente, autorizado para este tipo documental. */
   approvedDefinition(
     documentType: string,
   ): Promise<Readonly<{ id: string; promptHash: string }> | undefined>;
-  run(
+  /**
+   * Roda a extração sobre bytes que não serão preservados. Devolve o
+   * identificador da execução junto do resultado: é o vínculo que substitui o
+   * arquivo guardado no rastro de auditoria.
+   */
+  runEphemeral(
     input: Readonly<{
       idempotencyKey: string;
       definitionId: string;
-      documentVersionId: string;
       requestedFields: readonly string[];
+      source: Readonly<{ uri: string; filename: string; mimeType: string; documentType: string; title: string }>;
+      bytes: Buffer;
     }>,
     auth: AuthorizationContext,
     correlationId: string,
@@ -101,10 +105,12 @@ export interface EditalReadingRepository {
   save(
     input: Readonly<{
       tenderId: string;
-      documentVersionId: string;
+      executionId: string;
+      source: EditalSource;
       requirement: EditalRequirement;
     }>,
     actorId: string,
+    correlationId: string,
   ): Promise<StoredEditalReading>;
 }
 
@@ -125,7 +131,6 @@ const message = (error: unknown): string =>
 export class EditalReadingService {
   constructor(
     private readonly files: TenderFilesPort,
-    private readonly archive: EditalArchivePort,
     private readonly extraction: EditalExtractionPort,
     private readonly readings: EditalReadingRepository,
   ) {}
@@ -154,7 +159,7 @@ export class EditalReadingService {
       if (candidates.length === 0) return { status: "NO_FILE" };
 
       // A lista já vem na ordem de interesse: termo de referência, projeto
-      // básico, edital, anexo. O primeiro que couber no teto é o escolhido.
+      // básico, edital, anexo. O primeiro PDF que couber no teto é o escolhido.
       let downloaded: DownloadedFile | undefined;
       let chosen: TenderFile | undefined;
       let oversized: TenderFile | undefined;
@@ -171,79 +176,75 @@ export class EditalReadingService {
       }
 
       const fileHash = createHash("sha256").update(downloaded.bytes).digest("hex");
-      const versionId = await this.store(tender, chosen, downloaded, fileHash, auth.actorId, correlationId);
 
       // A chave carrega o hash do arquivo E o do prompt: repetir a leitura do
       // mesmo edital não paga de novo, mas mudar o prompt permite reler em vez
       // de esbarrar na idempotência da chamada anterior.
-      const execution = await this.extraction.run(
+      const execution = await this.extraction.runEphemeral(
         {
           idempotencyKey: `edital:${fileHash.slice(0, 32)}:${definition.promptHash.slice(0, 32)}`,
           definitionId: definition.id,
-          documentVersionId: versionId,
           requestedFields: editalFields,
+          source: {
+            uri: chosen.url,
+            filename: downloaded.filename,
+            mimeType: downloaded.mimeType,
+            documentType: EDITAL_DOCUMENT_TYPE,
+            title: `${chosen.documentType} — ${tender.title}`.slice(0, 255),
+          },
+          bytes: downloaded.bytes,
         },
         auth,
         correlationId,
       );
+
+      const executionId = idOf(execution);
+      if (!executionId) return { status: "FAILED", reason: "A execução de IA não devolveu identificador." };
 
       const requirement = interpret(execution);
       // Extração que não devolveu campo nenhum não vira leitura gravada: a
       // ausência de parcelas seria lida depois como "o edital não exige nada".
       if (requirement.services.length === 0 && requirement.consortiumAllowed === undefined
         && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined) {
-        return { status: "NOTHING_EXTRACTED", documentVersionId: versionId };
+        return { status: "NOTHING_EXTRACTED", executionId };
       }
 
       const reading = await this.readings.save(
-        { tenderId, documentVersionId: versionId, requirement },
+        {
+          tenderId,
+          executionId,
+          source: { uri: chosen.url, filename: downloaded.filename, fileHash, fetchedAt: new Date() },
+          requirement,
+        },
         auth.actorId,
+        correlationId,
       );
       return { status: "READ", reading };
     } catch (error) {
       return { status: "FAILED", reason: message(error).slice(0, 500) };
     }
   }
-
-  /** Arquiva o PDF, reaproveitando o que já estiver no acervo com o mesmo conteúdo. */
-  private async store(
-    tender: Readonly<{ id: string; title: string }>,
-    file: TenderFile,
-    downloaded: DownloadedFile,
-    fileHash: string,
-    actorId: string,
-    correlationId: string,
-  ): Promise<string> {
-    const already = await this.archive.findVersionByHash(fileHash);
-    if (already) return already.id;
-
-    const { versionId } = await this.archive.archive(
-      {
-        tenderId: tender.id,
-        title: `${file.documentType} — ${tender.title}`.slice(0, 255),
-        filename: downloaded.filename,
-        mimeType: downloaded.mimeType,
-        bytes: downloaded.bytes,
-        origin: file.url.slice(0, 500),
-      },
-      actorId,
-      correlationId,
-    );
-    return versionId;
-  }
 }
+
+const idOf = (execution: unknown): string | undefined => {
+  const id = (execution as { id?: unknown } | null)?.id;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
+};
 
 /** Lê o resultado da execução, seja qual for o formato em que ele volta. */
 function interpret(execution: unknown): EditalRequirement {
   const output = (execution as { output?: unknown } | null)?.output;
   const fields = fieldsFromExtractionOutput(output);
-  const extras = output as { confidence?: unknown; limitations?: unknown } | null;
-  const confidence = typeof extras?.confidence === "number" ? extras.confidence : undefined;
-  const limitations = Array.isArray(extras?.limitations)
-    ? extras.limitations.filter((item): item is string => typeof item === "string")
+  const registro = execution as { confidence?: unknown; limitations?: unknown } | null;
+  const confidence = registro?.confidence === null || registro?.confidence === undefined
+    ? undefined
+    // Decimal do Prisma não é number: comparar sem converter daria falso.
+    : Number(registro.confidence);
+  const limitations = Array.isArray(registro?.limitations)
+    ? registro.limitations.filter((item): item is string => typeof item === "string")
     : [];
   return parseEditalRequirement(fields, {
-    ...(confidence !== undefined ? { confidence } : {}),
+    ...(confidence !== undefined && Number.isFinite(confidence) ? { confidence } : {}),
     limitations,
   });
 }

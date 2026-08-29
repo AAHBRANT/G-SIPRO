@@ -5,13 +5,28 @@
 -- garantia estão no edital, e sem lê-lo a tela tem de dizer "a conferir". Esta
 -- tabela guarda o resultado da leitura para que a resposta apareça — e para que
 -- o mesmo edital não seja lido duas vezes, que é chamada de IA paga.
+--
+-- O ARQUIVO NÃO É PRESERVADO. São ~453 editais de ~12 MB por varredura, perto
+-- de 5 GB de PDF público que o PNCP já guarda. O que fica é o endereço de onde
+-- os bytes vieram — que é também o link de download que a fila oferece — mais
+-- o SHA-256 do que foi lido e a data da captura. É o mesmo desenho de
+-- climate_studies e analysis_evidences, já em produção neste banco.
 
 CREATE TABLE "scouted_tender_edital_readings" (
     "id" UUID NOT NULL,
     "tenderId" UUID NOT NULL,
-    -- Versão do arquivo preservado no acervo documental. Guardar o vínculo, e
-    -- não só o texto lido, é o que permite conferir depois contra a fonte.
-    "documentVersionId" UUID NOT NULL,
+    -- Execução de IA que produziu esta leitura. É por ela que se chega ao
+    -- modelo, à versão do prompt e aos trechos citados — o rastro que antes
+    -- passava pelo arquivo guardado.
+    "executionId" UUID NOT NULL,
+    -- Endereço público do arquivo lido, no PNCP. A fila oferece este link para
+    -- a pessoa baixar o edital sem navegar o portal.
+    "sourceUri" VARCHAR(1000) NOT NULL,
+    "sourceFilename" VARCHAR(255) NOT NULL,
+    -- SHA-256 dos bytes efetivamente enviados ao modelo. Sem arquivo guardado,
+    -- é o que denuncia edital retificado depois da leitura.
+    "sourceFileHash" CHAR(64) NOT NULL,
+    "sourceFetchedAt" TIMESTAMPTZ(6) NOT NULL,
     -- Parcelas de maior relevância com os quantitativos mínimos, como a leitura
     -- as devolveu. JSON porque a forma varia com o edital: uns exigem metro
     -- linear de ponte, outros metro cúbico de concreto, outros só descrevem.
@@ -42,16 +57,18 @@ CREATE UNIQUE INDEX "scouted_tender_edital_readings_tenderId_key"
     ON "scouted_tender_edital_readings"("tenderId");
 CREATE INDEX "scouted_tender_edital_readings_readById_idx"
     ON "scouted_tender_edital_readings"("readById");
+CREATE INDEX "scouted_tender_edital_readings_executionId_idx"
+    ON "scouted_tender_edital_readings"("executionId");
 
 -- A leitura não sobrevive à licitação que ela descreve.
 ALTER TABLE "scouted_tender_edital_readings"
     ADD CONSTRAINT "scouted_tender_edital_readings_tenderId_fkey"
     FOREIGN KEY ("tenderId") REFERENCES "scouted_tenders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- O arquivo de origem não pode sumir por baixo de uma leitura que o cita.
+-- A execução que a produziu é imutável e não pode sumir por baixo da leitura.
 ALTER TABLE "scouted_tender_edital_readings"
-    ADD CONSTRAINT "scouted_tender_edital_readings_documentVersionId_fkey"
-    FOREIGN KEY ("documentVersionId") REFERENCES "managed_document_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    ADD CONSTRAINT "scouted_tender_edital_readings_executionId_fkey"
+    FOREIGN KEY ("executionId") REFERENCES "ai_extraction_executions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "scouted_tender_edital_readings"
     ADD CONSTRAINT "scouted_tender_edital_readings_readById_fkey"
@@ -65,3 +82,8 @@ ALTER TABLE "scouted_tender_edital_readings"
 ALTER TABLE "scouted_tender_edital_readings"
     ADD CONSTRAINT "scouted_tender_edital_readings_review_complete"
     CHECK (("reviewedAt" IS NULL) = ("reviewedById" IS NULL));
+
+-- Hash malformado passaria despercebido e só apareceria na hora de conferir.
+ALTER TABLE "scouted_tender_edital_readings"
+    ADD CONSTRAINT "scouted_tender_edital_readings_hash_sha256"
+    CHECK ("sourceFileHash" ~ '^[a-f0-9]{64}$');

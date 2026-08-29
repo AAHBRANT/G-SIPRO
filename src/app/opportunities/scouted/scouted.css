@@ -853,3 +853,104 @@
   color: var(--texto-2);
   padding: 1px 6px;
 }
+
+/* Parcelas de maior relevância exigidas pelo edital.
+   Duas colunas: o texto do órgão à esquerda, o quantitativo à direita. Não é
+   tabela porque a folha inteira não tem nenhuma, e uma linha flex resolve com
+   menos regra. `tabular-nums` alinha os números na vertical, que é o que faz a
+   coluna de quantitativo ser lida de relance. */
+.bx-parcelas {
+  border-top: 1px solid var(--fio);
+  margin-top: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-top: 6px;
+}
+
+/* Edital com 30 parcelas esticaria a linha inteira da grade; a rolagem prende
+   o bloco na altura dos vizinhos. */
+.bx-parcela {
+  align-items: baseline;
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  font-size: 11.5px;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.bx-parcela:last-child { border-bottom: 0; }
+
+/* Texto livre do órgão: descrição sem espaço quebra o cartão sem isto. */
+.bx-parcela-nome {
+  color: var(--texto-2);
+  overflow-wrap: anywhere;
+}
+
+.bx-parcela-qtd {
+  color: var(--texto);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Dois links no mesmo bloco: sem invólucro eles encostam, porque `.bx-link` é
+   inline-flex com margem própria. */
+.bx-links {
+  border-top: 1px solid var(--fio);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 10px;
+}
+
+.bx-links .bx-link { margin: 0; }
+
+/* Baixar o edital é a ação primária do bloco; abrir no PNCP é a secundária. */
+.bx-link.forte {
+  background: var(--acento-fundo);
+  border: 1px solid var(--acento-fio);
+  border-radius: var(--r-p);
+  padding: 5px 10px;
+}
+
+/* ---------------------------------------------------------------------------
+   Correção: três classes usadas no TSX que nunca tiveram regra nesta folha.
+   O botão da bandeira estava saindo com o visual padrão do navegador dentro de
+   um cartão que não tem nenhum outro controle assim.
+   --------------------------------------------------------------------------- */
+
+/* Botão só de ícone, na linha da fila. */
+.bx-ic {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--fio);
+  border-radius: var(--r-p);
+  color: var(--texto-2);
+  cursor: pointer;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  transition: border-color 120ms ease, color 120ms ease;
+  width: 26px;
+}
+
+.bx-ic:hover { border-color: var(--fio-forte); color: var(--acento); }
+.bx-ic:disabled { cursor: default; opacity: 0.45; }
+
+.bx-mini-acoes {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+/* A coluna do medidor: só existia na consulta de tela estreita. */
+.bx-medidor-caixa {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}

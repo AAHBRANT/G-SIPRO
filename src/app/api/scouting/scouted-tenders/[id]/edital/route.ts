@@ -7,14 +7,12 @@ import { createRequestContext, runWithRequestContext } from "@/core/observabilit
 import { EditalReadingService } from "@/modules/scouting/application/edital-reading-service";
 import { PncpFilesClient } from "@/modules/scouting/infrastructure/pncp-files-client";
 import {
-  PrismaEditalArchive,
   PrismaEditalExtraction,
   PrismaEditalReadingRepository,
 } from "@/modules/scouting/infrastructure/prisma-edital-reading";
 
 const service = () => new EditalReadingService(
   new PncpFilesClient(),
-  new PrismaEditalArchive(),
   new PrismaEditalExtraction(),
   new PrismaEditalReadingRepository(),
 );
@@ -80,7 +78,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     try {
       const authorization = await requirePermission("opportunities.create");
       const { id } = await params;
-      const reading = await new PrismaEditalReadingRepository().markReviewed(id, authorization.actorId);
+      const reading = await new PrismaEditalReadingRepository().markReviewed(id, authorization.actorId, context.correlationId);
       if (!reading) return toApiError(new ResourceNotFoundError("Esta licitação ainda não teve o edital lido."));
       return NextResponse.json({ data: reading, correlationId: context.correlationId });
     } catch (error) {
