@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     tender: t,
     acervo: computeArchiveAdherence(
       {
-        sources: [t.subject],
+        sources: [{ text: t.subject }],
         ...(t.valueUndisclosed || t.estimatedValue === null ? {} : { estimatedValue: Number(t.estimatedValue) }),
         inferred: true,
       },

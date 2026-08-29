@@ -11,7 +11,7 @@ const servico = (discipline: string, description = "", parcial: Partial<ArchiveE
 });
 
 const exige = (subject: string, parcial: Partial<ArchiveRequirement> = {}): ArchiveRequirement =>
-  ({ sources: [subject], inferred: true, ...parcial });
+  ({ sources: [{ text: subject }], inferred: true, ...parcial });
 
 /** Acervo de uma empresa que faz rodovia, mas nunca fez ponte. */
 const acervoRodoviario = [
@@ -146,5 +146,68 @@ describe("porte", () => {
       expect(a.score).toBeGreaterThanOrEqual(0);
       expect(a.score).toBeLessThanOrEqual(100);
     }
+  });
+});
+
+describe("quantitativo: acervo maior cobre exigência menor", () => {
+  const acervoDePonte = [
+    servico("Obra de arte especial", "Ponte em concreto protendido", { quantities: ["30 m"], contractValue: 62_000_000 }),
+  ];
+  const exigeQuantidade = (text: string, value: number, unit: string): ArchiveRequirement =>
+    ({ sources: [{ text, quantity: { value, unit } }], inferred: false });
+
+  /** O caso que o dono descreveu: ponte de 30 m já executada, edital pede 15 m. */
+  it("ponte de 30 m no acervo cobre exigência de 15 m", () => {
+    const a = computeArchiveAdherence(exigeQuantidade("Construção de ponte", 15, "m"), acervoDePonte);
+    expect(a.missing).toHaveLength(0);
+    expect(a.required[0]?.quantity?.verdict).toBe("COVERED");
+    expect(a.reasons.join(" ")).toContain("cobre os 15 m exigidos");
+  });
+
+  /**
+   * O inverso é o que protege da inabilitação: ter o serviço não basta quando o
+   * edital põe número. Ponte de 30 m não cobre exigência de 80 m.
+   */
+  it("ter o serviço não basta quando o número não alcança", () => {
+    const a = computeArchiveAdherence(exigeQuantidade("Construção de ponte", 80, "m"), acervoDePonte);
+    expect(a.required[0]?.covered).toBe(false);
+    expect(a.missing.map((m) => m.label)).toEqual(["Obra de arte especial"]);
+    expect(a.needsPartner).toBe(true);
+  });
+
+  it("converte a unidade do acervo para a do edital", () => {
+    const emKm = [servico("Pavimentação asfáltica", "CBUQ", { quantities: ["12 km"] })];
+    const a = computeArchiveAdherence(exigeQuantidade("Pavimentação asfáltica", 8000, "m"), emKm);
+    expect(a.required[0]?.quantity?.verdict).toBe("COVERED");
+    expect(a.required[0]?.quantity?.best).toBe(12_000);
+  });
+
+  it("sem quantitativo exigido, volta a julgar só por categoria", () => {
+    // É onde a leitura por objeto para: o texto não traz número.
+    const a = computeArchiveAdherence(exige("Construção de ponte"), acervoDePonte);
+    expect(a.required[0]?.quantity).toBeUndefined();
+    expect(a.required[0]?.covered).toBe(true);
+  });
+
+  it("acervo sem número não vira reprovação: fica incomparável", () => {
+    const semNumero = [servico("Obra de arte especial", "Ponte", {})];
+    const a = computeArchiveAdherence(exigeQuantidade("Construção de ponte", 15, "m"), semNumero);
+    expect(a.required[0]?.quantity?.verdict).toBe("INCOMPARABLE");
+    // Incomparável não é insuficiente: a categoria segue coberta.
+    expect(a.required[0]?.covered).toBe(true);
+  });
+
+  it("quando duas parcelas pedem o mesmo serviço, vale o maior quantitativo", () => {
+    const requisito: ArchiveRequirement = {
+      sources: [
+        { text: "Ponte de acesso", quantity: { value: 12, unit: "m" } },
+        { text: "Ponte principal", quantity: { value: 45, unit: "m" } },
+      ],
+      inferred: false,
+    };
+    const a = computeArchiveAdherence(requisito, acervoDePonte);
+    // 30 m no acervo contra os 45 m exigidos: não cobre.
+    expect(a.required[0]?.quantity?.required.value).toBe(45);
+    expect(a.required[0]?.covered).toBe(false);
   });
 });

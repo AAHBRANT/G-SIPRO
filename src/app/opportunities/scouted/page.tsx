@@ -155,7 +155,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // for lido, o requisito é inferido do objeto — e sai marcado como tal.
     archive: computeArchiveAdherence(
       {
-        sources: [tender.subject],
+        sources: [{ text: tender.subject }],
         ...(tender.valueUndisclosed || tender.estimatedValue === null ? {} : { estimatedValue: Number(tender.estimatedValue) }),
         inferred: true,
       },
@@ -325,7 +325,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   {tender.archive.required.map((item) => <Motivo
                     key={item.categoryId}
                     met={item.covered}
-                    rotulo={item.covered ? `${item.label} — ${item.evidenceCount} no acervo` : `${item.label} — sem acervo`}
+                    rotulo={item.quantity
+                      ? `${item.label} — ${item.quantity.explanation}`
+                      : item.covered ? `${item.label} — ${item.evidenceCount} no acervo` : `${item.label} — sem acervo`}
                     skipped={false}
                   />)}
                   {!tender.archive.determined && tender.archive.reasons.map((reason) =>

@@ -279,7 +279,12 @@ export class PrismaArchiveEvidenceRepository {
                   select: {
                     subject: true,
                     value: true,
-                    services: { select: { id: true, discipline: true, originalDescription: true, characteristics: true } },
+                    services: {
+                      select: {
+                        id: true, discipline: true, originalDescription: true, characteristics: true,
+                        quantities: { select: { value: true, unit: true } },
+                      },
+                    },
                   },
                 },
               },
@@ -305,6 +310,8 @@ export class PrismaArchiveEvidenceRepository {
           discipline: service.discipline,
           description: service.originalDescription,
           characteristics: service.characteristics,
+          // Já vem separado em valor e unidade no caminho estruturado.
+          quantities: service.quantities.map((q) => `${q.value.toString()} ${q.unit}`),
           ...(contractValue !== undefined ? { contractValue } : {}),
           ...(contractSubject ? { contractSubject } : {}),
         }));
@@ -319,6 +326,9 @@ export class PrismaArchiveEvidenceRepository {
         // A extração traz quantidade e unidade juntas; elas entram como
         // característica porque é onde o confronto procura detalhe.
         characteristics: service.quantities,
+        // A extração devolve quantidade e unidade num texto só, e é dele que a
+        // comparação de quantitativo tira o número.
+        quantities: service.quantities === "Não informada" ? [] : [service.quantities],
         ...(contractValue !== undefined ? { contractValue } : {}),
         ...(contractSubject ? { contractSubject } : {}),
       }));

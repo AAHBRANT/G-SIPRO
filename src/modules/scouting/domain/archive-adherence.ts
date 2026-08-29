@@ -1,3 +1,4 @@
+import { compareQuantity, parseQuantity, type Quantity, type QuantityComparison } from "@/modules/scouting/domain/quantity";
 import { categoriesIn, type ServiceCategory } from "@/modules/scouting/domain/service-catalog";
 
 /**
@@ -19,6 +20,16 @@ import { categoriesIn, type ServiceCategory } from "@/modules/scouting/domain/se
  * só a origem do requisito — o confronto continua igual.
  */
 
+/**
+ * Uma exigência: o texto que a descreve e, quando o edital informa, o
+ * quantitativo mínimo. Sem quantitativo a cobertura é só de categoria — que é
+ * onde a leitura por objeto para.
+ */
+export type RequirementSource = Readonly<{
+  text: string;
+  quantity?: Quantity;
+}>;
+
 export type ArchiveRequirement = Readonly<{
   /**
    * Textos de onde as categorias de serviço são reconhecidas.
@@ -27,7 +38,7 @@ export type ArchiveRequirement = Readonly<{
    * Depois da leitura, é a lista de parcelas de maior relevância, cada uma um
    * texto. O confronto não muda: a régua é a mesma nos dois casos.
    */
-  sources: readonly string[];
+  sources: readonly RequirementSource[];
   /** Porte da obra a disputar, quando o órgão revela. */
   estimatedValue?: number;
   /** Falso quando o requisito veio do edital, e não de inferência. */
@@ -40,6 +51,8 @@ export type ArchiveEvidence = Readonly<{
   discipline: string;
   description: string;
   characteristics: string;
+  /** Quantitativos do serviço, como escritos no atestado: "12,5 km", "300 m²". */
+  quantities?: readonly string[];
   contractValue?: number;
   contractSubject?: string;
 }>;
@@ -48,6 +61,11 @@ export type CoverageItem = Readonly<{
   categoryId: string;
   label: string;
   covered: boolean;
+  /**
+   * Confronto de quantitativo, quando o edital informou o mínimo E o acervo
+   * traz número comparável. Ausente enquanto o requisito vier do objeto.
+   */
+  quantity?: QuantityComparison;
   /** Quantos serviços do acervo sustentam esta categoria. */
   evidenceCount: number;
   /** Até três exemplos, para conferir se a leitura faz sentido. */
@@ -112,10 +130,19 @@ export function computeArchiveAdherence(
   archive: readonly ArchiveEvidence[],
 ): ArchiveAdherence {
   // União das categorias de todas as fontes, sem repetir: duas parcelas do
-  // mesmo ramo não valem por duas exigências.
-  const exigidas = [...new Map(
-    requirement.sources.flatMap((fonte) => categoriesIn(fonte)).map((c) => [c.id, c]),
-  ).values()];
+  // mesmo ramo não valem por duas exigências. O maior quantitativo entre elas
+  // manda: exigir 10 km e 3 km do mesmo serviço significa exigir 10 km.
+  const porCategoria = new Map<string, { categoria: ServiceCategory; quantity?: Quantity }>();
+  for (const fonte of requirement.sources) {
+    for (const categoria of categoriesIn(fonte.text)) {
+      const atual = porCategoria.get(categoria.id);
+      const maior = !atual?.quantity || (fonte.quantity && fonte.quantity.value > atual.quantity.value)
+        ? fonte.quantity
+        : atual.quantity;
+      porCategoria.set(categoria.id, { categoria, ...(maior ? { quantity: maior } : {}) });
+    }
+  }
+  const exigidas = [...porCategoria.values()];
 
   if (exigidas.length === 0) {
     // Objeto genérico demais para dizer o que exige. Chutar aqui seria pior do
@@ -130,14 +157,23 @@ export function computeArchiveAdherence(
 
   const indice = indexarAcervo(archive);
 
-  const required: CoverageItem[] = exigidas.map((categoria: ServiceCategory) => {
+  const required: CoverageItem[] = exigidas.map(({ categoria, quantity }) => {
     const evidencias = indice.get(categoria.id) ?? [];
+    // Quantitativo do acervo para este serviço, na ordem em que o atestado
+    // escreveu. Serviço sem número entra como nulo e é contado como ignorado,
+    // em vez de sumir da conta em silêncio.
+    const doAcervo = evidencias.flatMap((e) => (e.quantities ?? []).map((texto) => parseQuantity(texto)));
+    const comparacao = quantity ? compareQuantity(quantity, doAcervo) : undefined;
+
     return {
       categoryId: categoria.id,
       label: categoria.label,
-      covered: evidencias.length > 0,
+      // Com quantitativo exigido, ter o serviço não basta: o número tem de
+      // alcançar. Ponte de 8 m não cobre exigência de 15 m só por ser ponte.
+      covered: evidencias.length > 0 && (comparacao === undefined || comparacao.verdict !== "BELOW"),
       evidenceCount: evidencias.length,
       examples: evidencias.slice(0, 3).map((e) => e.description.trim().slice(0, 120)),
+      ...(comparacao ? { quantity: comparacao } : {}),
     };
   });
 
@@ -169,6 +205,10 @@ export function computeArchiveAdherence(
     reasons.push(`acervo comprova ${cobertas.length} de ${required.length}: ${cobertas.map((c) => c.label.toLowerCase()).join(", ")}`);
   }
   if (missing.length > 0) reasons.push(`falta acervo de ${missing.map((m) => m.label.toLowerCase()).join(", ")}`);
+  // O confronto de número é o que sustenta a habilitação: vai por extenso.
+  for (const item of required) {
+    if (item.quantity) reasons.push(`${item.label.toLowerCase()}: ${item.quantity.explanation}`);
+  }
   if (scale === "COVERED" && largestExecuted !== undefined) reasons.push(`já executou obra de ${dinheiro(largestExecuted)}`);
   if (scale === "BELOW" && largestExecuted !== undefined && requirement.estimatedValue !== undefined) {
     reasons.push(`maior obra executada foi ${dinheiro(largestExecuted)}, contra ${dinheiro(requirement.estimatedValue)} desta`);

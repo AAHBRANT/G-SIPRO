@@ -1,4 +1,5 @@
 import type { ArchiveRequirement } from "@/modules/scouting/domain/archive-adherence";
+import { normalizeUnit } from "@/modules/scouting/domain/quantity";
 
 /**
  * O que o edital exige de qualificação técnica.
@@ -131,7 +132,19 @@ export function toArchiveRequirement(
   return {
     // Cada parcela é lida com a mesma régua do acervo. O texto do edital entra
     // como veio: reescrevê-lo aqui perderia o vocabulário do próprio órgão.
-    sources: requirement.services.map((service) => service.description),
+    //
+    // O quantitativo mínimo viaja junto quando o edital o informa em unidade
+    // comparável. É ele que faz "ponte de 30 m cobre exigência de 15 m" deixar
+    // de ser leitura de categoria e virar confronto de número.
+    sources: requirement.services.map((service) => {
+      const unidade = normalizeUnit(service.unit);
+      return {
+        text: service.description,
+        ...(service.quantity !== undefined && unidade
+          ? { quantity: { value: service.quantity, unit: unidade } }
+          : {}),
+      };
+    }),
     ...(estimatedValue !== undefined ? { estimatedValue } : {}),
     inferred: false,
   };
