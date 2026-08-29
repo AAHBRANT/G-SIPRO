@@ -73,6 +73,31 @@ async function main(): Promise<void> {
     }
   }
 
+  /**
+   * Conflação de categorias.
+   *
+   * O catálogo é grosso em alguns pontos: "túnel" e "ponte" caem os dois em
+   * `obra-de-arte`, então um atestado de ponte cobre uma exigência de túnel.
+   * Este mapa mostra, com a nomenclatura REAL dos atestados, onde isso
+   * acontece — é a lista que decide quais categorias precisam ser separadas.
+   */
+  const porCategoria = new Map<string, Set<string>>();
+  for (const e of acervo) {
+    for (const c of categoriesIn(`${e.discipline} ${e.description} ${e.characteristics}`)) {
+      const atual = porCategoria.get(c.label) ?? new Set<string>();
+      atual.add(e.discipline.trim().slice(0, 44) || "(sem disciplina)");
+      porCategoria.set(c.label, atual);
+    }
+  }
+  const conflacoes = [...porCategoria].filter(([, d]) => d.size > 1).sort((a, b) => b[1].size - a[1].size);
+  if (conflacoes.length > 0) {
+    console.log("\nCategorias que juntam disciplinas diferentes — candidatas a separar:");
+    for (const [categoria, disciplinas] of conflacoes.slice(0, 15)) {
+      console.log(`  ${categoria}`);
+      console.log(`      ${[...disciplinas].join(" | ")}`);
+    }
+  }
+
   /* ---------- 2. a fila de hoje ---------- */
   const fila = await db.scoutedTender.findMany({
     where: { status: "PENDING" },
@@ -143,8 +168,9 @@ async function main(): Promise<void> {
   }
 
   console.log("\n───");
-  console.log("Lembrete: os serviços exigidos são ESTIMADOS do objeto. O que o edital");
-  console.log("cobra de verdade só está no PDF, que o sistema ainda não lê.");
+  console.log("Lembrete: aqui os serviços exigidos são ESTIMADOS do objeto. O que o edital");
+  console.log("cobra de verdade sai da leitura do PDF, que depende do caso de uso de IA");
+  console.log("estar cadastrado e aprovado na governança.");
 }
 
 try {
