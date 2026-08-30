@@ -174,3 +174,11 @@ export function resolveSignal(command: SignalCommand): ResolvedSignal {
 /** Rótulo padrão de um nível fixo, para exibição fora do fluxo de gravação. */
 export const labelOfLevel = (level: SignalLevel): string =>
   level === "CUSTOM" ? "Sinalização" : fixedLevels[level].label;
+
+/**
+ * Cor de partida de um nível fixo, para a TELA vestir cada botão de prioridade
+ * com a própria cor. Sem isto o seletor pinta os três com o acento genérico —
+ * vinho no claro, bege no escuro — e Alta, Média e Baixa ficam idênticas.
+ */
+export const colorOfLevel = (level: SignalLevel): string | undefined =>
+  level === "CUSTOM" ? undefined : fixedLevels[level].color;

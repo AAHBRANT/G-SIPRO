@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 
-import { suggestedColors, type SignalLevel } from "@/modules/scouting/domain/signal";
+import { colorOfLevel, suggestedColors, themeVariants, type SignalLevel } from "@/modules/scouting/domain/signal";
 
 export type CurrentSignal = Readonly<{ level: SignalLevel; label: string; color: string; note?: string }>;
 
@@ -76,7 +76,10 @@ export function SignalActions({ id, signal }: { id: string; signal?: CurrentSign
       title={signal ? `Sinalizada: ${signal.label}` : "Sinalizar com prioridade"}
       type="button"
     >
-      <Flag size={15}/>
+      {/* Ícone de contorno, não a bandeira fincada: o desenho com mastro,
+          pano e sombra é feito para 30px na linha, e a 13px dentro do botão
+          vira borrão. Quem diz "esta linha tem sinal" é o `data-on`. */}
+      <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 21V4h13l-2.5 4L18 12H5"/></svg>
     </button>
 
     {open && <div className="bx-fundo" onClick={(event) => { if (event.target === event.currentTarget) fechar(); }}>
@@ -92,12 +95,19 @@ export function SignalActions({ id, signal }: { id: string; signal?: CurrentSign
         <div className="bx-modal-corpo">
           <span className="bx-rot">Prioridade</span>
           <div className="bx-op-p" style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-            {níveisFixos.map((nível) => <button
-              aria-pressed={level === nível.value}
-              key={nível.value}
-              onClick={() => setLevel(nível.value)}
-              type="button"
-            >{nível.label}</button>)}
+            {níveisFixos.map((nível) => {
+              // As duas variantes viajam no próprio botão; o CSS escolhe a do
+              // tema. É o que faz Alta, Média e Baixa serem distinguíveis.
+              const cor = colorOfLevel(nível.value);
+              const tons = cor ? themeVariants(cor) : undefined;
+              return <button
+                aria-pressed={level === nível.value}
+                key={nível.value}
+                onClick={() => setLevel(nível.value)}
+                style={tons ? ({ "--sig-claro": tons.light, "--sig-escuro": tons.dark } as CSSProperties) : undefined}
+                type="button"
+              >{nível.label}</button>;
+            })}
             <button aria-pressed={level === "CUSTOM"} onClick={() => setLevel("CUSTOM")} type="button">Outro nome…</button>
           </div>
 
