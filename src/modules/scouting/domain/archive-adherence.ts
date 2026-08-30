@@ -103,19 +103,46 @@ export type ArchiveAdherence = Readonly<{
 const dinheiro = (value: number) =>
   `R$ ${(value / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
 
+/**
+ * Índice do acervo, guardado por identidade do próprio arranjo.
+ *
+ * ⚠️ Este cache não é otimização de vaidade: sem ele a fila não abria. A tela
+ * carrega até 900 licitações e confronta cada uma contra o acervo INTEIRO, que
+ * é o mesmo para todas. Reindexar por licitação custava ~30 s de CPU com o
+ * acervo real da casa — o clique no card ficava sem resposta e a pessoa
+ * desistia antes da página montar.
+ *
+ * A chave é a referência do arranjo, não o conteúdo: `loadEvidence()` devolve
+ * um arranjo novo a cada requisição e ninguém o modifica depois. Um `WeakMap`
+ * solta a entrada junto com o arranjo, então isto não vaza entre requisições.
+ */
+const indices = new WeakMap<readonly ArchiveEvidence[], Map<string, IndexedEvidence[]>>();
+
+/** Evidência com o quantitativo já lido: a conversão também rodava por licitação. */
+type IndexedEvidence = Readonly<{ evidence: ArchiveEvidence; quantities: readonly (Quantity | null)[] }>;
+
 /** Categorias que cada serviço do acervo comprova, com o serviço que as sustenta. */
-function indexarAcervo(archive: readonly ArchiveEvidence[]): Map<string, ArchiveEvidence[]> {
-  const indice = new Map<string, ArchiveEvidence[]>();
+function indexarAcervo(archive: readonly ArchiveEvidence[]): Map<string, IndexedEvidence[]> {
+  const guardado = indices.get(archive);
+  if (guardado) return guardado;
+
+  const indice = new Map<string, IndexedEvidence[]>();
   for (const evidence of archive) {
     // Disciplina, descrição e características juntas: a nomenclatura de atestado
     // varia, e o que falta num campo costuma estar no outro.
     const texto = `${evidence.discipline} ${evidence.description} ${evidence.characteristics}`;
+    const item: IndexedEvidence = {
+      evidence,
+      quantities: (evidence.quantities ?? []).map((texto) => parseQuantity(texto)),
+    };
     for (const categoria of categoriesIn(texto)) {
       const atual = indice.get(categoria.id);
-      if (atual) atual.push(evidence);
-      else indice.set(categoria.id, [evidence]);
+      if (atual) atual.push(item);
+      else indice.set(categoria.id, [item]);
     }
   }
+
+  indices.set(archive, indice);
   return indice;
 }
 
@@ -179,7 +206,8 @@ export function computeArchiveAdherence(
     // Quantitativo do acervo para este serviço, na ordem em que o atestado
     // escreveu. Serviço sem número entra como nulo e é contado como ignorado,
     // em vez de sumir da conta em silêncio.
-    const doAcervo = evidencias.flatMap((e) => (e.quantities ?? []).map((texto) => parseQuantity(texto)));
+    // Já vieram lidos do índice: converter aqui rodava por licitação.
+    const doAcervo = evidencias.flatMap((e) => e.quantities);
     const comparacao = quantity ? compareQuantity(quantity, doAcervo) : undefined;
 
     return {
@@ -189,7 +217,7 @@ export function computeArchiveAdherence(
       // alcançar. Ponte de 8 m não cobre exigência de 15 m só por ser ponte.
       covered: evidencias.length > 0 && (comparacao === undefined || comparacao.verdict !== "BELOW"),
       evidenceCount: evidencias.length,
-      examples: evidencias.slice(0, 3).map((e) => e.description.trim().slice(0, 120)),
+      examples: evidencias.slice(0, 3).map((e) => e.evidence.description.trim().slice(0, 120)),
       ...(comparacao ? { quantity: comparacao } : {}),
     };
   });
@@ -201,7 +229,7 @@ export function computeArchiveAdherence(
   // cobertas. Contrato alheio ao objeto não comprova capacidade para este.
   const valores = required
     .filter((item) => item.covered)
-    .flatMap((item) => (indice.get(item.categoryId) ?? []).map((e) => e.contractValue))
+    .flatMap((item) => (indice.get(item.categoryId) ?? []).map((e) => e.evidence.contractValue))
     .filter((valor): valor is number => valor !== undefined);
   const largestExecuted = valores.length > 0 ? Math.max(...valores) : undefined;
 
