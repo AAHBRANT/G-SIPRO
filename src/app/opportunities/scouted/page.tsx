@@ -99,6 +99,12 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   const selectedTypes = many(params.tipo).filter((entry) => scoutWorkTypes.includes(entry as ScoutWorkType));
   const selectedSpheres = many(params.esfera).filter((entry) => entry in sphereLabels);
   const minimumValue = digits(one(params.vmin));
+  const maximumValue = digits(one(params.vmax));
+  const minimumDays = digits(one(params.dmin));
+  const maximumDays = digits(one(params.dmax));
+  // Sigiloso entra por padrão: orçamento fechado é comum em obra grande, e
+  // excluí-lo por omissão eliminaria justamente o alvo.
+  const includeUndisclosed = one(params.sig) !== "0";
   const adherenceFloor = Math.max(0, Math.min(100, Number(one(params.ader) ?? 0) || 0));
   const sort = one(params.sort) ?? "aderencia";
 
@@ -108,11 +114,30 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
    * primeira em silêncio: quem buscasse texto E valor mínimo perdia a busca sem
    * nenhum aviso. Reunidas em AND, as duas valem juntas.
    */
+  // Um só instante para a requisição inteira: a fila, o prazo e os cartões têm
+  // de concordar sobre que horas são.
+  const now = new Date();
   const groupsOfOr: Prisma.ScoutedTenderWhereInput[] = [];
   if (query) groupsOfOr.push({ OR: [{ subject: { contains: query, mode: "insensitive" } }, { authorityName: { contains: query, mode: "insensitive" } }, { city: { contains: query, mode: "insensitive" } }] });
-  // Valor sigiloso nunca é excluído por faixa: o orçamento fechado é comum em
-  // obra grande, e filtrá-lo por valor eliminaria justamente o alvo.
-  if (minimumValue !== undefined) groupsOfOr.push({ OR: [{ estimatedValue: { gte: minimumValue } }, { valueUndisclosed: true }] });
+  // A faixa de valor só se aplica a quem revelou o orçamento. Quem não
+  // revelou entra ou fica de fora pela caixa "incluir valor sigiloso", nunca
+  // pela faixa — senão a obra grande de orçamento fechado sumiria da fila.
+  const faixaDeValor: Prisma.ScoutedTenderWhereInput[] = [];
+  if (minimumValue !== undefined) faixaDeValor.push({ estimatedValue: { gte: minimumValue } });
+  if (maximumValue !== undefined) faixaDeValor.push({ estimatedValue: { lte: maximumValue } });
+  if (faixaDeValor.length > 0 || !includeUndisclosed) {
+    const comValor: Prisma.ScoutedTenderWhereInput = faixaDeValor.length > 0
+      ? { AND: [{ valueUndisclosed: false }, ...faixaDeValor] }
+      : { valueUndisclosed: false };
+    groupsOfOr.push(includeUndisclosed ? { OR: [comValor, { valueUndisclosed: true }] } : comValor);
+  }
+
+  // Prazo em DIAS a partir de agora, convertido para data — é assim que a
+  // pessoa pensa ("quero as que encerram entre 5 e 30 dias") e é o que o banco
+  // consegue comparar.
+  const emDias = (dias: number) => new Date(now.getTime() + dias * 86_400_000);
+  if (minimumDays !== undefined) groupsOfOr.push({ proposalClosesAt: { gte: emDias(minimumDays) } });
+  if (maximumDays !== undefined) groupsOfOr.push({ proposalClosesAt: { lte: emDias(maximumDays) } });
 
   const states = statesOfRegions(selectedRegions);
   const where: Prisma.ScoutedTenderWhereInput = {
@@ -129,7 +154,6 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     : [{ proposalClosesAt: "asc" }, { createdAt: "desc" }];
 
   const database = getDatabase();
-  const now = new Date();
   const shortDeadline = new Date(now.getTime() + SHORT_DEADLINE_DAYS * 86_400_000);
   const filter = await loadFilter();
 
@@ -252,9 +276,14 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       <Cartao dica="orçamento fechado pelo órgão" rotulo="Valor sigiloso" valor={facets.filter((entry) => entry.valueUndisclosed).length}/>
     </section>
 
-    <section className="bx-mesa" style={{ marginTop: 14 }}>
+    {/* Duas colunas: filtros à esquerda, lista à direita. A sidebar fica FORA
+        da mesa — dentro dela a rolagem própria não funcionaria, porque a mesa
+        tem overflow:hidden. */}
+    <div className="bx-palco">
       <ScoutedFilters groups={groups} sortOptions={sortOptions}/>
 
+      <div>
+    <section className="bx-mesa">
       <header className="bx-relacao">
         <h2>
           Relação de rastreadas
@@ -472,7 +501,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
           <span>{total === 0 ? "A próxima varredura ocorre no domingo." : "Baixe a aderência mínima ou desmarque alguma região."}</span>
         </div>}
       </div>
-    </section>
+        </section>
+      </div>
+    </div>
     </div>
   </div>;
 }

@@ -9,37 +9,32 @@ export type FilterGroup = Readonly<{
   options: ReadonlyArray<{ value: string; label: string; count: number }>;
 }>;
 
-const chevron = <svg aria-hidden="true" className="seta h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>;
-const check = <svg aria-hidden="true" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="3.4" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>;
-const cross = <svg aria-hidden="true" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.8" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>;
 const lupa = <svg aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.1" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.3-4.3"/></svg>;
 
 /**
- * Barra de filtros da fila de triagem, em uma única faixa: busca, ordenação,
- * grupos e corte de aderência. O estado vive na barra de endereço para que a
- * seleção sobreviva a recarregar a página e possa ser passada por link.
+ * Barra lateral de filtros da fila de triagem.
+ *
+ * É a estrutura do protótipo aprovado: coluna fixa à esquerda, cabeçalho preto
+ * com "Limpar tudo" grudado no topo, e cada filtro numa seção com título — tudo
+ * à vista, sem menu suspenso. A versão anterior escondia cada grupo atrás de um
+ * chip que abria um menu; para saber o que estava filtrado era preciso abrir um
+ * por um.
+ *
+ * ⚠️ A barra é mais alta que a tela. `position: sticky` com teto de altura e
+ * rolagem própria (no CSS) é o que permite alcançar os últimos filtros sem
+ * perder os primeiros de vista. Nada aqui mede posição nem observa rolagem.
+ *
+ * O estado vive na barra de endereço: a seleção sobrevive a recarregar a página
+ * e pode ser passada por link para outra pessoa.
  */
 export function ScoutedFilters({ groups, sortOptions }: { groups: ReadonlyArray<FilterGroup>; sortOptions: ReadonlyArray<{ value: string; label: string }> }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const [open, setOpen] = useState<string>();
   const [query, setQuery] = useState(params.get("q") ?? "");
-  const box = useRef<HTMLDivElement>(null);
 
   const adherenceParam = Number(params.get("ader") ?? 0);
   const adherenceFloor = Number.isFinite(adherenceParam) ? Math.max(0, Math.min(100, adherenceParam)) : 0;
-  useEffect(() => {
-    function outside(event: MouseEvent) {
-      if (open && box.current && !box.current.contains(event.target as Node)) setOpen(undefined);
-    }
-    function escape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(undefined);
-    }
-    document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", escape);
-    return () => { document.removeEventListener("mousedown", outside); document.removeEventListener("keydown", escape); };
-  }, [open]);
 
   function apply(next: URLSearchParams) {
     next.delete("page");
@@ -47,9 +42,7 @@ export function ScoutedFilters({ groups, sortOptions }: { groups: ReadonlyArray<
     router.push(search ? `${pathname}?${search}` : pathname, { scroll: false });
   }
 
-  function selected(key: string): string[] {
-    return params.getAll(key);
-  }
+  const selected = (key: string): string[] => params.getAll(key);
 
   function toggle(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -60,97 +53,109 @@ export function ScoutedFilters({ groups, sortOptions }: { groups: ReadonlyArray<
     apply(next);
   }
 
-  function clearGroup(key: string) {
-    const next = new URLSearchParams(params.toString());
-    next.delete(key);
-    apply(next);
-  }
-
   function setSingle(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value); else next.delete(key);
     apply(next);
   }
 
-  const activeCount = groups.reduce((total, group) => total + selected(group.key).length, 0)
-    + (params.get("q") ? 1 : 0)
-    + (adherenceFloor > 0 ? 1 : 0);
+  return <aside className="bx-lado">
+    <div className="bx-lado-cab">
+      <h2>Filtros</h2>
+      <button onClick={() => { setQuery(""); router.push(pathname, { scroll: false }); }} type="button">Limpar tudo</button>
+    </div>
 
-  return <div ref={box}>
-    <div className="bx-barra">
-      <form className="bx-busca" onSubmit={(event) => { event.preventDefault(); setSingle("q", query.trim()); }}>
+    <div className="bx-secao">
+      <form className="bx-busca" onSubmit={(event) => { event.preventDefault(); setSingle("q", query.trim()); }} style={{ height: 34 }}>
         {lupa}
-        <input aria-label="Buscar" onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por objeto, órgão ou cidade e pressionar Enter…" value={query}/>
+        <input aria-label="Buscar" onChange={(event) => setQuery(event.target.value)} placeholder="Objeto, órgão, cidade, processo…" value={query}/>
       </form>
+    </div>
 
-      {groups.map((group) => {
-        const marked = selected(group.key);
-        const isOpen = open === group.key;
-        return <div className="relative" key={group.key}>
-          <button aria-expanded={isOpen} className="bx-chip" data-ativo={marked.length ? "sim" : "nao"} onClick={() => setOpen(isOpen ? undefined : group.key)} type="button">
-            {group.label}
-            {marked.length > 0 && <span className="qtd">{marked.length}</span>}
-            {chevron}
-          </button>
-
-          {isOpen && <div className="bx-menu">
-            <div className="bx-menu-cab">
-              <span>{group.label}</span>
-              {marked.length > 0 && <button onClick={() => clearGroup(group.key)} type="button">limpar</button>}
-            </div>
-            {group.options.map((option) => {
-              const on = marked.includes(option.value);
-              return <button
-                aria-pressed={on}
-                className="bx-op"
-                disabled={option.count === 0 && !on}
-                key={option.value}
-                onClick={() => toggle(group.key, option.value)}
-                type="button"
-              >
-                <span className="cx">{check}</span>
-                <span className="flex-1 truncate">{option.label}</span>
-                <span className="n">{option.count}</span>
-              </button>;
-            })}
-          </div>}
-        </div>;
-      })}
-
+    <div className="bx-secao">
+      <h3>Aderência ao perfil</h3>
       <AdherenceRange floor={adherenceFloor} key={adherenceFloor} onCommit={(value) => setSingle("ader", value > 0 ? String(value) : "")}/>
+    </div>
 
-      <label className="bx-chip" style={{ cursor: "default" }}>
-        <span className="text-[var(--texto-3)]">Ordenar</span>
-        <select
-          className="border-0 bg-transparent font-bold outline-none"
-          onChange={(event) => setSingle("sort", event.target.value)}
-          style={{ color: "inherit", fontFamily: "inherit", fontSize: "12.5px" }}
-          value={params.get("sort") ?? sortOptions[0]?.value}
-        >
-          {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+    <div className="bx-secao">
+      <h3>Valor estimado</h3>
+      <div className="bx-par-campos">
+        <Numero chave="vmin" dica="14.000.000" params={params} rotulo="Mínimo" onCommit={setSingle}/>
+        <Numero chave="vmax" dica="sem teto" params={params} rotulo="Máximo" onCommit={setSingle}/>
+      </div>
+      {/* Orçamento fechado é comum em obra grande: filtrar por faixa sem esta
+          ressalva eliminaria justamente o alvo. Por isso vem marcado. */}
+      <label className="bx-check" style={{ marginTop: 9 }}>
+        <input checked={params.get("sig") !== "0"} onChange={(event) => setSingle("sig", event.target.checked ? "" : "0")} type="checkbox"/>
+        <span className="txt"><b>Incluir valor sigiloso</b><span>Orçamento fechado é comum em obra grande.</span></span>
       </label>
     </div>
 
-    {activeCount > 0 && <div className="bx-barra" style={{ paddingTop: 8, paddingBottom: 8 }}>
-      {params.get("q") && <span className="bx-selo">
-        “{params.get("q")}”
-        <button aria-label="Remover busca" onClick={() => { setQuery(""); setSingle("q", ""); }} type="button">{cross}</button>
-      </span>}
-      {adherenceFloor > 0 && <span className="bx-selo">
-        aderência ≥ {adherenceFloor}%
-        <button aria-label="Remover corte de aderência" onClick={() => setSingle("ader", "")} type="button">{cross}</button>
-      </span>}
-      {groups.flatMap((group) => selected(group.key).map((value) => {
-        const label = group.options.find((option) => option.value === value)?.label ?? value;
-        return <span className="bx-selo" key={`${group.key}-${value}`}>
-          {label}
-          <button aria-label={`Remover ${label}`} onClick={() => toggle(group.key, value)} type="button">{cross}</button>
-        </span>;
-      }))}
-      <button className="bx-limpar ml-auto" onClick={() => { setQuery(""); router.push(pathname, { scroll: false }); }} type="button">Limpar tudo</button>
-    </div>}
-  </div>;
+    <div className="bx-secao">
+      <h3>Prazo para a proposta</h3>
+      <div className="bx-par-campos">
+        <Numero chave="dmin" dica="0" params={params} rotulo="Mín. de dias" onCommit={setSingle}/>
+        <Numero chave="dmax" dica="sem teto" params={params} rotulo="Máx. de dias" onCommit={setSingle}/>
+      </div>
+    </div>
+
+    {groups.map((group) => {
+      const marked = selected(group.key);
+      return <div className="bx-secao" key={group.key}>
+        <h3>{group.label}</h3>
+        <div className="bx-pilulas">
+          {group.options.map((option) => {
+            const on = marked.includes(option.value);
+            return <button
+              aria-pressed={on}
+              className="bx-pil"
+              disabled={option.count === 0 && !on}
+              key={option.value}
+              onClick={() => toggle(group.key, option.value)}
+              type="button"
+            >
+              {option.label}<span className="n">{option.count}</span>
+            </button>;
+          })}
+        </div>
+      </div>;
+    })}
+
+    <div className="bx-secao">
+      <h3>Ordenar</h3>
+      <select
+        className="bx-sel"
+        onChange={(event) => setSingle("sort", event.target.value)}
+        value={params.get("sort") ?? sortOptions[0]?.value}
+      >
+        {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </div>
+  </aside>;
+}
+
+/**
+ * Campo numérico da sidebar. Grava ao sair do campo ou no Enter, não a cada
+ * tecla: a fila recarregaria a cada dígito.
+ */
+function Numero({ chave, dica, params, rotulo, onCommit }: {
+  chave: string; dica: string; rotulo: string;
+  params: URLSearchParams; onCommit: (chave: string, valor: string) => void;
+}) {
+  const [valor, setValor] = useState(params.get(chave) ?? "");
+  const gravar = () => { const limpo = valor.replace(/\D/g, ""); if (limpo !== (params.get(chave) ?? "")) onCommit(chave, limpo); };
+
+  return <label className="bx-mini">
+    <span>{rotulo}</span>
+    <input
+      inputMode="numeric"
+      onBlur={gravar}
+      onChange={(event) => setValor(event.target.value)}
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); gravar(); } }}
+      placeholder={dica}
+      value={valor}
+    />
+  </label>;
 }
 
 /**
@@ -174,9 +179,8 @@ function AdherenceRange({ floor, onCommit }: { floor: number; onCommit: (value: 
     timer.current = setTimeout(() => onCommit(next), 320);
   }
 
-  return <div className="bx-ader" data-ativo={floor > 0 ? "sim" : "nao"}>
-    <label htmlFor="ader">Aderência mín.</label>
-    <input id="ader" max={100} min={0} onChange={(event) => slide(Number(event.target.value))} step={5} type="range" value={value}/>
+  return <div className="bx-faixa">
+    <input aria-label="Aderência mínima" max={100} min={0} onChange={(event) => slide(Number(event.target.value))} step={5} type="range" value={value}/>
     <span className="pc">{value}%</span>
   </div>;
 }
