@@ -490,7 +490,10 @@
 
 /* ---------- linha da licitação ---------- */
 
-.bx-linha { border-bottom: 1px solid var(--fio); }
+/* `--sig` vive em TODA linha, não só na sinalizada: quem consome a variável
+   fora do bloco de sinalização (o modal, por exemplo) ficaria sem cor. */
+.bx-linha { border-bottom: 1px solid var(--fio); position: relative; --sig: var(--sig-claro); }
+.bx[data-tema="escuro"] .bx-linha { --sig: var(--sig-escuro); }
 .bx-linha:last-child { border-bottom: 0; }
 
 .bx-cab {
@@ -498,9 +501,12 @@
   cursor: pointer;
   display: grid;
   gap: 13px;
-  grid-template-columns: 16px minmax(0, 1fr) 128px 92px 156px;
+  /* 168px, não 156: é a medida da ÚLTIMA rodada do protótipo, a que
+     acomoda medidor + Aprovar/Descartar + a fita de ícones sem encostar
+     nas bordas. Com 156 os botões espremem e os ícones vão para a borda. */
+  grid-template-columns: 16px minmax(0, 1fr) 128px 92px 168px;
   list-style: none;
-  padding: 13px 15px;
+  padding: 11px 15px;
   transition: background 0.16s;
 }
 
@@ -573,7 +579,9 @@
 
 /* ---------- velocímetro de aderência ---------- */
 
-.bx-medidor { display: block; margin: 0 auto; }
+/* O SVG nasce 100×74 (viewBox de desenho) e o CSS o encolhe para 84×62 —
+   é o que faz a coluna direita parar de ser mais alta que a licitação. */
+.bx-medidor { display: block; height: 62px; margin: 0 auto; width: 84px; }
 .bx-medidor .trilha { stroke: var(--cinza-16); }
 .bx-medidor .arco { stroke: var(--acento); transition: stroke-dasharray 0.4s ease; }
 .bx-medidor .agulha { stroke: var(--texto); }
@@ -740,25 +748,15 @@
    navegador as trata como conteúdo do detalhe e joga tudo para o rodapé. */
 .bx-cab { position: relative; }
 
-/* O terreno onde a bandeira é fincada.
-   ⚠️ Era uma barra atravessando a linha inteira, com a bandeira 26px abaixo
-   dela — lia-se como um risco vermelho solto, e não como marca fincada. O
-   terreno agora é um montinho SOB o mastro, da largura da bandeira, e quem
-   sinaliza a linha é o próprio tom de fundo. */
-.bx-terreno {
-  background: var(--sig);
-  border-radius: 2px;
-  bottom: auto;
-  height: 3px;
-  left: 8px;
-  position: absolute;
-  top: 29px;
-  width: 30px;
-}
+/* O terreno onde a bandeira é fincada: faixa da cor do sinal atravessando o
+   topo da linha. É o desenho do protótipo, aprovado por ele. Já tentei trocar
+   por um montinho sob o mastro e ficou pior — a faixa é o que dá a leitura de
+   "linha marcada", e a bandeira é o que diz por quem. */
+.bx-terreno { background: var(--sig); height: 4px; left: 0; position: absolute; right: 0; top: 0; }
 
-/* O mastro encosta no montinho: é o que faz a bandeira parecer cravada em vez
-   de apoiada. O topo de 0 alinha a base do desenho (y≈29) com o terreno. */
-.bx-bandeira { left: 8px; line-height: 0; position: absolute; top: 0; }
+/* O mastro nasce DENTRO da faixa de 4px: é isso que faz a bandeira parecer
+   cravada em vez de apoiada. */
+.bx-bandeira { left: 13px; line-height: 0; position: absolute; top: 1px; }
 .bx-bandeira .mastro { stroke: var(--sig); }
 .bx-bandeira .pano { fill: var(--sig); }
 .bx-bandeira .chao { fill: var(--sig); opacity: 0.42; }
@@ -815,8 +813,14 @@
   font-size: 11.5px; font-weight: 700; padding: 8px 6px; transition: all 0.15s;
 }
 .bx-op-p button:hover[aria-pressed="false"] { border-color: var(--fio-forte); color: var(--texto); }
+/* O botão marcado veste a PRÓPRIA cor da prioridade, na variante do tema.
+   Com `--acento` os três níveis saíam vinho no claro e bege no escuro —
+   indistinguíveis entre si, que é o "não tem nem cor que a gente definiu". */
 .bx-op-p button[aria-pressed="true"] {
-  background: var(--acento-fundo); border-color: var(--acento); color: var(--acento);
+  --sig: var(--sig-claro);
+  background: color-mix(in srgb, var(--sig) 15%, transparent);
+  border: 1px solid var(--sig);
+  color: var(--sig);
 }
 
 .bx-livre {
@@ -941,24 +945,29 @@
   background: transparent;
   border: 1px solid var(--fio);
   border-radius: var(--r-p);
-  color: var(--texto-2);
+  color: var(--texto-3);
   cursor: pointer;
   display: inline-flex;
-  height: 26px;
+  height: 24px;
   justify-content: center;
   padding: 0;
-  transition: border-color 120ms ease, color 120ms ease;
+  transition: all 0.15s;
   width: 26px;
 }
 
-.bx-ic:hover { border-color: var(--fio-forte); color: var(--acento); }
+.bx-ic:hover { border-color: var(--acento-fio); color: var(--acento); }
+/* O estado ligado JÁ era escrito no botão (`data-on`) e não tinha regra
+   nenhuma — o botão de licitação sinalizada ficava igual ao das outras. */
+.bx-ic[data-on="sim"] { background: var(--acento-fundo); border-color: var(--acento-fio); color: var(--acento); }
+.bx-ic svg { height: 13px; width: 13px; }
+
 .bx-ic:disabled { cursor: default; opacity: 0.45; }
 
 .bx-mini-acoes {
   align-items: center;
   display: flex;
-  gap: 5px;
-  justify-content: flex-end;
+  gap: 4px;
+  justify-content: center;
 }
 
 /* A coluna do medidor: só existia na consulta de tela estreita.
