@@ -740,12 +740,25 @@
    navegador as trata como conteúdo do detalhe e joga tudo para o rodapé. */
 .bx-cab { position: relative; }
 
-/* O terreno onde a bandeira é fincada. */
-.bx-terreno { background: var(--sig); height: 4px; left: 0; position: absolute; right: 0; top: 0; }
+/* O terreno onde a bandeira é fincada.
+   ⚠️ Era uma barra atravessando a linha inteira, com a bandeira 26px abaixo
+   dela — lia-se como um risco vermelho solto, e não como marca fincada. O
+   terreno agora é um montinho SOB o mastro, da largura da bandeira, e quem
+   sinaliza a linha é o próprio tom de fundo. */
+.bx-terreno {
+  background: var(--sig);
+  border-radius: 2px;
+  bottom: auto;
+  height: 3px;
+  left: 8px;
+  position: absolute;
+  top: 29px;
+  width: 30px;
+}
 
-/* O mastro nasce dentro da faixa: é o que faz a bandeira parecer cravada em
-   vez de apoiada. */
-.bx-bandeira { left: 13px; line-height: 0; position: absolute; top: 1px; }
+/* O mastro encosta no montinho: é o que faz a bandeira parecer cravada em vez
+   de apoiada. O topo de 0 alinha a base do desenho (y≈29) com o terreno. */
+.bx-bandeira { left: 8px; line-height: 0; position: absolute; top: 0; }
 .bx-bandeira .mastro { stroke: var(--sig); }
 .bx-bandeira .pano { fill: var(--sig); }
 .bx-bandeira .chao { fill: var(--sig); opacity: 0.42; }
@@ -948,9 +961,16 @@
   justify-content: flex-end;
 }
 
-/* A coluna do medidor: só existia na consulta de tela estreita. */
+/* A coluna do medidor: só existia na consulta de tela estreita.
+   ⚠️ `flex-direction: column` é obrigatório. A coluna tem 156px e guarda três
+   coisas empilhadas — medidor, Aprovar/Descartar e a bandeira. Em linha (o
+   padrão do flex) o medidor de 100px espreme os botões e a bandeira sai
+   cortada pela borda: foi exatamente o que aconteceu ao dar estilo a esta
+   classe sem declarar a direção. */
 .bx-medidor-caixa {
   align-items: center;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: flex-start;
 }
