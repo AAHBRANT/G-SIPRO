@@ -33,5 +33,10 @@ export default async function TechnicalArchivePage() {
     return { id: document.id, versionId: version.id, title: document.title, owner: document.owner.displayName, version: version.version, mimeType: version.mimeType, size: `${(Number(version.sizeBytes) / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`, hash: version.fileHash, origin: version.origin, createdAt: version.createdAt.toLocaleDateString("pt-BR"), number: evidence?.number ?? fieldValue(/número|numero/i), issuer: evidence?.issuingBody ?? fieldValue(/emissor|conselho/i), subject: evidence?.subjectActivity ?? fieldValue(/objeto|atividade/i), contractor: evidence?.experience.contractorName ?? fieldValue(/contratante|cliente/i), services, fields: [...baseFields, ...extractedFields], extractionStatus: execution?.status, extractionError: execution?.errorMessage ?? undefined };
   }));
 
-  return <div className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8"><ArchiveWorkspace canCreate={authorize(authorization, { permission: "documents.create" }).allowed} canDelete={authorize(authorization, { permission: "technical-archive.delete" }).allowed} extractionDefinitionId={authorize(authorization, { permission: "ai.execute" }).allowed ? extractionDefinition?.id : undefined} items={items} users={users.map(user => ({ id: user.id, name: user.displayName }))}/></div>;
+  return <div className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    {/* O diagnóstico responde "a triagem entende o vocabulário destes
+        atestados?". A porta fica aqui porque é aqui que a dúvida nasce. */}
+    <a className="mb-4 inline-block text-sm font-bold text-brand underline" href="/technical-archive/diagnostico">Diagnóstico do catálogo →</a>
+    <ArchiveWorkspace canCreate={authorize(authorization, { permission: "documents.create" }).allowed} canDelete={authorize(authorization, { permission: "technical-archive.delete" }).allowed} extractionDefinitionId={authorize(authorization, { permission: "ai.execute" }).allowed ? extractionDefinition?.id : undefined} items={items} users={users.map(user => ({ id: user.id, name: user.displayName }))}/>
+  </div>;
 }
