@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
+import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
 import { editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
@@ -214,9 +215,8 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
    * sistema conferiu aparece resolvido, e o que só o edital responde aparece
    * pendente — nunca atendido.
    */
-  const comRequisitos = scored.map((tender) => ({
-    ...tender,
-    prerequisites: buildPrerequisites({
+  const comRequisitos = scored.map((tender) => {
+    const prerequisites = buildPrerequisites({
       archive: tender.archive,
       ...(tender.days !== undefined ? { daysToClose: tender.days } : {}),
       minimumDays: filter.minimumDaysToClose,
@@ -224,19 +224,52 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       valueUndisclosed: tender.valueUndisclosed,
       ...(filter.minimumValue !== undefined ? { minimumValue: filter.minimumValue } : {}),
       ...(tender.edital ? { edital: tender.edital.requirement } : {}),
-    }),
-  }));
+    });
+    /**
+     * A NOTA DA LINHA é a fração de pré-requisitos ATENDIDOS.
+     *
+     * Já foi "aderência ao perfil" (uma lista configurada, que não inabilita
+     * ninguém) e depois "cobertura de acervo" (que, saindo do objeto, cobria
+     * quase tudo e dava o mesmo número para a fila inteira). Pré-requisito é o
+     * que decide participar: acervo, porte, prazo, valor e o que o edital exige.
+     *
+     * Só MET conta. ATENÇÃO é "cumpre com ressalva" e DESCONHECIDO é "ninguém
+     * verificou" — nenhum dos dois é requisito preenchido, e contá-los aqui
+     * devolveria a mesma confiança falsa de antes.
+     */
+    const resumo = summarize(prerequisites);
+    return {
+      ...tender,
+      prerequisites,
+      resumo,
+      score: resumo.total === 0 ? 0 : Math.round((resumo.met / resumo.total) * 100),
+    };
+  });
 
   const kept = adherenceFloor > 0
-    ? comRequisitos.filter((tender) => tender.archive.determined && tender.archive.score >= adherenceFloor)
+    ? comRequisitos.filter((tender) => tender.score >= adherenceFloor)
     : comRequisitos;
   const ordered = sort === "aderencia"
     // Sem acervo julgado, o perfil serve de desempate: é o que sobra para
     // ordenar, e vale mais que ordem aleatória.
-    ? [...kept].sort((a, b) => (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1)
-        || b.adherence.score - a.adherence.score)
+    ? [...kept].sort((a, b) => b.score - a.score
+        // Empate em pré-requisitos: quem tem mais acervo comprovado vem antes.
+        || (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1))
     : kept;
   const tenders = ordered.slice(0, PAGE_SIZE);
+
+  /**
+   * Mesma obra publicada mais de uma vez. Roda sobre a fila inteira, e não
+   * sobre a página: a irmã da linha visível costuma estar na página seguinte,
+   * e um aviso que só aparece quando as duas caem juntas na tela não serve.
+   */
+  const duplicadas = findDuplicates(kept.map((tender) => ({
+    id: tender.id,
+    ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
+    authorityName: tender.authorityName,
+    ...(tender.processNumber ? { processNumber: tender.processNumber } : {}),
+    subject: tender.subject,
+  })));
 
   const facetScores = facets.map((entry) => computeAdherence(toAdherenceInput(entry), filter, now));
   const total = facets.length;
@@ -337,6 +370,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                       {r.met}/{r.total} pré-requisitos{r.unknown > 0 ? ` · ${r.unknown} a conferir` : ""}
                     </span>;
                   })()}
+                  {duplicadas.has(tender.id) && <span className="bx-eti aviso">
+                    possível republicação · {duplicadas.get(tender.id)?.length} outra(s) igual(is)
+                  </span>}
                   {tender.archive.needsPartner && <span className="bx-eti alerta">
                     consórcio{tender.archive.missing.length > 0
                       ? `: falta ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}`
@@ -358,7 +394,11 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
               </div>
 
               <div className="bx-medidor-caixa">
-                <AdherenceGauge score={tender.archive.score} undetermined={!tender.archive.determined}/>
+                <AdherenceGauge
+                  aria={`${tender.resumo.met} de ${tender.resumo.total} pré-requisitos atendidos`}
+                  score={tender.score}
+                  undetermined={false}
+                />
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
                 {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
                     Por isso não depende da alçada de decidir. */}
