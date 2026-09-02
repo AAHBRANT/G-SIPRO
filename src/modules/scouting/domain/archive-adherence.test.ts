@@ -44,8 +44,8 @@ describe("cobertura de serviços", () => {
     );
     expect(a.required.map((r) => r.label).sort()).toEqual(["Obra de arte especial", "Pavimento asfáltico", "Terraplenagem"]);
     expect(a.missing.map((m) => m.label)).toEqual(["Obra de arte especial"]);
-    // 2 de 3 cobertas, sem porte comparável: 2/3 de 80.
-    expect(a.score).toBe(53);
+    // 2 de 3 cobertas: a nota é a fração de serviços, e só ela.
+    expect(a.score).toBe(67);
   });
 
   it("aponta consórcio quando falta acervo de algum serviço", () => {
@@ -107,10 +107,17 @@ describe("o que não dá para julgar", () => {
 });
 
 describe("porte", () => {
-  it("limita a nota a 80 quando o orçamento é sigiloso: nem zero, nem cheia", () => {
+  /**
+   * O porte fica FORA da nota. Ele valia 20 dos 100 pontos, e como quase nenhum
+   * atestado tem valor de contrato cadastrado, toda licitação da fila parava em
+   * 80 — o mesmo número para todas, que não separa nada e ainda parece precisão.
+   * Agora a nota responde só "quantos dos serviços exigidos eu tenho", e o porte
+   * aparece como frase à parte.
+   */
+  it("orçamento sigiloso não derruba a nota: o porte não entra nela", () => {
     const a = computeArchiveAdherence(exige("Terraplenagem e pavimentação asfáltica"), acervoRodoviario);
     expect(a.scale).toBe("UNKNOWN");
-    expect(a.score).toBe(80);
+    expect(a.score).toBe(100);
     expect(a.reasons.join(" ")).toContain("orçamento sigiloso");
   });
 

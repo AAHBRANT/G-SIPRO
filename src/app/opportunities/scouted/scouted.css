@@ -1124,3 +1124,21 @@
 .bx-check input { accent-color: var(--acento); cursor: pointer; margin-top: 2px; }
 .bx-check .txt b { display: block; font-size: 12.5px; font-weight: 600; }
 .bx-check .txt span { color: var(--texto-3); font-size: 11px; line-height: 1.45; }
+
+/* Placar do acervo: o número que a pessoa procura ao abrir a licitação —
+   quantos serviços exigidos ela tem, quantos faltam, quantos ninguém conferiu.
+   Vem antes da lista porque a lista é a justificativa, não a resposta. */
+.bx-placar {
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 9px;
+}
+
+.bx-placar span { color: var(--texto-3); font-size: 11px; }
+.bx-placar b { display: block; font-size: 19px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.1; }
+.bx-placar .tem b { color: var(--acento); }
+.bx-placar .falta b { color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-placar .falta b { color: var(--bege); }
+.bx-placar .duvida b { color: var(--texto-2); }

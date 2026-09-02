@@ -161,8 +161,10 @@ const naoJulgado = (requirement: ArchiveRequirement, motivo: string): ArchiveAdh
 /**
  * Confronta o que o objeto exige com o que a empresa comprovou executar.
  *
- * A cobertura de serviços pesa 80 e o porte 20: consórcio resolve porte com
- * frequência, enquanto falta de acervo do serviço inabilita direto.
+ * A nota é a fração dos serviços exigidos que o acervo comprova — nada mais.
+ * O porte é apurado à parte: ele decide consórcio, mas não entra no número,
+ * porque quase nenhum atestado tem valor de contrato e a nota acabava presa no
+ * mesmo teto para a fila inteira.
  */
 export function computeArchiveAdherence(
   requirement: ArchiveRequirement,
@@ -234,15 +236,25 @@ export function computeArchiveAdherence(
   const largestExecuted = valores.length > 0 ? Math.max(...valores) : undefined;
 
   let scale: ScaleVerdict = "UNKNOWN";
-  let notaPorte = 0;
   if (requirement.estimatedValue !== undefined && largestExecuted !== undefined) {
-    if (largestExecuted >= requirement.estimatedValue) { scale = "COVERED"; notaPorte = 1; }
-    else { scale = "BELOW"; notaPorte = Math.max(0, Math.min(1, largestExecuted / requirement.estimatedValue)); }
+    scale = largestExecuted >= requirement.estimatedValue ? "COVERED" : "BELOW";
   }
 
-  // Sem comparação de porte a nota para nos 80 pontos da cobertura. Cem por
-  // cento tem de significar "todo serviço comprovado E porte coberto".
-  const score = Math.round(cobertura * 80 + notaPorte * 20);
+  /**
+   * A nota é SÓ a cobertura de serviços: dos serviços que a licitação exige,
+   * quantos o acervo comprova.
+   *
+   * ⚠️ O porte ficava valendo 20 dos 100 pontos. Como quase nenhum atestado tem
+   * valor de contrato cadastrado, o porte saía "não julgado" em toda licitação
+   * e a nota parava em 80 — TODA a fila com o mesmo número, que não separa
+   * nada e ainda parece precisão. Misturar "tenho o serviço?" com "a obra cabe
+   * no meu porte?" num número só torna os dois ilegíveis.
+   *
+   * O porte continua sendo apurado e continua decidindo consórcio; ele aparece
+   * como frase à parte no cartão, com o motivo de não ter sido julgado quando
+   * for o caso.
+   */
+  const score = Math.round(cobertura * 100);
 
   const reasons: string[] = [];
   const cobertas = required.filter((item) => item.covered);

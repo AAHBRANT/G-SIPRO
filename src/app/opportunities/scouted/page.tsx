@@ -422,7 +422,20 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                 </div>}
 
                 <div className="bx-bloco">
-                  <h3>Acervo técnico — {tender.archive.determined ? `${tender.archive.score}%` : "não julgado"}</h3>
+                  {/* O título conta o placar antes de qualquer coisa: é a
+                      pergunta que a pessoa faz ao abrir a licitação — de quantos
+                      serviços exigidos eu tenho prova? */}
+                  <h3>Acervo técnico — {tender.archive.determined
+                    ? `${tender.archive.required.length - tender.archive.missing.length} de ${tender.archive.required.length} serviço(s)`
+                    : "não julgado"}</h3>
+
+                  {tender.archive.determined && <div className="bx-placar">
+                    <span className="tem"><b>{tender.archive.required.length - tender.archive.missing.length}</b> comprovados</span>
+                    <span className="falta"><b>{tender.archive.missing.length}</b> faltando</span>
+                    {tender.archive.unreadable.length > 0
+                      && <span className="duvida"><b>{tender.archive.unreadable.length}</b> não conferidos</span>}
+                  </div>}
+
                   {/* Serviço a serviço: é a lista do que falta que vira a
                       conversa de consórcio. */}
                   {tender.archive.required.map((item) => <Motivo
@@ -430,16 +443,31 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                     met={item.covered}
                     rotulo={item.quantity
                       ? `${item.label} — ${item.quantity.explanation}`
-                      : item.covered ? `${item.label} — ${item.evidenceCount} no acervo` : `${item.label} — sem acervo`}
+                      : item.covered ? `${item.label} — ${item.evidenceCount} atestado(s) no acervo` : `${item.label} — nenhum atestado no acervo`}
                     skipped={false}
                   />)}
+
+                  {/* Exigência que o catálogo não soube classificar não é
+                      "coberta" nem "faltando": ninguém a conferiu. */}
+                  {tender.archive.unreadable.map((texto) =>
+                    <Motivo key={texto} met={false} rotulo={`${texto} — o sistema não soube classificar; confira à mão`} skipped/>)}
+
                   {!tender.archive.determined && tender.archive.reasons.map((reason) =>
                     <Motivo key={reason} met={false} rotulo={reason} skipped/>)}
-                  {tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined && <Motivo
-                    met={false}
-                    rotulo={`porte: maior obra executada foi R$ ${(tender.archive.largestExecuted / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`}
-                    skipped={false}
-                  />}
+
+                  {/* O PORTE sempre aparece, inclusive quando não deu para
+                      julgar. Ele saiu da nota justamente porque ficava invisível
+                      ali dentro, derrubando toda licitação para o mesmo número
+                      sem dizer por quê. */}
+                  {tender.archive.determined && (
+                    tender.archive.scale === "COVERED" && tender.archive.largestExecuted !== undefined
+                      ? <Motivo met rotulo={`Porte — já executou obra de ${dinheiroCurto(tender.archive.largestExecuted)}`} skipped={false}/>
+                      : tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined
+                        ? <Motivo met={false} rotulo={`Porte — maior obra executada foi ${dinheiroCurto(tender.archive.largestExecuted)}, contra ${tender.estimatedValue !== null && !tender.valueUndisclosed ? dinheiroCurto(Number(tender.estimatedValue)) : "o valor desta"}`} skipped={false}/>
+                        : <Motivo met={false} skipped rotulo={tender.valueUndisclosed || tender.estimatedValue === null
+                            ? "Porte — não comparável: o órgão não revelou o orçamento"
+                            : "Porte — não comparável: os atestados do acervo não têm valor de contrato cadastrado"}/>
+                  )}
                   {tender.archive.needsPartner && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
                     <strong>Indica consórcio.</strong>{" "}
                     {tender.archive.missing.length > 0
@@ -515,6 +543,10 @@ function Cartao({ rotulo, valor, dica, destaque }: { rotulo: string; valor: numb
     <p className="dica">{dica}</p>
   </article>;
 }
+
+/** R$ em milhões, como o cartão os mostra. */
+const dinheiroCurto = (valor: number) =>
+  `R$ ${(valor / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return <div className="bx-item"><dt>{rotulo}</dt><dd>{valor}</dd></div>;
