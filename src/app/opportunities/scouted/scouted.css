@@ -651,7 +651,12 @@
   padding: 15px 15px 15px 44px;
 }
 
+/* ⚠️ `align-items: start` é o que faz cada cartão ter a altura do que ele
+   carrega. Sem isso o grid estica todos até a altura do mais alto, e o bloco de
+   4 linhas fica com um vão de meia tela embaixo — com o último item boiando lá
+   no fundo, longe do conteúdo a que pertence. */
 .bx-paineis {
+  align-items: start;
   display: grid;
   gap: 11px;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -877,11 +882,8 @@
    menos regra. `tabular-nums` alinha os números na vertical, que é o que faz a
    coluna de quantitativo ser lida de relance. */
 .bx-parcelas {
-  border-top: 1px solid var(--fio);
-  margin-top: 8px;
   max-height: 190px;
   overflow-y: auto;
-  padding-top: 6px;
 }
 
 /* Edital com 30 parcelas esticaria a linha inteira da grade; a rolagem prende
@@ -893,7 +895,7 @@
   font-size: 11.5px;
   gap: 10px;
   justify-content: space-between;
-  padding: 5px 0;
+  padding: 6px 11px;
 }
 
 .bx-parcela:last-child { border-bottom: 0; }
@@ -914,13 +916,16 @@
 
 /* Dois links no mesmo bloco: sem invólucro eles encostam, porque `.bx-link` é
    inline-flex com margem própria. */
+/* A calha de 11px é a mesma de `.bx-item`, `.bx-motivo` e `.bx-nota`. Sem
+   ela os links encostavam na borda enquanto o texto acima começava recuado —
+   foi o desalinhamento que ele circulou no print. */
 .bx-links {
   border-top: 1px solid var(--fio);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
-  padding-top: 10px;
+  padding: 10px 11px 11px;
 }
 
 .bx-links .bx-link { margin: 0; }
@@ -1124,3 +1129,21 @@
 .bx-check input { accent-color: var(--acento); cursor: pointer; margin-top: 2px; }
 .bx-check .txt b { display: block; font-size: 12.5px; font-weight: 600; }
 .bx-check .txt span { color: var(--texto-3); font-size: 11px; line-height: 1.45; }
+
+/* Placar do acervo: o número que a pessoa procura ao abrir a licitação —
+   quantos serviços exigidos ela tem, quantos faltam, quantos ninguém conferiu.
+   Vem antes da lista porque a lista é a justificativa, não a resposta. */
+.bx-placar {
+  border-bottom: 1px solid var(--fio);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 9px 11px;
+}
+
+.bx-placar span { color: var(--texto-3); font-size: 11px; }
+.bx-placar b { display: block; font-size: 19px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.1; }
+.bx-placar .tem b { color: var(--acento); }
+.bx-placar .falta b { color: var(--vinho); }
+.bx[data-tema="escuro"] .bx-placar .falta b { color: var(--bege); }
+.bx-placar .duvida b { color: var(--texto-2); }

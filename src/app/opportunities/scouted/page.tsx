@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
+import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
 import { editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
@@ -214,9 +215,8 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
    * sistema conferiu aparece resolvido, e o que só o edital responde aparece
    * pendente — nunca atendido.
    */
-  const comRequisitos = scored.map((tender) => ({
-    ...tender,
-    prerequisites: buildPrerequisites({
+  const comRequisitos = scored.map((tender) => {
+    const prerequisites = buildPrerequisites({
       archive: tender.archive,
       ...(tender.days !== undefined ? { daysToClose: tender.days } : {}),
       minimumDays: filter.minimumDaysToClose,
@@ -224,19 +224,52 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       valueUndisclosed: tender.valueUndisclosed,
       ...(filter.minimumValue !== undefined ? { minimumValue: filter.minimumValue } : {}),
       ...(tender.edital ? { edital: tender.edital.requirement } : {}),
-    }),
-  }));
+    });
+    /**
+     * A NOTA DA LINHA é a fração de pré-requisitos ATENDIDOS.
+     *
+     * Já foi "aderência ao perfil" (uma lista configurada, que não inabilita
+     * ninguém) e depois "cobertura de acervo" (que, saindo do objeto, cobria
+     * quase tudo e dava o mesmo número para a fila inteira). Pré-requisito é o
+     * que decide participar: acervo, porte, prazo, valor e o que o edital exige.
+     *
+     * Só MET conta. ATENÇÃO é "cumpre com ressalva" e DESCONHECIDO é "ninguém
+     * verificou" — nenhum dos dois é requisito preenchido, e contá-los aqui
+     * devolveria a mesma confiança falsa de antes.
+     */
+    const resumo = summarize(prerequisites);
+    return {
+      ...tender,
+      prerequisites,
+      resumo,
+      score: resumo.total === 0 ? 0 : Math.round((resumo.met / resumo.total) * 100),
+    };
+  });
 
   const kept = adherenceFloor > 0
-    ? comRequisitos.filter((tender) => tender.archive.determined && tender.archive.score >= adherenceFloor)
+    ? comRequisitos.filter((tender) => tender.score >= adherenceFloor)
     : comRequisitos;
   const ordered = sort === "aderencia"
     // Sem acervo julgado, o perfil serve de desempate: é o que sobra para
     // ordenar, e vale mais que ordem aleatória.
-    ? [...kept].sort((a, b) => (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1)
-        || b.adherence.score - a.adherence.score)
+    ? [...kept].sort((a, b) => b.score - a.score
+        // Empate em pré-requisitos: quem tem mais acervo comprovado vem antes.
+        || (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1))
     : kept;
   const tenders = ordered.slice(0, PAGE_SIZE);
+
+  /**
+   * Mesma obra publicada mais de uma vez. Roda sobre a fila inteira, e não
+   * sobre a página: a irmã da linha visível costuma estar na página seguinte,
+   * e um aviso que só aparece quando as duas caem juntas na tela não serve.
+   */
+  const duplicadas = findDuplicates(kept.map((tender) => ({
+    id: tender.id,
+    ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
+    authorityName: tender.authorityName,
+    ...(tender.processNumber ? { processNumber: tender.processNumber } : {}),
+    subject: tender.subject,
+  })));
 
   const facetScores = facets.map((entry) => computeAdherence(toAdherenceInput(entry), filter, now));
   const total = facets.length;
@@ -337,6 +370,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                       {r.met}/{r.total} pré-requisitos{r.unknown > 0 ? ` · ${r.unknown} a conferir` : ""}
                     </span>;
                   })()}
+                  {duplicadas.has(tender.id) && <span className="bx-eti aviso">
+                    possível republicação · {duplicadas.get(tender.id)?.length} outra(s) igual(is)
+                  </span>}
                   {tender.archive.needsPartner && <span className="bx-eti alerta">
                     consórcio{tender.archive.missing.length > 0
                       ? `: falta ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}`
@@ -358,7 +394,11 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
               </div>
 
               <div className="bx-medidor-caixa">
-                <AdherenceGauge score={tender.archive.score} undetermined={!tender.archive.determined}/>
+                <AdherenceGauge
+                  aria={`${tender.resumo.met} de ${tender.resumo.total} pré-requisitos atendidos`}
+                  score={tender.score}
+                  undetermined={false}
+                />
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
                 {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
                     Por isso não depende da alçada de decidir. */}
@@ -422,7 +462,20 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                 </div>}
 
                 <div className="bx-bloco">
-                  <h3>Acervo técnico — {tender.archive.determined ? `${tender.archive.score}%` : "não julgado"}</h3>
+                  {/* O título conta o placar antes de qualquer coisa: é a
+                      pergunta que a pessoa faz ao abrir a licitação — de quantos
+                      serviços exigidos eu tenho prova? */}
+                  <h3>Acervo técnico — {tender.archive.determined
+                    ? `${tender.archive.required.length - tender.archive.missing.length} de ${tender.archive.required.length} serviço(s)`
+                    : "não julgado"}</h3>
+
+                  {tender.archive.determined && <div className="bx-placar">
+                    <span className="tem"><b>{tender.archive.required.length - tender.archive.missing.length}</b> comprovados</span>
+                    <span className="falta"><b>{tender.archive.missing.length}</b> faltando</span>
+                    {tender.archive.unreadable.length > 0
+                      && <span className="duvida"><b>{tender.archive.unreadable.length}</b> não conferidos</span>}
+                  </div>}
+
                   {/* Serviço a serviço: é a lista do que falta que vira a
                       conversa de consórcio. */}
                   {tender.archive.required.map((item) => <Motivo
@@ -430,16 +483,31 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                     met={item.covered}
                     rotulo={item.quantity
                       ? `${item.label} — ${item.quantity.explanation}`
-                      : item.covered ? `${item.label} — ${item.evidenceCount} no acervo` : `${item.label} — sem acervo`}
+                      : item.covered ? `${item.label} — ${item.evidenceCount} atestado(s) no acervo` : `${item.label} — nenhum atestado no acervo`}
                     skipped={false}
                   />)}
+
+                  {/* Exigência que o catálogo não soube classificar não é
+                      "coberta" nem "faltando": ninguém a conferiu. */}
+                  {tender.archive.unreadable.map((texto) =>
+                    <Motivo key={texto} met={false} rotulo={`${texto} — o sistema não soube classificar; confira à mão`} skipped/>)}
+
                   {!tender.archive.determined && tender.archive.reasons.map((reason) =>
                     <Motivo key={reason} met={false} rotulo={reason} skipped/>)}
-                  {tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined && <Motivo
-                    met={false}
-                    rotulo={`porte: maior obra executada foi R$ ${(tender.archive.largestExecuted / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`}
-                    skipped={false}
-                  />}
+
+                  {/* O PORTE sempre aparece, inclusive quando não deu para
+                      julgar. Ele saiu da nota justamente porque ficava invisível
+                      ali dentro, derrubando toda licitação para o mesmo número
+                      sem dizer por quê. */}
+                  {tender.archive.determined && (
+                    tender.archive.scale === "COVERED" && tender.archive.largestExecuted !== undefined
+                      ? <Motivo met rotulo={`Porte — já executou obra de ${dinheiroCurto(tender.archive.largestExecuted)}`} skipped={false}/>
+                      : tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined
+                        ? <Motivo met={false} rotulo={`Porte — maior obra executada foi ${dinheiroCurto(tender.archive.largestExecuted)}, contra ${tender.estimatedValue !== null && !tender.valueUndisclosed ? dinheiroCurto(Number(tender.estimatedValue)) : "o valor desta"}`} skipped={false}/>
+                        : <Motivo met={false} skipped rotulo={tender.valueUndisclosed || tender.estimatedValue === null
+                            ? "Porte — não comparável: o órgão não revelou o orçamento"
+                            : "Porte — não comparável: os atestados do acervo não têm valor de contrato cadastrado"}/>
+                  )}
                   {tender.archive.needsPartner && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
                     <strong>Indica consórcio.</strong>{" "}
                     {tender.archive.missing.length > 0
@@ -515,6 +583,10 @@ function Cartao({ rotulo, valor, dica, destaque }: { rotulo: string; valor: numb
     <p className="dica">{dica}</p>
   </article>;
 }
+
+/** R$ em milhões, como o cartão os mostra. */
+const dinheiroCurto = (valor: number) =>
+  `R$ ${(valor / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return <div className="bx-item"><dt>{rotulo}</dt><dd>{valor}</dd></div>;

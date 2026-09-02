@@ -1,5 +1,10 @@
 /**
- * Velocímetro de aderência ao perfil, 0 a 100.
+ * Velocímetro de PRÉ-REQUISITOS atendidos, 0 a 100.
+ *
+ * Mede quantos dos pré-requisitos da licitação a empresa cumpre — acervo,
+ * porte, prazo, valor e o que o edital exige. Já mediu "aderência ao perfil" e
+ * depois "cobertura de acervo"; as duas eram estreitas demais para servirem de
+ * número único da linha.
  *
  * Renderiza no servidor: é desenho puro, sem estado nem interação, então não
  * precisa atravessar a fronteira para o navegador.
@@ -28,13 +33,13 @@ function arcTo(score: number): string {
 
 const ticks = [0, 25, 50, 75, 100];
 
-export function AdherenceGauge({ score, undetermined }: { score: number; undetermined: boolean }) {
+export function AdherenceGauge({ score, undetermined, aria }: { score: number; undetermined: boolean; aria?: string }) {
   const value = undetermined ? 0 : Math.max(0, Math.min(100, Math.round(score)));
   const [nx, ny] = pointAt(value, R * 0.66);
 
   return (
     <svg
-      aria-label={undetermined ? "Aderência não calculada" : `Aderência ao perfil: ${value} de 100`}
+      aria-label={aria ?? (undetermined ? "Pré-requisitos não avaliados" : `Pré-requisitos atendidos: ${value}%`)}
       className="bx-medidor"
       height="74"
       role="img"
@@ -64,7 +69,7 @@ export function AdherenceGauge({ score, undetermined }: { score: number; undeter
         {undetermined ? "—" : `${value}%`}
       </text>
       <text className="bx-medidor-rot" x={CX} y={CY + 26}>
-        aderência
+        pré-requisitos
       </text>
     </svg>
   );
