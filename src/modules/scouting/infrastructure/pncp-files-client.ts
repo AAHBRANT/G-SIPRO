@@ -9,7 +9,14 @@
  * uma URL de download direta. O download responde `application/octet-stream`
  * com o nome verdadeiro no `content-disposition`, e não no corpo — daí o tipo
  * ser deduzido da extensão do nome, e não do cabeçalho.
+ *
+ * A ordem de interesse mora em `edital-relevance`: é a mesma régua que escolhe
+ * o anexo certo dentro de um pacote compactado, e ter duas listas divergindo
+ * daria uma ordem para o arquivo solto e outra para o mesmo arquivo dentro do
+ * .zip.
  */
+import { editalRelevance } from "@/modules/scouting/domain/edital-relevance";
+
 const PNCP_BASE_URL = "https://pncp.gov.br/api/pncp/v1";
 
 const LIST_TIMEOUT_MS = 20_000;
@@ -46,24 +53,7 @@ type PncpFileRecord = Readonly<{
   sequencialDocumento?: number;
 }>;
 
-/**
- * Ordem de interesse para a habilitação técnica.
- *
- * O edital costuma trazer a qualificação técnica, mas em obra grande a lista de
- * parcelas de maior relevância vive no termo de referência ou no projeto
- * básico. Ler só o edital deixaria justamente o quantitativo de fora.
- */
-const relevance: ReadonlyArray<{ pattern: RegExp; weight: number }> = [
-  { pattern: /termo\s+de\s+refer/i, weight: 0 },
-  { pattern: /projeto\s+b[aá]sico/i, weight: 1 },
-  { pattern: /edital/i, weight: 2 },
-  { pattern: /anexo/i, weight: 3 },
-];
-
-const weightOf = (file: TenderFile): number => {
-  const texto = `${file.documentType} ${file.title}`;
-  return relevance.find((item) => item.pattern.test(texto))?.weight ?? 9;
-};
+const weightOf = (file: TenderFile): number => editalRelevance(file.documentType, file.title);
 
 /** Deduz o tipo pelo nome, já que o servidor responde sempre octet-stream. */
 export function mimeFromFilename(filename: string): string {
@@ -72,6 +62,7 @@ export function mimeFromFilename(filename: string): string {
   if (extensao === "doc") return "application/msword";
   if (extensao === "docx") return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   if (extensao === "zip") return "application/zip";
+  if (extensao === "rar") return "application/vnd.rar";
   return "application/octet-stream";
 }
 
