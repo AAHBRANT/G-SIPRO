@@ -1,10 +1,25 @@
 /**
- * Velocímetro de PRÉ-REQUISITOS atendidos, 0 a 100.
+ * Velocímetro de EXIGÊNCIA TÉCNICA, 0 a 100.
  *
- * Mede quantos dos pré-requisitos da licitação a empresa cumpre — acervo,
- * porte, prazo, valor e o que o edital exige. Já mediu "aderência ao perfil" e
- * depois "cobertura de acervo"; as duas eram estreitas demais para servirem de
- * número único da linha.
+ * Mede só uma coisa: dos serviços que este tipo de obra exige, quantos o
+ * acervo comprova. É a pergunta que decide ANTES de gastar uma leitura de
+ * edital (paga) — "vale a pena olhar essa licitação de perto?".
+ *
+ * ⚠️ Por que não é "pré-requisitos atendidos" (o que já foi, e voltou a ser
+ * medido em 04/09/2026): aquele número mistura acervo com porte, prazo, valor
+ * e o que só o edital responde. Cinco dos oito itens nunca fecham enquanto o
+ * edital não é lido — e por isso a nota travava em ~38% em TODA licitação,
+ * não importa se o acervo era ótimo ou péssimo. Misturado, o número não
+ * ajudava a decidir o que vale ler; separado, ele ajuda.
+ *
+ * ⚠️ Isto AINDA é estimativa quando `requirementInferred` (o edital não foi
+ * lido): a exigência vem só do objeto, uma frase — não das parcelas de maior
+ * relevância de verdade. Objeto genérico tende a mostrar número alto mesmo
+ * quando a real exigência do edital é outra. Alto aqui não é "aprovado";
+ * é "nada óbvio faltando pelo que dá para saber sem ler o edital ainda".
+ *
+ * Já mediu "aderência ao perfil" e depois "cobertura de acervo" com porte
+ * embutido; as duas eram medidas diferentes desta.
  *
  * Renderiza no servidor: é desenho puro, sem estado nem interação, então não
  * precisa atravessar a fronteira para o navegador.
@@ -39,7 +54,7 @@ export function AdherenceGauge({ score, undetermined, aria }: { score: number; u
 
   return (
     <svg
-      aria-label={aria ?? (undetermined ? "Pré-requisitos não avaliados" : `Pré-requisitos atendidos: ${value}%`)}
+      aria-label={aria ?? (undetermined ? "Exigência técnica não avaliada" : `Exigência técnica atendida: ${value}%`)}
       className="bx-medidor"
       height="74"
       role="img"
@@ -69,7 +84,7 @@ export function AdherenceGauge({ score, undetermined, aria }: { score: number; u
         {undetermined ? "—" : `${value}%`}
       </text>
       <text className="bx-medidor-rot" x={CX} y={CY + 26}>
-        pré-requisitos
+        exigência técnica
       </text>
     </svg>
   );

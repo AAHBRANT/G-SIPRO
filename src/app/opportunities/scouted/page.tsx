@@ -44,7 +44,7 @@ const workTypeLabels: Record<ScoutWorkType, string> = {
   RENOVATION: "Reforma e retrofit",
 };
 const sortOptions = [
-  { value: "aderencia", label: "Maior aderência" },
+  { value: "aderencia", label: "Maior exigência técnica" },
   { value: "prazo", label: "Prazo mais curto" },
   { value: "valor", label: "Maior valor" },
   { value: "recente", label: "Captada mais recentemente" },
@@ -247,15 +247,18 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     };
   });
 
+  // Filtro e ordenação por EXIGÊNCIA TÉCNICA (acervo puro), não pelo apanhado
+  // de pré-requisitos — que trava perto de 38% em toda licitação enquanto o
+  // edital não é lido, e um piso configurado contra ele esconderia a fila
+  // inteira. Ver o comentário em adherence-gauge.tsx.
   const kept = adherenceFloor > 0
-    ? comRequisitos.filter((tender) => tender.score >= adherenceFloor)
+    ? comRequisitos.filter((tender) => tender.archive.score >= adherenceFloor)
     : comRequisitos;
   const ordered = sort === "aderencia"
-    // Sem acervo julgado, o perfil serve de desempate: é o que sobra para
-    // ordenar, e vale mais que ordem aleatória.
-    ? [...kept].sort((a, b) => b.score - a.score
-        // Empate em pré-requisitos: quem tem mais acervo comprovado vem antes.
-        || (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1))
+    // Sem acervo julgado, vai para o fim: é dado que falta, não zero de verdade.
+    ? [...kept].sort((a, b) => (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1)
+        // Empate em acervo: quem atende mais pré-requisitos vem antes.
+        || b.score - a.score)
     : kept;
   const tenders = ordered.slice(0, PAGE_SIZE);
 
@@ -327,7 +330,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
         <p>
           {kept.length > tenders.length && <>Mostrando as <strong>{tenders.length}</strong> primeiras · </>}
           {semJulgamento > 0 && <><strong>{semJulgamento}</strong> fora do corte por acervo não julgado · </>}
-          {truncated && <>Fila maior que {QUEUE_CAP}; a contagem por aderência considera as {QUEUE_CAP} primeiras · </>}
+          {truncated && <>Fila maior que {QUEUE_CAP}; a contagem por exigência técnica considera as {QUEUE_CAP} primeiras · </>}
           Ordenado por <strong>{sortOptions.find((option) => option.value === sort)?.label.toLowerCase()}</strong>
         </p>
       </header>
@@ -358,9 +361,10 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   {tender.valueUndisclosed && <span className="bx-eti alerta">valor sigiloso</span>}
                   {tender.adherence.reasons.filter((reason) => !reason.met && !reason.skipped && reason.criterion !== "SPHERE").map((reason) =>
                     <span className="bx-eti alerta" key={reason.criterion}>{reason.label}</span>)}
-                  {tender.archive.determined
-                    ? <span className="bx-eti">acervo {tender.archive.score}%{tender.archive.requirementInferred ? " (estimado)" : ""}</span>
-                    : <span className="bx-eti">acervo não julgado</span>}
+                  {/* O percentual já é o medidor grande; aqui só o caso em que
+                      nem isso existe, porque o medidor mostra "—" sem dizer o
+                      motivo. */}
+                  {!tender.archive.determined && <span className="bx-eti">acervo não julgado</span>}
                   {/* O que falta decide parceria, então aparece na linha e
                       não escondido dentro do painel. */}
                   <span className={tender.edital ? (tender.edital.reviewedAt ? "bx-eti" : "bx-eti aviso") : "bx-eti"}>
@@ -396,10 +400,18 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
               </div>
 
               <div className="bx-medidor-caixa">
+                {/* O medidor grande responde UMA pergunta: dos serviços que
+                    este tipo de obra exige, quantos o acervo comprova? É a
+                    pergunta de antes de gastar uma leitura de edital — não o
+                    apanhado de porte/prazo/valor/edital, que trava perto de
+                    38% em toda licitação enquanto o edital não é lido
+                    (ver adherence-gauge.tsx). */}
                 <AdherenceGauge
-                  aria={`${tender.resumo.met} de ${tender.resumo.total} pré-requisitos atendidos`}
-                  score={tender.score}
-                  undetermined={false}
+                  aria={tender.archive.determined
+                    ? `Exigência técnica: ${tender.archive.required.length - tender.archive.missing.length} de ${tender.archive.required.length} serviços comprovados${tender.archive.requirementInferred ? ", estimado do objeto" : ""}`
+                    : "Exigência técnica não avaliada — acervo não julgado"}
+                  score={tender.archive.score}
+                  undetermined={!tender.archive.determined}
                 />
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
                 {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
@@ -571,7 +583,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
 
         {tenders.length === 0 && <div className="bx-vazio">
           <p>{total === 0 ? "Nenhuma licitação aguardando triagem" : "Nada com esses filtros"}</p>
-          <span>{total === 0 ? "A próxima varredura ocorre no domingo." : "Baixe a aderência mínima ou desmarque alguma região."}</span>
+          <span>{total === 0 ? "A próxima varredura ocorre no domingo." : "Baixe a exigência técnica mínima ou desmarque alguma região."}</span>
         </div>}
       </div>
         </section>

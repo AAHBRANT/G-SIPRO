@@ -73,7 +73,7 @@ export function ScoutedFilters({ groups, sortOptions }: { groups: ReadonlyArray<
     </div>
 
     <div className="bx-secao">
-      <h3>Aderência ao perfil</h3>
+      <h3>Exigência técnica</h3>
       <AdherenceRange floor={adherenceFloor} key={adherenceFloor} onCommit={(value) => setSingle("ader", value > 0 ? String(value) : "")}/>
     </div>
 
@@ -159,7 +159,7 @@ function Numero({ chave, dica, params, rotulo, onCommit }: {
 }
 
 /**
- * Barra de aderência mínima. O valor local existe só para o número acompanhar o
+ * Barra de exigência técnica mínima. O valor local existe só para o número acompanhar o
  * arrasto; a consulta sai quando a mão para, senão a fila recarregaria dezenas
  * de vezes num gesto só.
  *
@@ -180,7 +180,7 @@ function AdherenceRange({ floor, onCommit }: { floor: number; onCommit: (value: 
   }
 
   return <div className="bx-faixa">
-    <input aria-label="Aderência mínima" max={100} min={0} onChange={(event) => slide(Number(event.target.value))} step={5} type="range" value={value}/>
+    <input aria-label="Exigência técnica mínima" max={100} min={0} onChange={(event) => slide(Number(event.target.value))} step={5} type="range" value={value}/>
     <span className="pc">{value}%</span>
   </div>;
 }
