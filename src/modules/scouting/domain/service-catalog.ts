@@ -119,9 +119,13 @@ export const serviceCatalog: readonly ServiceCategory[] = [
   categoria("canalizacao", "Canalização e macrodrenagem", ["canalizac*", "macrodrenagem", "retificacao de corrego", "curso d agua", "canal"]),
   categoria("obra-de-arte", "Obra de arte especial", ["ponte", "viaduto", "passarela", "tunel", "obra de arte especial", "concreto protendido", "aduela"]),
   // "rebaixamento do lencol freatico" é serviço auxiliar de fundação em terreno
-  // encharcado — achado no diagnóstico de 03/09/2026.
-  categoria("fundacao", "Fundação", ["fundac*", "estaca", "microestaca", "tubulao", "sapata", "bloco de coroamento", "radier", "rebaixamento do lencol freatico"]),
-  categoria("estrutura-concreto", "Estrutura de concreto", ["estrutura de concreto", "concreto armado", "pilar", "viga", "laje", "forma e armacao"]),
+  // encharcado — achado no diagnóstico de 03/09/2026. "escorament*" (valas e
+  // cavas de fundação contínua) achado em edital real de Camaquá/RS, 04/09/2026.
+  categoria("fundacao", "Fundação", ["fundac*", "estaca", "microestaca", "tubulao", "sapata", "bloco de coroamento", "radier", "rebaixamento do lencol freatico", "escorament*"]),
+  // "ca-50"/"ca-60" (bitola de aço-carbono para concreto armado, a designação
+  // que todo atestado e orçamento usa) e "vergalhao*" achados em edital real de
+  // Camaquá/RS, 04/09/2026 — "forma e armacao" não cobria a menção nua ao aço.
+  categoria("estrutura-concreto", "Estrutura de concreto", ["estrutura de concreto", "concreto armado", "pilar", "viga", "laje", "forma e armacao", "ca-50", "ca-60", "vergalhao*"]),
   categoria("estrutura-metalica", "Estrutura metálica e cobertura", ["estrutura metalica", "cobertura", "telhamento", "trelica", "galpao metalico"]),
   // "muro de flexao"/"cortina de flexao" e "barragem"/"enrocamento"/
   // "vertedouro" achados no diagnóstico de 03/09/2026: enrocamento (pedra
@@ -147,7 +151,11 @@ export const serviceCatalog: readonly ServiceCategory[] = [
   // produção. Revertido no mesmo dia. Se um dia isto voltar a ser tentado,
   // tem de ser separando o vocabulário do objeto do vocabulário do acervo —
   // não alargando os dois juntos.
-  categoria("instalacoes-eletricas", "Instalações elétricas", ["instalacoes eletricas", "instalacao eletrica", "cabeamento", "subestacao", "quadro de distribuicao", "spda"]),
+  // "grupo gerador" achado em edital real de Camaquá/RS, 04/09/2026 — termo
+  // composto específico, não um radical solto: o objeto genérico de obra civil
+  // não cita "grupo gerador" de passagem do jeito que cita "elétrica" (o
+  // incidente acima), então não repete o mesmo risco de falso pré-requisito.
+  categoria("instalacoes-eletricas", "Instalações elétricas", ["instalacoes eletricas", "instalacao eletrica", "cabeamento", "subestacao", "quadro de distribuicao", "spda", "grupo gerador"]),
   // "hidrossanitario" (uma palavra) e "hidro-sanitario" (com hífen) são a
   // MESMA coisa escrita de duas formas — o radical original só cobria a
   // primeira; o hífen não é removido por `normalizeText`. Estes dois, ao

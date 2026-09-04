@@ -200,6 +200,28 @@ describe("radical e palavra inteira", () => {
   });
 });
 
+/**
+ * Termos acrescentados a partir de parcelas exigidas reais que apareciam como
+ * "o sistema não soube classificar" na tela — edital real de Camaquá/RS,
+ * 04/09/2026. Texto como a leitura devolveu, não paráfrase.
+ */
+describe("parcelas achadas no edital real de Camaquá/RS, 04/09/2026", () => {
+  it.each([
+    ["Grupo gerador 115KVA Cond. D", "instalacoes-eletricas"],
+    ["Escoramento de valas/cavas p/fund.cont.", "fundacao"],
+    ["Fornecimento e aplicação de aço CA-50 – diâmetro > ou = 1/2\"", "estrutura-concreto"],
+  ])("%s casa %s", (texto, esperada) => {
+    expect(ids(texto)).toContain(esperada);
+  });
+
+  // O mesmo risco do incidente de "elétrica"/"hidráulica" soltas: "grupo
+  // gerador" não pode ser tão largo a ponto de um objeto genérico de obra
+  // civil (que não cita geradores) acabar exigindo a categoria de passagem.
+  it("objeto genérico de obra civil não passa a exigir instalações elétricas por causa de 'grupo gerador'", () => {
+    expect(ids("Contratação de empresa para execução de obras de pavimentação e drenagem urbana")).not.toContain("instalacoes-eletricas");
+  });
+});
+
 describe("integridade do catálogo", () => {
   it("todo termo tem um padrão compilado", () => {
     for (const categoria of serviceCatalog) {
