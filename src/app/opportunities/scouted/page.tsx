@@ -17,6 +17,7 @@ import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkTyp
 import { themeVariants } from "@/modules/scouting/domain/signal";
 import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { AdherenceGauge } from "./adherence-gauge";
+import { EditalReadingActions } from "./edital-reading-actions";
 import { ScoutedFilters, type FilterGroup } from "./scouted-filters";
 import { Flag, SignalActions } from "./signal-actions";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
@@ -282,6 +283,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   ];
 
   const canDecide = authorize(authorization, { permission: "opportunities.create" }).allowed;
+  const canReadEdital = authorize(authorization, { permission: "ai.execute" }).allowed;
   const truncated = rows.length === QUEUE_CAP;
 
   return <div className="bx" id={THEME_ROOT_ID}>
@@ -437,6 +439,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                         ? <>Edital lido e <strong>conferido</strong> por uma pessoa em {tender.edital.reviewedAt.toLocaleDateString("pt-BR")}.</>
                         : <>Edital lido automaticamente e <strong>ainda não conferido</strong> por uma pessoa. Antes de montar proposta ou consórcio, confira as parcelas contra o PDF.</>}
                   </p>
+                  {!tender.edital && (canReadEdital
+                    ? <EditalReadingActions id={tender.id}/>
+                    : <p className="bx-nota">Sem alçada para ler o edital.</p>)}
                 </div>
 
                 {tender.edital && <div className="bx-bloco">
