@@ -48,6 +48,79 @@ const TRECHO_MENCAO_DE_PASSAGEM = `a demonstração da capacidade técnica do pr
 que seria tratado na qualificação técnico-operacional). c) Apresentação de
 Pessoal Técnico – Art. 67, III da Lei 14.133/2021.`;
 
+/**
+ * Trechos verdadeiros do edital 011/26 (Concorrência) de Santa Cruz do Sul/RS
+ * — segundo município testado, com estrutura de documento bem diferente da
+ * de Pedra Preta. Mesma regra: cortar não reescreve o que fica.
+ */
+const TRECHO_SANTACRUZ_LISTA_PARCELAS = `e.2) Os atestados ou certidões solicitados deverão comprovar a execução
+de serviços de características semelhantes e de complexidade tecnológica
+equivalente ou superior as parcelas de maior relevância técnica ou valor
+significativo, que são:
+•   Execução de Pavimentação com Bloco Intertravado de no mínimo 656,95m²;
+•   Execução de Sub-Base para Pavimentação de no mínimo 135,33 m³;
+•   Execução de Microdrenagem de no mínimo 103 m.
+e.3) Será admitida, para fins de comprovação de quantitativo mínimo, a
+apresentação e o somatório de diferentes atestados executados de forma
+concomitante.`;
+
+/**
+ * A vedação de consórcio não repete o verbo perto do item — vem uma vez no
+ * cabeçalho ("Não poderão disputar esta licitação"), e "consórcio" só
+ * reaparece bem mais adiante como mais uma linha de uma lista numerada
+ * (aqui, itens 3.8.2 a 3.8.4 ficam entre o cabeçalho e o item real, exigindo
+ * a segunda tentativa de `resolveConsorcio` — a janela estreita ao redor do
+ * item sozinho nunca alcança o "poderão disputar" do cabeçalho).
+ */
+const TRECHO_SANTACRUZ_CONSORCIO_CABECALHO_LONGE = `3.8 - Não poderão disputar esta licitação:
+3.8.1 - aquele que não atenda às condições deste Edital e seu(s) anexo(s);
+3.8.2 - autor do anteprojeto, do projeto básico ou do projeto executivo,
+pessoa física ou jurídica, quando a licitação versar sobre serviços ou
+fornecimento de bens a ele relacionados;
+3.8.2.1 - equiparam-se aos autores do projeto as empresas integrantes do
+mesmo grupo econômico.
+3.8.3 - empresa, isoladamente ou em consórcio, responsável pela elaboração
+do projeto básico ou do projeto executivo, ou empresa da qual o autor do
+projeto seja dirigente, gerente, controlador, acionista ou detentor de mais
+de 5% (cinco por cento) do capital com direito a voto, responsável técnico
+ou subcontratado, quando a licitação versar sobre serviços ou fornecimento
+de bens a ela necessários;
+3.8.4 - pessoa física ou jurídica que se encontre, ao tempo da licitação,
+impossibilitada de participar da licitação em decorrência de sanção que lhe
+foi imposta;
+3.8.9 - pessoas jurídicas reunidas em consórcio; 3.8.10 – Organizações da
+Sociedade Civil de Interesse Público - OSCIP, atuando nessa condição.`;
+
+/**
+ * Trechos verdadeiros do edital de Camaquá/RS (Concorrência 16/2026) —
+ * terceiro município testado. Espaços soltos no meio de palavra ("fornecid
+ * o(s)", "term os") são artefato real do pdfjs-dist neste PDF, mantidos como
+ * saíram.
+ */
+const TRECHO_CAMAQUA_CAT_VEDACAO_DE_SUBSTITUICAO = `d)   Atestados e Certidão de Acervo Técnico (CAT): Atestado(s) fornecid
+o(s) por pessoa(s) jurídica(s)  de direito público ou privado, comprovando a execução de serviços
+similares e compatíveis com o  objeto da licitação, devidamente certificado(s) no CREA e/ou CAU
+e/ou CFT, acompanhado(s) da  CAT do responsável técnico, nos term os do parágrafo primeiro do
+art. 67 da Lei nº 14.133/2021 ,  apresentando quantitativos mínimos de 50% dos objetos de maior re
+levância técnica e econômica .  Vedada a substituição por qualquer outro documento.`;
+
+/**
+ * "Isoladamente ou em consórcio" aqui descreve COMO o autor do projeto pode
+ * estar organizado — a exclusão é por conflito de interesse (ser autor do
+ * projeto, Lei 14.133 art. 14), não por ser consórcio. As duas únicas
+ * menções a "consórcio" no edital real de Camaquá/RS eram desta cláusula —
+ * o documento não declara política nenhuma sobre consórcio em si.
+ */
+const TRECHO_CAMAQUA_CONSORCIO_APENAS_QUALIFICADOR = `4)   Declaramos, que em cumprimento do artigo 14 da Lei 14.133/21 que a nossa empresa não
+poderá disputar licitação ou participar da execução de contrato, direta ou indiretamente nas
+seguintes hipóteses: o autor do a nteprojeto, do projeto básico ou do projeto executivo, pessoa física
+ou jurídica, quando a licitação   versar   sobre obra,   serviços   ou fornecimento de bens a ele
+relacionados; a empresa isoladamente ou em consórcio, responsável pela elaboração do projeto
+bási co ou do projeto executivo, ou empresa da qual o autor do projeto seja dirigente, gerente,
+controlador, acionista ou detentor de mais de 5% (cinco por cento) do capital com direito a voto,
+responsável   técnico   ou   subcontratado,   quando   a   licitação   versar   sobre   serviços   ou
+fornecimento de bens a ela necessários.`;
+
 describe("cláusulas institucionais, achadas no edital real de Pedra Preta/MT", () => {
   it("reconhece a vedação de consórcio pelo substantivo, não só pelo adjetivo", () => {
     const r = extractInstitutionalRequirement(TRECHO_CONSORCIO);
@@ -84,6 +157,36 @@ describe("cláusulas institucionais, achadas no edital real de Pedra Preta/MT", 
   });
 });
 
+describe("cláusulas institucionais, achadas no edital real de Santa Cruz do Sul/RS", () => {
+  it("acha a vedação de consórcio no cabeçalho da lista, mesmo com o item bem mais adiante", () => {
+    // A janela estreita ao redor de "consórcio" (item 3.8.9) não alcança o
+    // "Não poderão disputar" do cabeçalho — só a segunda tentativa acha.
+    const r = extractInstitutionalRequirement(TRECHO_SANTACRUZ_CONSORCIO_CABECALHO_LONGE);
+    expect(r.consortiumAllowed).toBe(false);
+    expect(r.limitations).not.toContain(expect.stringContaining("consórcio"));
+  });
+});
+
+describe("cláusulas institucionais, achadas no edital real de Camaquá/RS", () => {
+  it("não deixa 'vedada a substituição [do documento]' virar 'CAT não exigido'", () => {
+    // A vedação aqui é sobre TROCAR o atestado por outro documento, não
+    // sobre a exigência do CAT em si — sem o filtro, "vedad" da frase
+    // errada ganhava de qualquer sinal positivo antes dele.
+    const r = extractInstitutionalRequirement(TRECHO_CAMAQUA_CAT_VEDACAO_DE_SUBSTITUICAO);
+    expect(r.requiresCat).toBe(true);
+  });
+
+  it("não confunde 'consórcio' como qualificador de OUTRA exclusão (autor do projeto) com vedação de consórcio em si", () => {
+    // O cabeçalho "não poderá disputar" está logo ali, mas governa a
+    // exclusão do AUTOR DO PROJETO — "consórcio" só qualifica como esse
+    // autor pode estar organizado. Sem o filtro, isto virava "vedado" por
+    // engano; o documento na verdade não fala nada sobre consórcio em si.
+    const r = extractInstitutionalRequirement(TRECHO_CAMAQUA_CONSORCIO_APENAS_QUALIFICADOR);
+    expect(r.consortiumAllowed).toBeUndefined();
+    expect(r.limitations.some((l) => l.includes("consórcio"))).toBe(true);
+  });
+});
+
 describe("seção de parcelas de maior relevância", () => {
   it("acha a seção técnico-operacional pelo título, não por menção de passagem", () => {
     expect(extractRelevantServicesSection(TRECHO_MENCAO_DE_PASSAGEM)).toBeUndefined();
@@ -104,6 +207,19 @@ describe("seção de parcelas de maior relevância", () => {
     const trecho = TRECHO_JUSTIFICATIVA; // já contém "4 0%", não "40%"
     const r = editalRequirementFromText(trecho);
     expect(r.services.length).toBeGreaterThan(0);
+  });
+
+  it("extrai a lista com marcador do edital real de Santa Cruz do Sul/RS — formato bem diferente do de Pedra Preta", () => {
+    const r = editalRequirementFromText(TRECHO_SANTACRUZ_LISTA_PARCELAS);
+    expect(r.services).toHaveLength(3);
+    // Quantidade e unidade vêm GRUDADAS no original ("656,95m²") — e "m²"
+    // precisa manter o expoente na unidade normalizada, não virar "m" solto.
+    expect(r.services[0]?.quantity).toBeCloseTo(656.95, 1);
+    expect(r.services[0]?.unit).toBe("m2");
+    expect(r.services[1]?.quantity).toBeCloseTo(135.33, 1);
+    expect(r.services[1]?.unit).toBe("m3");
+    expect(r.services[2]?.quantity).toBeCloseTo(103, 1);
+    expect(r.services[2]?.unit).toBe("m");
   });
 
   it("não confunde a seção técnico-PROFISSIONAL (sem quantitativo mínimo) com a operacional", () => {

@@ -43,6 +43,27 @@ import { normalizeText } from "@/modules/scouting/domain/qualification";
 const JANELA_CLAUSULA = 220;
 
 /**
+ * Minúsculas + sem acento, SEM colapsar espaço — ao contrário de `normalizeText`
+ * (qualification.ts), que colapsa espaço múltiplo em um só. Aqui a posição de
+ * um casado precisa corresponder 1:1 ao índice do TEXTO ORIGINAL, porque é ela
+ * que decide onde cortar `textoOriginal` mais abaixo. Um edital real de 261 mil
+ * caracteres (Santa Cruz do Sul/RS), com espaçamento de coluna do PDF (3+
+ * espaços seguidos entre palavras, o padrão inteiro do documento), tinha a
+ * seção inteira errada cortada — o casado em texto colapsado caía dezenas de
+ * milhares de posições antes de onde o mesmo trecho está no original, porque o
+ * colapso encolhe o texto e o encolhimento cresce por todo o documento. Textos
+ * curtos (as fixtures de teste) não têm espaçamento repetido o bastante pra
+ * doer, por isso o bug não aparecia nelas.
+ */
+const MARCA_DIACRITICO_INICIO = String.fromCharCode(0x0300);
+const MARCA_DIACRITICO_FIM = String.fromCharCode(0x036f);
+const REGEX_MARCA_DIACRITICO = new RegExp(`[${MARCA_DIACRITICO_INICIO}-${MARCA_DIACRITICO_FIM}]`, "g");
+
+function normalizeIndicePreservado(texto: string): string {
+  return texto.toLowerCase().normalize("NFD").replace(REGEX_MARCA_DIACRITICO, "");
+}
+
+/**
  * Sim/não em texto CRU de lei — diferente de `parseBoolean` (edital-
  * requirement.ts), que lê a resposta já curta e reescrita pela IA. Texto de
  * origem prefere o SUBSTANTIVO ("vedação", "exigência") onde a resposta da IA
@@ -53,9 +74,18 @@ const JANELA_CLAUSULA = 220;
  * fundamenta uma vedação costuma mencionar o poder geral de "admitir" antes
  * de dizer que aqui não se admite — o substantivo direto da decisão
  * ("vedação") tem de vencer a palavra genérica da explicação ("admitir").
+ *
+ * ⚠️ "Vedada a substituição [de X por Y]" é removida ANTES de tudo — achado
+ * testando o edital real de Camaquá/RS: a cláusula de CAT/CREA vinha seguida,
+ * na mesma janela, de "Vedada a substituição por [outro documento]", e o
+ * "vedad" dessa frase (sobre TROCAR o documento) virava "CAT não exigido" por
+ * engano — a vedação aqui nega a substituição, nunca a exigência que a
+ * antecede. Sem isto, uma cláusula clássica de contrato público (comum,
+ * sem relação nenhuma com o gatilho que a janela veio buscar) sacava o "falso"
+ * errado antes de qualquer chance de o texto certo classificar.
  */
 function simNaoDeTextoCru(texto: string): boolean | undefined {
-  const alvo = normalizeText(texto);
+  const alvo = normalizeText(texto).replace(/vedad\w*\s+a\s+substituic\w*[^.;]*/g, "");
   if (/n[ao]o (sera|podera|admite|permite|se admite)|vedad|vedac|proibid|proibic|inadmiss|impedid|dispensad|facultad|poder[ao] declinar|fica a criteri/.test(alvo)) return false;
   if (/permit|admit|autoriz|obrigatori|exigid|exigenc|sera necessari/.test(alvo)) return true;
   return undefined;
@@ -74,10 +104,10 @@ function simNaoDeTextoCru(texto: string): boolean | undefined {
  * depois. Por isso quem chama varre todas as ocorrências e fica com a
  * primeira que realmente classificar, em vez de travar na primeira que achar.
  */
-function todasAsJanelas(textoOriginal: string, textoNormalizado: string, gatilhos: readonly RegExp[]): readonly string[] {
+function todasAsJanelas(textoOriginal: string, textoIndicePreservado: string, gatilhos: readonly RegExp[]): readonly string[] {
   const janelas: string[] = [];
   for (const gatilho of gatilhos) {
-    for (const casado of textoNormalizado.matchAll(new RegExp(gatilho, "g"))) {
+    for (const casado of textoIndicePreservado.matchAll(new RegExp(gatilho, "g"))) {
       const inicio = Math.max(0, casado.index - 40);
       const fim = Math.min(textoOriginal.length, casado.index + JANELA_CLAUSULA);
       janelas.push(textoOriginal.slice(inicio, fim));
@@ -87,8 +117,52 @@ function todasAsJanelas(textoOriginal: string, textoNormalizado: string, gatilho
 }
 
 const CLAUSULA_CONSORCIO: readonly RegExp[] = [/consorcio/];
-const CLAUSULA_CAT: readonly RegExp[] = [/\bcat\b|atestado de (responsabilidade|capacidade) tecnica|\bcrea\b|\bcau\b/];
-const CLAUSULA_VISITA: readonly RegExp[] = [/visita tecnica|vistoria tecnica/];
+const CLAUSULA_CAT: readonly RegExp[] = [/\bcat\b|atestado\s+de\s+(responsabilidade|capacidade)\s+tecnica|\bcrea\b|\bcau\b/];
+const CLAUSULA_VISITA: readonly RegExp[] = [/visita\s+tecnica|vistoria\s+tecnica/];
+
+/**
+ * Só o consórcio tem esta segunda tentativa: em edital real, a vedação às
+ * vezes não repete o verbo perto do item — vem UMA VEZ, no cabeçalho de uma
+ * lista numerada de impedidos de disputar/participar (Lei 14.133, art. 14), e
+ * "consórcio" aparece bem depois só como mais uma linha da lista, sem repetir
+ * "vedado" por perto. Achado testando o edital real de Santa Cruz do Sul/RS:
+ * "3.8 - Não poderão disputar esta licitação: ... 3.8.9 - pessoas jurídicas
+ * reunidas em consórcio;" — ~2.900 caracteres depois do cabeçalho que a proíbe,
+ * bem além da janela estreita de `todasAsJanelas`.
+ */
+const CABECALHO_IMPEDIMENTO_PARTICIPACAO = /nao\s+poder(?:a|ao)\s+(?:disputar|participar)|impedidos?\s+de\s+(?:disputar|participar)|vedada\s+a\s+participac/;
+const JANELA_CABECALHO_IMPEDIMENTO = 3_500;
+
+/**
+ * "Empresa, isoladamente ou em consórcio, responsável pela elaboração do
+ * projeto..." NÃO é vedação a consórcio — é a exclusão, bem mais comum (Lei
+ * 14.133, art. 14), do AUTOR DO PROJETO por conflito de interesse, que só
+ * cita "consórcio" pra dizer que o impedimento vale nas duas formas de
+ * organização. Achado testando o edital real de Camaquá/RS: as DUAS únicas
+ * ocorrências de "consórcio" no documento eram desta cláusula — sem este
+ * filtro, o cabeçalho "não poderá disputar" (que ali governa a lista de
+ * conflito de interesse, não uma vedação de consórcio) fazia o fallback dizer
+ * "vedado" quando o documento não fala nada sobre consórcio em si.
+ */
+const CONSORCIO_E_QUALIFICADOR_DE_OUTRA_EXCLUSAO = /elaboracao\s+do\s+projeto|autor\s+do\s+projeto|projeto\s+basico|projeto\s+executivo/;
+
+function resolveConsorcio(textoOriginal: string, alvo: string, limitations: string[]): boolean | undefined {
+  const rotulo = "se permite consórcio";
+  const janelas = todasAsJanelas(textoOriginal, alvo, CLAUSULA_CONSORCIO);
+  if (janelas.length === 0) { limitations.push(`não foi possível localizar no texto: ${rotulo}`); return undefined; }
+  for (const janela of janelas) {
+    const valor = simNaoDeTextoCru(janela);
+    if (valor !== undefined) return valor;
+  }
+  for (const ancora of alvo.matchAll(new RegExp(CLAUSULA_CONSORCIO[0]!, "g"))) {
+    const contextoImediato = alvo.slice(Math.max(0, ancora.index - 40), ancora.index + JANELA_CLAUSULA);
+    if (CONSORCIO_E_QUALIFICADOR_DE_OUTRA_EXCLUSAO.test(contextoImediato)) continue;
+    const desde = Math.max(0, ancora.index - JANELA_CABECALHO_IMPEDIMENTO);
+    if (CABECALHO_IMPEDIMENTO_PARTICIPACAO.test(alvo.slice(desde, ancora.index))) return false;
+  }
+  limitations.push(`achou menção a "${rotulo}" mas não deu para classificar sim/não`);
+  return undefined;
+}
 
 /**
  * As três cláusulas institucionais que `EditalRequirement` de fato usa.
@@ -101,7 +175,7 @@ export function extractInstitutionalRequirement(textoOriginal: string): Readonly
   requiresSiteVisit?: boolean;
   limitations: readonly string[];
 }> {
-  const alvo = normalizeText(textoOriginal);
+  const alvo = normalizeIndicePreservado(textoOriginal);
   const limitations: string[] = [];
 
   const ler = (gatilhos: readonly RegExp[], rotulo: string): boolean | undefined => {
@@ -115,7 +189,7 @@ export function extractInstitutionalRequirement(textoOriginal: string): Readonly
     return undefined;
   };
 
-  const consortiumAllowed = ler(CLAUSULA_CONSORCIO, "se permite consórcio");
+  const consortiumAllowed = resolveConsorcio(textoOriginal, alvo, limitations);
   // ⚠️ CAT/CREA/CAU é quase universal em obra pública — a ausência de registro
   // no conselho de classe é rara o bastante para o padrão inverso (só exigir
   // quando NEGADO explicitamente) valer mais do que exigir uma frase de "sim"
@@ -133,51 +207,84 @@ export function extractInstitutionalRequirement(textoOriginal: string): Readonly
 }
 
 /**
- * A frase "qualificação técnico-operacional" aparece várias vezes num
- * documento real — inclusive de PASSAGEM, explicando a diferença para a
- * qualificação técnico-PROFISSIONAL (do engenheiro, sem quantitativo mínimo).
- * Só uma ocorrência é o TÍTULO da seção que interessa, e ela sempre vem
- * seguida da citação do artigo e de "atestado" + "empresa" — é a exigência
- * sobre a EMPRESA, não sobre o profissional.
+ * DUAS âncoras, porque dois municípios reais nomeiam a mesma exigência de
+ * jeitos que não se sobrepõem:
+ *  - "Parcela(s) de maior relevância técnica ou valor significativo" é a
+ *    expressão da PRÓPRIA LEI (14.133/2021, art. 67, §1º) — Santa Cruz do
+ *    Sul/RS usa essa frase quase literal.
+ *  - Pedra Preta/MT NUNCA usa essa frase; organiza a mesma exigência sob o
+ *    título "d) Qualificação Técnico-Operacional", sem citar a lei ipsis
+ *    litteris. Um município não tem o vocabulário do outro.
+ *
+ * ⚠️ Qualquer uma das duas aparece MAIS DE UMA VEZ no mesmo documento pelo
+ * mesmo motivo: a qualificação técnico-PROFISSIONAL (do engenheiro, sem
+ * quantitativo mínimo) cita a mesma lista de parcelas, sem número nenhum,
+ * antes da qualificação técnico-OPERACIONAL (da empresa, com quantitativo) a
+ * repetir. Não dá para escolher pelo título da seção nem por qual âncora
+ * casou — escolhe-se pela ocorrência cujo texto seguinte tem mais NÚMERO com
+ * jeito de quantitativo, em qualquer formato (tabela ou lista): é o
+ * quantitativo mínimo que só a exigência da empresa carrega.
  */
-const ANCORA_OPERACIONAL = /qualificacao tecnic[ao][\s-]*operacional/g;
-const CONFIRMA_TITULO_SECAO = /atestado[\s\S]{0,120}empresa|empresa[\s\S]{0,120}atestado/;
-const ANCORA_SECAO_SEGUINTE = /\bconclusao\b|\bjustificativa\s*:/;
+const ANCORAS_PARCELAS: readonly RegExp[] = [
+  /parcelas?\s+de\s+maior\s+relev[aâ]ncia/g,
+  /qualificacao\s+tecnic[ao][\s-]*operacional/g,
+];
+const ANCORA_SECAO_SEGUINTE = /\bconclusao\b|\bjustificativa\s*:|\b[a-z]\.\d\)|8\.2\.\d/;
+
+/** Quantos números com jeito de quantitativo aparecem na janela — o sinal de
+ *  que esta ocorrência, e não a outra, é a que importa. */
+function contarQuantitativos(texto: string): number {
+  return [...texto.matchAll(/\b\d[\d.,]*\s*(m[23²³]?|un|kg|km|ha)\b/g)].length;
+}
 
 /**
  * O trecho de texto que provavelmente contém as parcelas de maior relevância,
- * ou `undefined` quando nenhuma ocorrência da âncora se confirma como título
- * de seção — mais seguro que devolver a seção errada.
+ * ou `undefined` quando a frase-âncora não aparece no documento.
  */
 export function extractRelevantServicesSection(textoOriginal: string): string | undefined {
-  const alvo = normalizeText(textoOriginal);
+  // `normalizeIndicePreservado`, não `normalizeText`: o índice do casado aqui
+  // decide onde CORTAR `textoOriginal` logo abaixo, e só pode fazer isso
+  // corretamente se preservar 1:1 o índice do original — `normalizeText`
+  // colapsa espaço múltiplo e desloca a posição (ver comentário da função).
+  const alvo = normalizeIndicePreservado(textoOriginal);
 
-  // ⚠️ `normalizeText` COLAPSA espaço múltiplo em um só — comum em texto de
-  // PDF extraído. Isso encolhe o texto normalizado em relação ao original, e
-  // o encolhimento CRESCE conforme se avança no documento. Um índice certo
-  // no texto normalizado cai cada vez mais cedo do que devia no original — a
-  // seção real de Pedra Preta cortava faltando os últimos ~5 caracteres da
-  // última parcela (o "40%" da linha 6), sem margem nenhuma. A margem abaixo
-  // é o remédio: melhor incluir um pouco de sobra da seção seguinte (inofensivo
-  // — `parseRelevantServicesTable`, mais abaixo, só reconhece o formato de
-  // linha da tabela e ignora o resto) do que perder o fim da que interessa.
-  const MARGEM_DESVIO_NORMALIZACAO = 400;
+  // Folga pequena além do fim detectado: o ponto de corte da seção seguinte é
+  // aproximado (título nem sempre começa exatamente onde o regex casa), e um
+  // pouco de sobra é inofensivo — os parsers de linha, mais abaixo, só
+  // reconhecem o próprio formato e ignoram o resto.
+  const FOLGA_FIM_SECAO = 100;
+  const JANELA_PONTUACAO = 2_000;
+  const teto = 6_000;
 
-  for (const ancora of alvo.matchAll(ANCORA_OPERACIONAL)) {
-    const inicio = ancora.index;
-    const depois = alvo.slice(inicio + ancora[0].length, inicio + ancora[0].length + 250);
-    if (!CONFIRMA_TITULO_SECAO.test(depois)) continue; // menção de passagem, não o título
+  type Candidata = { inicio: number; fim: number; pontuacao: number };
+  const candidatas: Candidata[] = [];
 
-    const fimMatch = ANCORA_SECAO_SEGUINTE.exec(alvo.slice(inicio + ancora[0].length + 250));
-    const teto = 6_000;
-    const fim = fimMatch
-      ? Math.min(inicio + ancora[0].length + 250 + fimMatch.index + MARGEM_DESVIO_NORMALIZACAO, inicio + teto)
-      : Math.min(textoOriginal.length, inicio + teto);
-
-    const trecho = textoOriginal.slice(inicio, fim).trim();
-    if (trecho.length > 0) return trecho;
+  for (const ancoraRegex of ANCORAS_PARCELAS) {
+    for (const ancora of alvo.matchAll(ancoraRegex)) {
+      const inicio = ancora.index;
+      const fimMatch = ANCORA_SECAO_SEGUINTE.exec(alvo.slice(inicio + ancora[0].length));
+      const fim = fimMatch
+        ? Math.min(inicio + ancora[0].length + fimMatch.index + FOLGA_FIM_SECAO, inicio + teto)
+        : Math.min(alvo.length, inicio + teto);
+      const pontuacao = contarQuantitativos(alvo.slice(inicio, Math.min(inicio + JANELA_PONTUACAO, fim)));
+      candidatas.push({ inicio, fim, pontuacao });
+    }
   }
-  return undefined;
+
+  // Pontuação zero não é candidata real — é menção de passagem (parênteses
+  // explicando outra seção, citação da lei sem tabela nenhuma depois), como
+  // "...(o que seria tratado na qualificação técnico-operacional)." Sem isto,
+  // qualquer ocorrência do termo vira "seção achada" mesmo sem uma linha de
+  // quantitativo por perto — voltando a confundir passagem com título.
+  const comQuantitativo = candidatas.filter((c) => c.pontuacao > 0);
+  if (comQuantitativo.length === 0) return undefined;
+  // A de mais quantitativo por perto vence; empate resolve pela ÚLTIMA — a
+  // profissional vem antes da operacional nas duas leis (8.666 e 14.133).
+  comQuantitativo.sort((a, b) => b.pontuacao - a.pontuacao || b.inicio - a.inicio);
+  const melhor = comQuantitativo[0]!;
+
+  const trecho = textoOriginal.slice(melhor.inicio, Math.min(melhor.fim, textoOriginal.length)).trim();
+  return trecho.length > 0 ? trecho : undefined;
 }
 
 /**
@@ -195,8 +302,8 @@ export function extractRelevantServicesSection(textoOriginal: string): string | 
  */
 const PERCENTUAL_ORCADO = /100\s*%/g;
 // ⚠️ Duas armadilhas na unidade:
-// 1. "M³"/"M²" mantêm o expoente sobrescrito depois de `normalizeText` — ele
-//    não é letra acentuada, então nem NFD nem o strip de diacríticos o tocam.
+// 1. "M³"/"M²" mantêm o expoente sobrescrito depois de normalizado — ele não é
+//    letra acentuada, então nem NFD nem o strip de diacríticos o tocam.
 // 2. "³"/"²" NÃO conta como `\w` para o regex — `\b` logo depois deles nunca
 //    fecha (não-palavra seguida de espaço não é fronteira), e o motor
 //    backtrackeava para NÃO capturar o expoente, só para a fronteira fechar.
@@ -204,7 +311,9 @@ const PERCENTUAL_ORCADO = /100\s*%/g;
 const QUANTIDADE_EXIGIDA_APOS = /^\s*([\d.,]+)\s*(m[23²³]?|un|kg|km|ha|l)(?=[\s%]|$)[^%]{0,20}?\d\s?\d{0,2}\s*%/i;
 
 function parseRelevantServicesTable(textoOriginal: string): readonly RequiredService[] {
-  const alvo = normalizeText(textoOriginal);
+  // `normalizeIndicePreservado`, não `normalizeText`: `casado.index` corta
+  // `textoOriginal` logo abaixo (na descrição), e precisa do índice 1:1.
+  const alvo = normalizeIndicePreservado(textoOriginal);
   const services: RequiredService[] = [];
   let finalAnterior = 0;
 
@@ -235,17 +344,57 @@ function parseRelevantServicesTable(textoOriginal: string): readonly RequiredSer
 }
 
 /**
+ * A mesma exigência, em formato de LISTA com marcador em vez de tabela —
+ * achado testando contra o edital real de Santa Cruz do Sul/RS: "•
+ * Execução de Pavimentação com Bloco Intertravado de no mínimo 656,95m²".
+ *
+ * Aqui a quantidade e a unidade vêm GRUDADAS, sem espaço ("656,95m²") — ao
+ * contrário do "4 0%" com espaço solto de Pedra Preta. Os dois formatos são
+ * artefatos de fontes/geradores de PDF diferentes, não erro de digitação; o
+ * padrão de unidade já aceita os dois porque o `\s*` entre número e unidade é
+ * zero-ou-mais.
+ *
+ * ⚠️ Mesma armadilha do "³"/"²" já vista em `QUANTIDADE_EXIGIDA_APOS`: um
+ * `\b` logo após o expoente opcional não fecha (não-palavra seguida de ";" ou
+ * "." também não é fronteira), e o motor sacrifica o expoente pra fechar a
+ * fronteira em "m" mesmo — "656,95m²;" virava unidade "m", não "m2". Por isso
+ * a fronteira aqui também é um lookahead explícito, não `\b`.
+ */
+const PARCELA_EM_LISTA = /•\s*([^•]+?)\s*(?:no\s+)?m[ií]nimo\s+(?:de\s+)?([\d.,]+)\s*(m[23²³]?|un|kg|km|ha|l)(?=[\s;.,)]|$)/gi;
+
+function parseRelevantServicesBulletList(textoOriginal: string): readonly RequiredService[] {
+  const services: RequiredService[] = [];
+  for (const casado of textoOriginal.matchAll(PARCELA_EM_LISTA)) {
+    const descricao = casado[1]!.replace(/\s+/g, " ").replace(/[,;:]\s*$/, "").trim();
+    const quantidade = parseQuantidadeUnidade(`${casado[2]} ${casado[3]}`);
+    const unidade = normalizeUnit(casado[3]);
+    services.push({
+      description: descricao.length > 0 ? descricao : "(descrição não identificada)",
+      ...(quantidade && unidade ? { quantity: quantidade.value, unit: unidade } : {}),
+    });
+  }
+  return services;
+}
+
+/**
  * Ponto de entrada único: texto extraído de um documento → o mesmo
  * `EditalRequirement` que a leitura por IA produzia.
  *
  * As três cláusulas institucionais usam o classificador próprio deste módulo,
  * porque `parseBoolean` (edital-requirement.ts) foi calibrado para resposta
  * curta da IA, não para o substantivo de texto de lei.
+ *
+ * As parcelas tentam DOIS formatos — tabela (Pedra Preta/MT) e lista com
+ * marcador (Santa Cruz do Sul/RS) — porque cada município organiza a mesma
+ * exigência da lei à sua moda, e nenhum dos dois foi hipotético: os dois
+ * saíram de editais publicados de verdade, testados um contra o outro para
+ * o método não regredir ao resolver o segundo.
  */
 export function editalRequirementFromText(textoOriginal: string): EditalRequirement {
   const secaoServicos = extractRelevantServicesSection(textoOriginal);
   const institucional = extractInstitutionalRequirement(textoOriginal);
-  const services = secaoServicos ? parseRelevantServicesTable(secaoServicos) : [];
+  const daTabela = secaoServicos ? parseRelevantServicesTable(secaoServicos) : [];
+  const services = daTabela.length > 0 ? daTabela : (secaoServicos ? parseRelevantServicesBulletList(secaoServicos) : []);
 
   const limitations = [
     ...(secaoServicos ? [] : ["não foi possível localizar no texto: a lista de parcelas de maior relevância"]),
