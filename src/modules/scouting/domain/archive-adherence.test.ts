@@ -246,7 +246,7 @@ describe("parcela que o catálogo não sabe classificar", () => {
   });
 
   it("exigência inteiramente desconhecida continua sem julgamento", () => {
-    const r = exigir(["Barragem de terra compactada com núcleo argiloso"]);
+    const r = exigir(["Fornecimento de mobiliário hospitalar especializado"]);
     expect(r.determined).toBe(false);
     expect(r.score).toBe(0);
   });

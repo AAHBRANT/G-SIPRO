@@ -61,7 +61,7 @@ describe("diagnóstico da fila", () => {
   const fila = [
     { subject: "Construção de ponte em concreto armado sobre o rio Preto" },
     // Vocabulário que o catálogo realmente não conhece — conferido à parte.
-    { subject: "Barragem de terra compactada com núcleo argiloso" },
+    { subject: "Fornecimento de mobiliário hospitalar especializado" },
     { subject: "Pavimentação asfáltica de vias urbanas", estimatedValue: 20_000_000 },
   ];
 

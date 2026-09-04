@@ -42,7 +42,27 @@ export type ServiceCategory = Readonly<{
  */
 const RADICAL = "*";
 
+/**
+ * Marcador de EXCEÇÃO, só combina com radical: `"asfalt*!manta"` casa
+ * "asfalt" em qualquer flexão — pavimentação asfáltica, mistura asfáltica,
+ * camada asfáltica — MENOS quando a palavra logo antes é "manta". "Manta
+ * asfáltica" é impermeabilização de laje, não pavimento, e essa distinção não
+ * dá para escrever como termo positivo sem enumerar à mão toda variação real
+ * de "asfált-" como adjetivo — e ainda assim perder a próxima que ninguém
+ * pensou. Achado no diagnóstico do catálogo em produção, 03/09/2026.
+ */
+const EXCETO = "!";
+
 const escapar = (texto: string) => texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Separa o corpo do termo (radical incluso) da palavra de exceção, quando
+ * houver. Um termo sem "!" devolve `excecao: undefined`.
+ */
+function partes(termo: string): { corpo: string; excecao?: string } {
+  const [corpo, excecao] = termo.split(EXCETO);
+  return { corpo: corpo ?? termo, ...(excecao ? { excecao } : {}) };
+}
 
 /**
  * Fronteira à esquerda sempre. À direita, só para palavra inteira — o radical
@@ -57,46 +77,85 @@ const comPlural = (palavra: string) => {
 };
 
 function expressao(termo: string): RegExp {
-  const radical = termo.endsWith(RADICAL);
-  const base = normalizeText(radical ? termo.slice(0, -1) : termo);
+  const { corpo, excecao } = partes(termo);
+  const radical = corpo.endsWith(RADICAL);
+  const base = normalizeText(radical ? corpo.slice(0, -1) : corpo);
   const inicio = "(?:^|[^a-z0-9])";
-  if (radical) return new RegExp(`${inicio}${escapar(base)}`);
+  if (radical) {
+    // A exceção fica DEPOIS da fronteira e ANTES do radical: ela precisa
+    // olhar a palavra imediatamente anterior ao "asfalt", não o caractere de
+    // fronteira que a antecede.
+    const naoApos = excecao ? `(?<!${escapar(normalizeText(excecao))}\\s)` : "";
+    return new RegExp(`${inicio}${naoApos}${escapar(base)}`);
+  }
   // Cada palavra flexiona: "poço tubular" tem de casar "poços tubulares".
   // Pluralizar só o fim deixaria o termo composto de fora.
-  const corpo = base.split(/\s+/).map(comPlural).join("\\s+");
-  return new RegExp(`${inicio}${corpo}(?:[^a-z0-9]|$)`);
+  const corpoRegex = base.split(/\s+/).map(comPlural).join("\\s+");
+  return new RegExp(`${inicio}${corpoRegex}(?:[^a-z0-9]|$)`);
 }
 
 const categoria = (id: string, label: string, terms: readonly string[]): ServiceCategory => ({
   id,
   label,
-  terms: terms.map((term) => normalizeText(term.endsWith(RADICAL) ? term.slice(0, -1) : term)),
+  terms: terms.map((term) => {
+    const { corpo } = partes(term);
+    return normalizeText(corpo.endsWith(RADICAL) ? corpo.slice(0, -1) : corpo);
+  }),
   patterns: terms.map(expressao),
 });
 
 export const serviceCatalog: readonly ServiceCategory[] = [
-  categoria("terraplenagem", "Terraplenagem", ["terraplen*", "terraplan*", "movimentacao de terra", "escavacao", "aterro", "corte e aterro", "desmonte"]),
-  categoria("pavimento-asfaltico", "Pavimento asfáltico", ["cbuq", "concreto betuminoso", "asfalt*", "recapea*", "imprimacao", "pintura de ligacao", "micro revestimento", "tratamento superficial"]),
-  categoria("pavimento-rigido", "Pavimento rígido e calçamento", ["pavimento de concreto", "piso intertravado", "paralelepipedo", "calcament*", "pedra portuguesa", "bloquete"]),
+  // ⚠️ "retaludament*" e "movimento de terra" somam-se aos termos já existentes
+  // ("movimentacao de terra", com -ção, é palavra diferente de "movimento", sem
+  // -ção — nenhum dos dois pluraliza no outro).
+  categoria("terraplenagem", "Terraplenagem", ["terraplen*", "terraplan*", "movimentacao de terra", "movimento de terra", "retaludament*", "escavacao", "aterro", "corte e aterro", "desmonte"]),
+  categoria("pavimento-asfaltico", "Pavimento asfáltico", ["cbuq", "caup", "concreto betuminoso", "asfalt*!manta", "recapea*", "imprimacao", "pintura de ligacao", "micro revestimento", "tratamento superficial"]),
+  // "calcada", "ciclofaixa" e "passeio" achados no diagnóstico de 03/09/2026:
+  // "calcament*" (calçamento) é palavra diferente de "calçada" — pavimento
+  // intertravado não é a mesma obra que o passeio de pedestre, mas os dois são
+  // pavimento e cabem na mesma categoria por ora.
+  categoria("pavimento-rigido", "Pavimento rígido e calçamento", ["pavimento de concreto", "piso intertravado", "paralelepipedo", "calcament*", "calcada", "ciclofaixa", "passeio", "pedra portuguesa", "bloquete"]),
   categoria("base-sub-base", "Base e sub-base", ["base e sub-base", "sub-base", "sub base", "brita graduada", "solo brita", "regularizacao do subleito", "reforco do subleito"]),
-  categoria("drenagem", "Drenagem", ["drenagem", "bueiro", "galeria de aguas pluviais", "sarjeta", "meio-fio", "meio fio", "boca de lobo", "canaleta"]),
+  // "poco de visita" achado no diagnóstico: é o poço de inspeção da rede
+  // coletora — a mesma peça que aparece nas parcelas de maior relevância de
+  // edital de drenagem (visto no caso real de Pedra Preta/MT).
+  categoria("drenagem", "Drenagem", ["drenagem", "bueiro", "galeria de aguas pluviais", "sarjeta", "meio-fio", "meio fio", "boca de lobo", "canaleta", "poco de visita"]),
   categoria("canalizacao", "Canalização e macrodrenagem", ["canalizac*", "macrodrenagem", "retificacao de corrego", "curso d agua", "canal"]),
   categoria("obra-de-arte", "Obra de arte especial", ["ponte", "viaduto", "passarela", "tunel", "obra de arte especial", "concreto protendido", "aduela"]),
-  categoria("fundacao", "Fundação", ["fundac*", "estaca", "microestaca", "tubulao", "sapata", "bloco de coroamento", "radier"]),
+  // "rebaixamento do lencol freatico" é serviço auxiliar de fundação em terreno
+  // encharcado — achado no diagnóstico de 03/09/2026.
+  categoria("fundacao", "Fundação", ["fundac*", "estaca", "microestaca", "tubulao", "sapata", "bloco de coroamento", "radier", "rebaixamento do lencol freatico"]),
   categoria("estrutura-concreto", "Estrutura de concreto", ["estrutura de concreto", "concreto armado", "pilar", "viga", "laje", "forma e armacao"]),
   categoria("estrutura-metalica", "Estrutura metálica e cobertura", ["estrutura metalica", "cobertura", "telhamento", "trelica", "galpao metalico"]),
-  categoria("contencao", "Contenção", ["contenc*", "muro de arrimo", "talude", "gabiao", "cortina atirantada", "solo grampeado"]),
+  // "muro de flexao"/"cortina de flexao" e "barragem"/"enrocamento"/
+  // "vertedouro" achados no diagnóstico de 03/09/2026: enrocamento (pedra
+  // lançada) é a mesma técnica de contenção do gabião, só que sem a tela
+  // metálica — e a barragem que o acervo registrou usa exatamente essa técnica.
+  categoria("contencao", "Contenção", ["contenc*", "muro de arrimo", "muro de flexao", "cortina de flexao", "talude", "gabiao", "cortina atirantada", "solo grampeado", "barragem", "enrocamento", "vertedouro"]),
   categoria("alvenaria", "Alvenaria e vedação", ["alvenaria", "vedacao", "bloco ceramico", "chapisco", "reboco", "emboco"]),
-  categoria("acabamento", "Acabamento", ["revestimento ceramico", "pintura", "gesso", "forro", "piso vinilico", "esquadria", "porcelanato"]),
+  // ⚠️ "acabamento" (a palavra que dá nome à própria categoria) NÃO estava na
+  // lista de termos — achado no diagnóstico de 03/09/2026, responsável sozinho
+  // por boa parte dos ~58 serviços rotulados "CASA 01/02/03 .../ACABAMENTO".
+  categoria("acabamento", "Acabamento", ["acabamento", "revestimento ceramico", "pintura", "gesso", "forro", "piso vinilico", "esquadria", "porcelanato"]),
   categoria("impermeabilizacao", "Impermeabilização", ["impermeabiliz*", "manta asfaltica"]),
-  categoria("instalacoes-eletricas", "Instalações elétricas", ["instalacoes eletricas", "instalacao eletrica", "cabeamento", "subestacao", "quadro de distribuicao", "spda"]),
-  categoria("instalacoes-hidraulicas", "Instalações hidráulicas", ["instalacoes hidraulicas", "instalacao hidraulica", "hidrossanitar*", "agua fria", "agua quente"]),
+  // ⚠️ "eletric*" pega "Elétrica" sozinha, sem "instalação" na frente — achado
+  // no diagnóstico: a disciplina do atestado costuma vir só como "Elétrica"
+  // ("CASA 01 .../ELÉTRICA"), nunca com a palavra "instalação" junto.
+  categoria("instalacoes-eletricas", "Instalações elétricas", ["instalacoes eletricas", "instalacao eletrica", "eletric*", "cabeamento", "subestacao", "quadro de distribuicao", "spda"]),
+  // ⚠️ Mesmo problema do elétrica: "Hidráulica" sozinha, sem "instalação".
+  // E "hidrossanitario" (uma palavra) e "hidro-sanitario" (com hífen) são a
+  // MESMA coisa escrita de duas formas — o radical original só cobria a
+  // primeira; o hífen não é removido por `normalizeText`, então precisa de
+  // termo próprio.
+  categoria("instalacoes-hidraulicas", "Instalações hidráulicas", ["instalacoes hidraulicas", "instalacao hidraulica", "hidraulic*", "hidrossanitar*", "hidro-sanitar*", "hidro sanitar*", "agua fria", "agua quente"]),
   categoria("climatizacao", "Climatização e exaustão", ["climatizac*", "ar condicionado", "exaustao", "hvac"]),
   categoria("rede-agua", "Rede de água e adutora", ["adutor*", "rede de agua", "abastecimento de agua", "reservatorio", "elevatoria de agua", "booster"]),
   categoria("rede-esgoto", "Rede de esgoto", ["rede de esgoto", "esgotamento sanitario", "coletor tronco", "interceptor", "elevatoria de esgoto"]),
   categoria("tratamento", "Estação de tratamento", ["estacao de tratamento", "eta", "ete", "tratamento de efluente"]),
   categoria("poco", "Poço tubular", ["poco tubular", "poco artesiano", "perfuracao de poco"]),
-  categoria("urbanizacao", "Urbanização e paisagismo", ["urbanizac*", "paisagismo", "praca", "calcadao", "orla", "requalificacao urbana", "mobiliario urbano", "arborizacao"]),
+  // "urbanismo" achado no diagnóstico: "urbanizac*" (com -ização) não pluraliza
+  // "urbanismo" (com -ismo) — são sufixos diferentes da mesma raiz.
+  categoria("urbanizacao", "Urbanização e paisagismo", ["urbanizac*", "urbanismo", "paisagismo", "praca", "calcadao", "orla", "requalificacao urbana", "mobiliario urbano", "arborizacao"]),
   categoria("sinalizacao", "Sinalização viária", ["sinalizacao viaria", "sinalizacao horizontal", "sinalizacao vertical", "pintura de faixa", "tachao", "defensa metalica"]),
   categoria("iluminacao", "Iluminação pública", ["iluminacao publica", "poste", "luminaria"]),
   categoria("demolicao", "Demolição e remoção", ["demolic*", "remocao", "desmobilizacao", "limpeza do terreno"]),
