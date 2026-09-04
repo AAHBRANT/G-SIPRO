@@ -609,8 +609,6 @@
 .bx-acao { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 2px; }
 .bx-acao .par { display: flex; gap: 6px; }
 
-.bx-acao-edital { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 9px; }
-
 .bx-bt {
   border-radius: var(--r-p);
   cursor: pointer;
