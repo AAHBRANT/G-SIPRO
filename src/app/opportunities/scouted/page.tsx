@@ -451,7 +451,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   </p>
                 </div>
 
-                {tender.edital && <div className="bx-bloco">
+                {tender.edital && <div className="bx-bloco bx-bloco-largo">
                   <h3>Parcelas exigidas pelo edital</h3>
                   {tender.edital.requirement.services.length > 0
                     ? <div className="bx-parcelas">
@@ -473,7 +473,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   </p>}
                 </div>}
 
-                <div className="bx-bloco">
+                <div className="bx-bloco bx-bloco-largo">
                   {/* O título conta o placar antes de qualquer coisa: é a
                       pergunta que a pessoa faz ao abrir a licitação — de quantos
                       serviços exigidos eu tenho prova? */}

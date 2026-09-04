@@ -662,6 +662,18 @@
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
+/* `align-items: start` só evita que o CONTEÚDO de um cartão estique — a LINHA
+   do grid continua com a altura do cartão mais alto dela, e um vizinho curto
+   sobra com vão vazio embaixo mesmo assim. Acervo técnico e parcelas exigidas
+   crescem sem teto (um pode ter 2 itens, outro 15); Identificação, Prazos,
+   Aderência e Edital são sempre curtos e de tamanho parecido. Em vez de
+   deixar os dois tipos dividirem linha — e o vão vazio aparecer de novo toda
+   vez que um dos dois crescer mais que o vizinho — os que crescem sem teto
+   ocupam a linha inteira, sozinhos, e os curtos dividem linha só entre si. */
+.bx-bloco-largo {
+  grid-column: 1 / -1;
+}
+
 .bx-bloco {
   background: var(--mesa);
   border: 1px solid var(--fio);
