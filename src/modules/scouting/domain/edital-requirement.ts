@@ -90,19 +90,80 @@ function quantityFromProse(text: string): { quantity?: number; unit?: string } {
   return {};
 }
 
+/** Uma linha "| a | b | c |" de tabela markdown, célula a célula, sem as bordas. */
+function celulasDaLinha(linha: string): readonly string[] {
+  return linha.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((celula) => celula.trim());
+}
+
+/** "|---|---|" ou "| :--- | ---: |": só traço, pipe, dois-pontos e espaço. */
+const LINHA_SEPARADORA_DE_TABELA = /^\|?[\s:|-]+\|?$/;
+
+/** Cada linha vira um serviço, com o quantitativo que der para reconhecer no
+ *  meio da frase — o caminho para texto corrido, sem tabela nem markdown. */
+function linhasParaServicos(linhas: readonly string[]): readonly RequiredService[] {
+  return linhas
+    .map((linha) => linha.replace(/^[\s\-•*\d.)]+/, "").trim())
+    .filter((linha) => linha.length > 4)
+    .map((description) => ({ description, ...quantityFromProse(description) }));
+}
+
+/**
+ * A IA às vezes devolve a tabela do edital em markdown em vez de JSON — e cair
+ * direto em `linhasParaServicos` tratava o CABEÇALHO ("Item | Origem |
+ * Código | Parcela/serviço | Unidade | Quantitativo mínimo") e a LINHA
+ * SEPARADORA ("|---|---|---|") como se fossem parcelas de verdade — as duas
+ * viravam "o sistema não soube classificar" na tela, ao lado de linhas de
+ * dado com a formatação de tabela intacta em vez de descrição limpa ("| 2 |
+ * DER-SP | 72.31.04.04 | Grupo gerador 115KVA Cond. D | hora | 9.504,00 |"
+ * em vez de só "Grupo gerador 115KVA Cond. D").
+ *
+ * As colunas são mapeadas pelo NOME do cabeçalho, não por posição fixa,
+ * porque a IA não garante a mesma ordem de coluna sempre. Sem coluna de
+ * descrição reconhecível, devolve `undefined` — quem chama decide o que
+ * fazer com as linhas de dado; nunca é esta função que arrisca a coluna errada.
+ */
+function parseMarkdownTableServices(linhasDeDados: readonly string[], cabecalho: readonly string[]): readonly RequiredService[] | undefined {
+  const colunas = cabecalho.map((celula) => celula.toLowerCase());
+  const indiceDescricao = colunas.findIndex((celula) => /parcela|servi[çc]o|descri[çc]/.test(celula));
+  const indiceUnidade = colunas.findIndex((celula) => /unidade/.test(celula));
+  const indiceQuantidade = colunas.findIndex((celula) => /quantitativ|quantidade/.test(celula));
+  if (indiceDescricao === -1) return undefined;
+
+  return linhasDeDados.flatMap((linha): RequiredService[] => {
+    const celulas = celulasDaLinha(linha);
+    const description = celulas[indiceDescricao]?.trim();
+    if (!description) return [];
+    const unit = indiceUnidade >= 0 ? celulas[indiceUnidade]?.trim() : undefined;
+    const quantity = indiceQuantidade >= 0 ? parseQuantity(celulas[indiceQuantidade]) : undefined;
+    return [{
+      description,
+      ...(quantity !== undefined ? { quantity } : {}),
+      ...(unit ? { unit } : {}),
+    }];
+  });
+}
+
 function parseServices(value: string | undefined): readonly RequiredService[] {
   if (!value) return [];
   let bruto: unknown;
   try {
     bruto = JSON.parse(value);
   } catch {
-    // A leitura pode devolver texto corrido quando o edital não traz tabela.
-    // Cada linha vira um serviço, com o quantitativo que der para reconhecer.
-    return value
-      .split(/\r?\n/)
-      .map((linha) => linha.replace(/^[\s\-•*\d.)]+/, "").trim())
-      .filter((linha) => linha.length > 4)
-      .map((description) => ({ description, ...quantityFromProse(description) }));
+    const linhas = value.split(/\r?\n/).map((linha) => linha.trim()).filter((linha) => linha.length > 0);
+    const ehTabela = linhas.length >= 3 && linhas[0]!.includes("|") && LINHA_SEPARADORA_DE_TABELA.test(linhas[1]!);
+    if (ehTabela) {
+      const linhasDeDados = linhas.slice(2).filter((linha) => !LINHA_SEPARADORA_DE_TABELA.test(linha));
+      const tabela = parseMarkdownTableServices(linhasDeDados, celulasDaLinha(linhas[0]!));
+      if (tabela) return tabela;
+      // Cabeçalho e separador NUNCA viram serviço, mesmo sem coluna de
+      // descrição reconhecível — e as linhas de dado, sem coluna para
+      // confiar, ao menos perdem o "|" antes de virar texto corrido: célula
+      // crua com pipe é pior do que célula sem pipe nenhuma.
+      return linhasParaServicos(linhasDeDados.map((linha) => celulasDaLinha(linha).join(" ")));
+    }
+    // A leitura pode devolver texto corrido quando o edital não traz tabela
+    // nem markdown nenhum.
+    return linhasParaServicos(linhas);
   }
   if (!Array.isArray(bruto)) return [];
 
