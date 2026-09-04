@@ -110,11 +110,7 @@ export const serviceCatalog: readonly ServiceCategory[] = [
   // -ção — nenhum dos dois pluraliza no outro).
   categoria("terraplenagem", "Terraplenagem", ["terraplen*", "terraplan*", "movimentacao de terra", "movimento de terra", "retaludament*", "escavacao", "aterro", "corte e aterro", "desmonte"]),
   categoria("pavimento-asfaltico", "Pavimento asfáltico", ["cbuq", "caup", "concreto betuminoso", "asfalt*!manta", "recapea*", "imprimacao", "pintura de ligacao", "micro revestimento", "tratamento superficial"]),
-  // "calcada", "ciclofaixa" e "passeio" achados no diagnóstico de 03/09/2026:
-  // "calcament*" (calçamento) é palavra diferente de "calçada" — pavimento
-  // intertravado não é a mesma obra que o passeio de pedestre, mas os dois são
-  // pavimento e cabem na mesma categoria por ora.
-  categoria("pavimento-rigido", "Pavimento rígido e calçamento", ["pavimento de concreto", "piso intertravado", "paralelepipedo", "calcament*", "calcada", "ciclofaixa", "passeio", "pedra portuguesa", "bloquete"]),
+  categoria("pavimento-rigido", "Pavimento rígido e calçamento", ["pavimento de concreto", "piso intertravado", "paralelepipedo", "calcament*", "pedra portuguesa", "bloquete"]),
   categoria("base-sub-base", "Base e sub-base", ["base e sub-base", "sub-base", "sub base", "brita graduada", "solo brita", "regularizacao do subleito", "reforco do subleito"]),
   // "poco de visita" achado no diagnóstico: é o poço de inspeção da rede
   // coletora — a mesma peça que aparece nas parcelas de maior relevância de
@@ -138,16 +134,26 @@ export const serviceCatalog: readonly ServiceCategory[] = [
   // por boa parte dos ~58 serviços rotulados "CASA 01/02/03 .../ACABAMENTO".
   categoria("acabamento", "Acabamento", ["acabamento", "revestimento ceramico", "pintura", "gesso", "forro", "piso vinilico", "esquadria", "porcelanato"]),
   categoria("impermeabilizacao", "Impermeabilização", ["impermeabiliz*", "manta asfaltica"]),
-  // ⚠️ "eletric*" pega "Elétrica" sozinha, sem "instalação" na frente — achado
-  // no diagnóstico: a disciplina do atestado costuma vir só como "Elétrica"
-  // ("CASA 01 .../ELÉTRICA"), nunca com a palavra "instalação" junto.
-  categoria("instalacoes-eletricas", "Instalações elétricas", ["instalacoes eletricas", "instalacao eletrica", "eletric*", "cabeamento", "subestacao", "quadro de distribuicao", "spda"]),
-  // ⚠️ Mesmo problema do elétrica: "Hidráulica" sozinha, sem "instalação".
-  // E "hidrossanitario" (uma palavra) e "hidro-sanitario" (com hífen) são a
+  // ⚠️⚠️ NÃO usar "eletric*"/"hidraulic*" como radical solto aqui. Foi tentado
+  // em 03/09/2026 para pegar "Elétrica"/"Hidráulica" sozinhas no ACERVO — e
+  // funcionou para isso — mas `categoriesIn` lê os DOIS lados com a mesma
+  // régua (é o próprio design: "comparar dois lados lidos por réguas
+  // diferentes produziria diferença que é do vocabulário, não da realidade").
+  // No lado da EXIGÊNCIA, o objeto da licitação quase sempre cita "rede
+  // elétrica e hidráulica" de passagem, como parte de qualquer obra civil — e
+  // aí essas viravam pré-requisito OBRIGATÓRIO contra as DUAS categorias com
+  // menos acervo de todo o catálogo (19 e 9 serviços). Resultado: a aderência
+  // de virtualmente toda licitação de infraestrutura despencou para ~38%, em
+  // produção. Revertido no mesmo dia. Se um dia isto voltar a ser tentado,
+  // tem de ser separando o vocabulário do objeto do vocabulário do acervo —
+  // não alargando os dois juntos.
+  categoria("instalacoes-eletricas", "Instalações elétricas", ["instalacoes eletricas", "instalacao eletrica", "cabeamento", "subestacao", "quadro de distribuicao", "spda"]),
+  // "hidrossanitario" (uma palavra) e "hidro-sanitario" (com hífen) são a
   // MESMA coisa escrita de duas formas — o radical original só cobria a
-  // primeira; o hífen não é removido por `normalizeText`, então precisa de
-  // termo próprio.
-  categoria("instalacoes-hidraulicas", "Instalações hidráulicas", ["instalacoes hidraulicas", "instalacao hidraulica", "hidraulic*", "hidrossanitar*", "hidro-sanitar*", "hidro sanitar*", "agua fria", "agua quente"]),
+  // primeira; o hífen não é removido por `normalizeText`. Estes dois, ao
+  // contrário do "hidraulic*" acima, exigem "hidro" E "sanitar" juntos, o que
+  // não aparece como menção de passagem num objeto genérico.
+  categoria("instalacoes-hidraulicas", "Instalações hidráulicas", ["instalacoes hidraulicas", "instalacao hidraulica", "hidrossanitar*", "hidro-sanitar*", "hidro sanitar*", "agua fria", "agua quente"]),
   categoria("climatizacao", "Climatização e exaustão", ["climatizac*", "ar condicionado", "exaustao", "hvac"]),
   categoria("rede-agua", "Rede de água e adutora", ["adutor*", "rede de agua", "abastecimento de agua", "reservatorio", "elevatoria de agua", "booster"]),
   categoria("rede-esgoto", "Rede de esgoto", ["rede de esgoto", "esgotamento sanitario", "coletor tronco", "interceptor", "elevatoria de esgoto"]),

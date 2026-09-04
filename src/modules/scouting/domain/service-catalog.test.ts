@@ -100,15 +100,22 @@ describe("disciplinas achadas no diagnóstico de 03/09/2026", () => {
     expect(ids(texto)).toContain(esperada);
   });
 
-  // "Elétrica" e "Hidráulica" sozinhas, sem a palavra "instalação" na frente —
-  // é assim que o atestado rotula, não como o catálogo original esperava.
-  it.each([
-    ["Elétrica", "instalacoes-eletricas"],
-    ["CASA 02 - AV. LUIS GUSHIKEN, 75 / ELÉTRICA", "instalacoes-eletricas"],
-    ["Hidráulica", "instalacoes-hidraulicas"],
-    ["CASA 03 - ESTRADA DO CIPÓ / HIDRÁULICA", "instalacoes-hidraulicas"],
-  ])("%s casa %s", (texto, esperada) => {
-    expect(ids(texto)).toContain(esperada);
+  /**
+   * ⚠️ INCIDENTE EM PRODUÇÃO, 03/09/2026. "Elétrica"/"Hidráulica" sozinhas
+   * (sem "instalação" na frente) foram reconhecidas de propósito — "CASA 01
+   * .../ELÉTRICA" é como o atestado rotula de verdade — mas `categoriesIn` lê
+   * o objeto da licitação com a MESMA régua, e todo objeto de obra civil cita
+   * "rede elétrica e hidráulica" de passagem. As duas viraram pré-requisito
+   * contra as categorias com MENOS acervo do catálogo inteiro (19 e 9
+   * serviços): a aderência da fila inteira despencou para ~38% em produção.
+   * Revertido no mesmo dia — ver o comentário junto à categoria.
+   *
+   * Estes dois casos (que ANTES eram esperados casar) documentam o oposto: a
+   * disciplina sozinha no acervo volta a não ser reconhecida, porque não há
+   * como reconhecê-la SEM reabrir o incidente acima.
+   */
+  it.each(["Elétrica", "Hidráulica"])("%s sozinha NÃO casa mais — ver o incidente de 03/09/2026", (texto) => {
+    expect(ids(texto)).toEqual([]);
   });
 
   /**
@@ -135,10 +142,37 @@ describe("disciplinas achadas no diagnóstico de 03/09/2026", () => {
     // "Movimento de Terra" (sem -ção) é palavra diferente de "movimentação de
     // terra" (com -ção), já catalogada — nenhuma das duas pluraliza na outra.
     ["Movimento de Terra — Maciços Compactados", "terraplenagem"],
-    ["6 CALÇADA/CICLOFAIXA", "pavimento-rigido"],
-    ["PASSEIO", "pavimento-rigido"],
   ])("%s casa %s", (texto, esperada) => {
     expect(ids(texto)).toContain(esperada);
+  });
+});
+
+/**
+ * O incidente de 03/09/2026 por trás do teste: `categoriesIn` lê o objeto da
+ * licitação (o que vira PRÉ-REQUISITO) e a disciplina do acervo (o que
+ * comprova capacidade) com a MESMA régua — de propósito, é o que torna a
+ * comparação honesta. Isso significa que qualquer termo largo demais no
+ * catálogo vira pré-requisito obrigatório contra qualquer objeto que o cite
+ * de passagem, mesmo sem ser o foco da obra.
+ *
+ * Termo é seguro para entrar como PALAVRA SOLTA (sem exigir companhia) só
+ * quando a categoria tem acervo GRANDE o bastante para quase sempre cobrir —
+ * senão o termo derruba a nota de qualquer objeto genérico que o mencione.
+ * "Elétrica"/"Hidráulica" tinham 19 e 9 serviços; foram revertidas. "Passeio"
+ * sozinho mirava uma categoria de só 10 e teve o mesmo destino.
+ */
+describe("termo largo não pode mirar categoria de pouco acervo (incidente de 03/09/2026)", () => {
+  it.each([
+    "Contratação de empresa para execução de obras de pavimentação, drenagem urbana, rede elétrica e hidráulica",
+    "Construção de unidade básica de saúde, incluindo estrutura, alvenaria, parte elétrica e hidráulica",
+  ])("objeto genérico de obra civil não exige mais instalações elétricas/hidráulicas: %s", (texto) => {
+    expect(ids(texto)).not.toContain("instalacoes-eletricas");
+    expect(ids(texto)).not.toContain("instalacoes-hidraulicas");
+  });
+
+  it("'passeio'/'calçada'/'ciclofaixa' soltos não miram mais pavimento rígido", () => {
+    expect(ids("Reforma de praça pública com passeio e iluminação")).not.toContain("pavimento-rigido");
+    expect(ids("Execução de calçada e ciclofaixa em avenida")).not.toContain("pavimento-rigido");
   });
 });
 
