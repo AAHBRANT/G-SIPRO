@@ -439,7 +439,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                   <Linha rotulo="Captada em" valor={tender.createdAt.toLocaleDateString("pt-BR")}/>
                 </div>
 
-                <div className="bx-bloco">
+                <div className="bx-bloco bx-bloco-largo">
                   <h3>Pré-requisitos</h3>
                   {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
                   <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
