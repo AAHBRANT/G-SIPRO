@@ -137,6 +137,29 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
   });
 
   /**
+   * O botão "Reler edital" existe para uma leitura já gravada que saiu ruim
+   * (ex.: bug de parser corrigido depois) — sem `force`, ela ficaria errada
+   * para sempre.
+   */
+  it("com force, lê de novo mesmo já tendo leitura gravada", async () => {
+    const { service, files, extraction, readings } = montar({
+      readings: {
+        find: vi.fn(async () => ({
+          tenderId: "t-1", executionId: "exec-0", readMethod: "AI" as const,
+          source: { uri: "https://x", filename: "e.pdf", fileHash: "a".repeat(64), fetchedAt: new Date() },
+          requirement: { services: [], limitations: [] },
+        })),
+      },
+    });
+    const outcome = await service.read("t-1", auth, undefined, true);
+
+    expect(outcome.status).toBe("READ");
+    expect(files.list).toHaveBeenCalledOnce();
+    expect(extraction.runEphemeral).toHaveBeenCalledOnce();
+    expect(readings.save).toHaveBeenCalledOnce();
+  });
+
+  /**
    * Sem caso de uso aprovado a leitura não pode acontecer — e não pode nem
    * começar: baixar 12 MB para descobrir depois que não há autorização
    * gastaria banda à toa.

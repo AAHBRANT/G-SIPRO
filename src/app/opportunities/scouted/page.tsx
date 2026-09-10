@@ -17,6 +17,7 @@ import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkTyp
 import { themeVariants } from "@/modules/scouting/domain/signal";
 import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { AdherenceGauge } from "./adherence-gauge";
+import { RereadEditalAction } from "./reread-edital-action";
 import { ScoutedFilters, type FilterGroup } from "./scouted-filters";
 import { Flag, SignalActions } from "./signal-actions";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
@@ -566,6 +567,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                       Abrir no PNCP
                       <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
                     </a>}
+                    {tender.edital && <RereadEditalAction id={tender.id}/>}
                   </div>
                   {tender.edital && <p className="bx-nota">
                     O arquivo não fica guardado no G-SIPRO: o link busca direto na origem, e por isso pode responder erro se o órgão o tirar do ar.

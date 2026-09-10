@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { requirePermission } from "@/core/authorization/authorization-context";
 import { ResourceNotFoundError } from "@/core/errors/application-error";
@@ -41,6 +42,13 @@ const httpStatus: Readonly<Record<string, number>> = {
   FAILED: 502,
 };
 
+const comandoSchema = z.object({
+  // Releitura forçada: para uma leitura já gravada que saiu ruim (por um bug
+  // de parser já corrigido, por exemplo) e não tem outro jeito de corrigir
+  // além de reler. Sem isto, a rota nunca reprocessa o que já está salvo.
+  force: z.boolean().default(false),
+}).strict();
+
 /**
  * Lê o edital de uma licitação rastreada.
  *
@@ -55,7 +63,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     try {
       const authorization = await requirePermission("ai.execute");
       const { id } = await params;
-      const outcome = await service().read(id, authorization, context.correlationId);
+      const { force } = comandoSchema.parse(await request.json().catch(() => ({})));
+      const outcome = await service().read(id, authorization, context.correlationId, force);
       return NextResponse.json(
         { data: outcome, correlationId: context.correlationId },
         { status: httpStatus[outcome.status] ?? 200 },

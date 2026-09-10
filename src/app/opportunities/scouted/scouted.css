@@ -946,6 +946,20 @@
 
 .bx-links .bx-link { margin: 0; }
 
+/* `width: 100%` põe a confirmação sozinha na própria linha do `.bx-links`
+   (que é flex-wrap): texto de aviso ao lado de dois botões, espremido junto
+   dos outros links, ficaria ilegível. */
+.bx-reler-confirma {
+  align-items: center;
+  color: var(--texto-3);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  gap: 8px;
+  width: 100%;
+}
+.bx-reler-confirma .bx-link { margin: 0; }
+
 /* Baixar o edital é a ação primária do bloco; abrir no PNCP é a secundária. */
 .bx-link.forte {
   background: var(--acento-fundo);

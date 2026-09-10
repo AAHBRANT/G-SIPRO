@@ -280,14 +280,19 @@ export class EditalReadingService {
     tenderId: string,
     auth: AuthorizationContext,
     correlationId: string = randomUUID(),
+    force = false,
   ): Promise<EditalReadingOutcome> {
     const tender = await this.readings.tender(tenderId);
     if (!tender) return { status: "TENDER_NOT_FOUND" };
 
-    // Reler custa uma chamada paga e não muda nada: o edital já publicado não
-    // se altera sem virar outro arquivo, com outro hash.
+    // Reler custa uma chamada paga e não muda nada por padrão: o edital já
+    // publicado não se altera sem virar outro arquivo, com outro hash. Mas uma
+    // leitura antiga pode ter saído ruim por um bug já corrigido no parser —
+    // sem `force`, ela ficaria errada para sempre, sem nenhum jeito de corrigir
+    // além de mexer direto no banco. `save()` é upsert por `tenderId`: a
+    // releitura substitui a linha inteira, não soma nada à antiga.
     const existing = await this.readings.find(tenderId);
-    if (existing) return { status: "ALREADY_READ", reading: existing };
+    if (existing && !force) return { status: "ALREADY_READ", reading: existing };
 
     const definition = await this.extraction.approvedDefinition(EDITAL_DOCUMENT_TYPE);
     if (!definition) return { status: "NOT_CONFIGURED" };
