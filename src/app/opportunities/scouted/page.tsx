@@ -8,6 +8,7 @@ import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
 import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adherence";
+import { combineAdherence } from "@/modules/scouting/domain/combined-adherence";
 import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
@@ -180,6 +181,17 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     const edital = tender.editalReading ? editalReadingFromRow(tender.editalReading) : undefined;
     const estimado = tender.valueUndisclosed || tender.estimatedValue === null ? undefined : Number(tender.estimatedValue);
     const lido = edital ? toArchiveRequirement(edital.requirement, estimado) : null;
+    const adherenceResult = computeAdherence(toAdherenceInput(tender), filter, now);
+    // A pergunta que inabilita: temos acervo para isto? Enquanto o edital não
+    // for lido, o requisito é inferido do objeto — e sai marcado como tal.
+    const archiveResult = computeArchiveAdherence(
+      lido ?? {
+        sources: [{ text: tender.subject }],
+        ...(estimado !== undefined ? { estimatedValue: estimado } : {}),
+        inferred: true,
+      },
+      archive,
+    );
     return {
     ...tender,
     edital,
@@ -187,17 +199,12 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // consulta nada, e melhorias na regra de contraste valem para o que já
     // está no banco sem reescrever registro nenhum.
     signal: tender.signal ? { ...tender.signal, ...themeVariants(tender.signal.color) } : null,
-    adherence: computeAdherence(toAdherenceInput(tender), filter, now),
-    // A pergunta que inabilita: temos acervo para isto? Enquanto o edital não
-    // for lido, o requisito é inferido do objeto — e sai marcado como tal.
-    archive: computeArchiveAdherence(
-      lido ?? {
-        sources: [{ text: tender.subject }],
-        ...(estimado !== undefined ? { estimatedValue: estimado } : {}),
-        inferred: true,
-      },
-      archive,
-    ),
+    adherence: adherenceResult,
+    archive: archiveResult,
+    // Perfil é via de mão dupla: não basta ser o tipo de obra que buscamos
+    // (adherence), tem que ser o que o acervo sustenta de verdade (archive).
+    // Metade e metade — ver combined-adherence.ts.
+    combined: combineAdherence(adherenceResult, archiveResult),
     days: tender.proposalClosesAt ? Math.max(0, Math.ceil((tender.proposalClosesAt.getTime() - now.getTime()) / 86_400_000)) : undefined,
   };
   });
@@ -533,8 +540,22 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                 </div>
 
                 <div className="bx-bloco">
-                  <h3>Aderência ao perfil — {tender.adherence.undetermined ? "não calculada" : `${tender.adherence.score}%`}</h3>
+                  <h3>
+                    Aderência ao perfil — {tender.adherence.undetermined ? "não calculada" : `${tender.combined.score}%`}
+                    {!tender.combined.determined && !tender.adherence.undetermined && " (acervo não avaliado)"}
+                  </h3>
                   {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
+                  {/* O perfil (tipo/valor/prazo/esfera) é só metade da conta — a
+                      outra metade é o acervo sustentar o que a licitação exige.
+                      Sem isto, "100% de perfil" e "sem nenhum acervo" ficavam
+                      em blocos separados que ninguém somava na cabeça. */}
+                  <Motivo
+                    met={tender.archive.determined && tender.archive.score === 100}
+                    rotulo={tender.archive.determined
+                      ? `acervo sustenta ${tender.archive.score}% do exigido`
+                      : "acervo ainda não avaliado"}
+                    skipped={!tender.archive.determined}
+                  />
                 </div>
 
                 {signal?.note && <div className="bx-bloco">
