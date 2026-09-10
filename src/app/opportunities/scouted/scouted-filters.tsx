@@ -11,6 +11,43 @@ export type FilterGroup = Readonly<{
 
 const lupa = <svg aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.1" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.3-4.3"/></svg>;
 
+export const FILTERS_ASIDE_ID = "bx-filtros-lado";
+const FILTERS_STORAGE_KEY = "gsipro:buscador:filtros-recolhidos";
+
+/**
+ * Aplica o estado salvo (recolhido ou não) antes da pintura — mesmo motivo do
+ * `themeBootScript` do tema: sem isto, a barra sempre nasceria aberta e só
+ * recolheria um instante depois, piscando na tela a cada carregamento.
+ */
+export const filtersBootScript = `(function(){try{var a=document.getElementById(${JSON.stringify(FILTERS_ASIDE_ID)});if(!a)return;var s=null;try{s=localStorage.getItem(${JSON.stringify(FILTERS_STORAGE_KEY)})}catch(e){}if(s==="1")a.setAttribute("data-recolhido","1")}catch(e){}})();`;
+
+const recolher = <svg aria-hidden="true" className="fecha" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7M8 5v14"/></svg>;
+const expandir = <svg aria-hidden="true" className="abre" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7M16 5v14"/></svg>;
+
+/**
+ * Recolhe a barra pra uma faixa estreita, só com o botão de abrir. Não é
+ * estado do React de propósito — o mesmo motivo do tema: o atributo já nasce
+ * certo (via `filtersBootScript`), e o CSS decide o que mostrar a partir dele,
+ * sem re-render nem risco de discordar do que a tela já pintou.
+ */
+function AlternarRecolhido() {
+  function alternar() {
+    const aside = document.getElementById(FILTERS_ASIDE_ID);
+    if (!aside) return;
+    const recolhido = aside.getAttribute("data-recolhido") === "1";
+    if (recolhido) aside.removeAttribute("data-recolhido"); else aside.setAttribute("data-recolhido", "1");
+    try {
+      window.localStorage.setItem(FILTERS_STORAGE_KEY, recolhido ? "0" : "1");
+    } catch {
+      // Sem persistência a escolha vale só para esta visita — aceitável.
+    }
+  }
+
+  return <button aria-label="Recolher ou expandir os filtros" className="bx-lado-alterna" onClick={alternar} type="button">
+    {recolher}{expandir}
+  </button>;
+}
+
 /**
  * Barra lateral de filtros da fila de triagem.
  *
@@ -59,12 +96,14 @@ export function ScoutedFilters({ groups, sortOptions }: { groups: ReadonlyArray<
     apply(next);
   }
 
-  return <aside className="bx-lado">
+  return <aside className="bx-lado" id={FILTERS_ASIDE_ID}>
     <div className="bx-lado-cab">
+      <AlternarRecolhido/>
       <h2>Filtros</h2>
-      <button onClick={() => { setQuery(""); router.push(pathname, { scroll: false }); }} type="button">Limpar tudo</button>
+      <button className="bx-lado-limpar" onClick={() => { setQuery(""); router.push(pathname, { scroll: false }); }} type="button">Limpar tudo</button>
     </div>
 
+    <div className="bx-lado-corpo">
     <div className="bx-secao">
       <form className="bx-busca" onSubmit={(event) => { event.preventDefault(); setSingle("q", query.trim()); }} style={{ height: 34 }}>
         {lupa}
@@ -130,6 +169,7 @@ export function ScoutedFilters({ groups, sortOptions }: { groups: ReadonlyArray<
       >
         {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
+    </div>
     </div>
   </aside>;
 }

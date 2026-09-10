@@ -1029,7 +1029,10 @@
    ========================================================================== */
 
 /* ---------- estrutura de duas colunas ---------- */
-.bx-palco { display: grid; gap: 14px; grid-template-columns: 268px minmax(0, 1fr); align-items: start; margin-top: 14px; }
+/* `auto` na primeira coluna, e não uma largura fixa: é a própria barra
+   (`.bx-lado`) que diz o quanto vale — 268px aberta, 44px recolhida — e a
+   coluna só acompanha. Mudar a largura em um lugar só. */
+.bx-palco { display: grid; gap: 14px; grid-template-columns: auto minmax(0, 1fr); align-items: start; margin-top: 14px; }
 @media (max-width: 1080px) { .bx-palco { grid-template-columns: 1fr; } }
 
 /* A barra é mais alta que a tela. Com sticky e overflow:hidden ela grudava no
@@ -1041,9 +1044,10 @@
    reproduzir a oscilação que já nos custou caro nesta tela. */
 .bx-lado {
   background: var(--mesa); border: 1px solid var(--fio); border-radius: var(--r-g);
-  box-shadow: var(--elev-1); position: sticky; top: 14px;
+  box-shadow: var(--elev-1); position: sticky; top: 14px; width: 268px;
   max-height: calc(100vh - 28px); overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: thin; scrollbar-color: var(--fio-forte) transparent;
+  transition: width .15s ease;
 }
 .bx-lado::-webkit-scrollbar { width: 9px; }
 .bx-lado::-webkit-scrollbar-track { background: transparent; }
@@ -1057,6 +1061,34 @@
   .bx-lado-cab { position: static; }
 }
 .bx[data-tema="escuro"] .bx-lado { backdrop-filter: var(--vidro); -webkit-backdrop-filter: var(--vidro); }
+
+/* ---------- recolher a barra de filtros ----------
+   O atributo (não estado do React) já nasce certo via `filtersBootScript`,
+   antes da pintura — ver o comentário em scouted-filters.tsx. Recolhida, só o
+   botão de abrir fica visível; o resto do conteúdo é só escondido, não
+   desmontado, então a seleção de filtros não se perde. */
+.bx-lado[data-recolhido="1"] { overflow: visible; width: 44px; }
+.bx-lado[data-recolhido="1"] .bx-lado-corpo,
+.bx-lado[data-recolhido="1"] .bx-lado-cab h2,
+.bx-lado[data-recolhido="1"] .bx-lado-limpar {
+  display: none;
+}
+@media (max-width: 1080px) {
+  /* Sem coluna fixa pra copiar, 44px ficaria minúsculo perdido na largura
+     inteira da tela — a faixa recolhida ocupa a largura toda mesmo. */
+  .bx-lado[data-recolhido="1"] { width: auto; }
+}
+
+.bx-lado-alterna {
+  align-items: center; background: none; border: 0; color: rgba(255,255,255,.68);
+  cursor: pointer; display: inline-flex; flex-shrink: 0; padding: 2px;
+}
+.bx-lado-alterna svg { height: 15px; width: 15px; }
+.bx-lado-alterna:hover { color: var(--branco); }
+.bx-lado-alterna .abre { display: none; }
+.bx-lado[data-recolhido="1"] .bx-lado-alterna .fecha { display: none; }
+.bx-lado[data-recolhido="1"] .bx-lado-alterna .abre { display: block; }
+.bx-lado[data-recolhido="1"] .bx-lado-cab { justify-content: center; padding-left: 0; padding-right: 0; }
 
 /* Fica à vista enquanto a barra rola: "Limpar tudo" é a saída de qualquer
    combinação e não pode sumir da tela. */

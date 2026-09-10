@@ -19,7 +19,7 @@ import { themeVariants } from "@/modules/scouting/domain/signal";
 import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { AdherenceGauge } from "./adherence-gauge";
 import { RereadEditalAction } from "./reread-edital-action";
-import { ScoutedFilters, type FilterGroup } from "./scouted-filters";
+import { filtersBootScript, ScoutedFilters, type FilterGroup } from "./scouted-filters";
 import { Flag, SignalActions } from "./signal-actions";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
 import { TriageActions } from "./triage-actions";
@@ -299,6 +299,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     {/* Aplica o tema salvo antes da pintura, para a tela não piscar no claro
         antes de virar escura. */}
     <script dangerouslySetInnerHTML={{ __html: themeBootScript }}/>
+    {/* Idem, para a barra de filtros recolhida — sem isto ela sempre nasceria
+        aberta e só recolheria um instante depois. */}
+    <script dangerouslySetInnerHTML={{ __html: filtersBootScript }}/>
 
     <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
     <Link className="bx-voltar" href="/opportunities">← Voltar às oportunidades</Link>
