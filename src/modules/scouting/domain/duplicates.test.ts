@@ -23,6 +23,23 @@ describe("mesma obra publicada duas vezes", () => {
     expect(d.get("a")).toEqual(["b"]);
   });
 
+  /**
+   * Achado em produção: Santa Lúcia/PR, mesma obra em duas linhas idênticas
+   * (objeto, valor, prazo) e nenhum aviso de republicação — o campo de
+   * documento do órgão nem sempre volta preenchido pelo PNCP, e a versão
+   * anterior escolhia "documento OU nome" por item, não por órgão: uma
+   * licitação virava chave de dígitos e a outra de texto, e as duas nunca
+   * batiam mesmo sendo a mesma obra.
+   */
+  it("agrupa mesmo quando só um dos dois avisos veio com o documento do órgão", () => {
+    const d = findDuplicates([
+      item({ id: "a", authorityDocument: "07658917000127" }),
+      item({ id: "b" }),
+    ]);
+    expect(d.get("a")).toEqual(["b"]);
+    expect(d.get("b")).toEqual(["a"]);
+  });
+
   it("três avisos do mesmo processo apontam um para os outros dois", () => {
     const comum = { authorityDocument: "07658917000127", processNumber: "2026-16974-0" };
     const d = findDuplicates([item({ id: "a", ...comum }), item({ id: "b", ...comum }), item({ id: "c", ...comum })]);
