@@ -157,6 +157,62 @@ describe("cláusulas institucionais, achadas no edital real de Pedra Preta/MT", 
   });
 });
 
+/**
+ * Diferente dos trechos acima: não veio de um edital real específico — os
+ * três municípios testados não tinham essa cláusula, e é exatamente por isso
+ * que "garantia de proposta" nunca tinha sido lida antes (nem pela IA). O
+ * texto abaixo segue o Art. 58 da Lei 14.133/2021 (que rege garantia DE
+ * PROPOSTA — confirmado por pesquisa, não por memória: art. 96 a 102 é a
+ * garantia de EXECUÇÃO contratual, uma exigência diferente) e a linguagem
+ * comum de edital para essa cláusula.
+ */
+const TRECHO_GARANTIA_PROPOSTA_EXIGIDA = `9.1. A prestação de garantia de proposta, nos termos do art. 58 da Lei nº
+14.133/2021, é exigida de todos os licitantes, no valor correspondente a 1%
+(um por cento) do valor estimado da contratação.`;
+
+const TRECHO_GARANTIA_PROPOSTA_DISPENSADA = `9.1. A garantia de proposta prevista no art. 58 da Lei nº 14.133/2021 fica
+dispensada nesta licitação.`;
+
+/**
+ * A armadilha que fez este campo nunca ser lido antes: um edital real quase
+ * sempre menciona garantia de EXECUÇÃO contratual (arts. 96 a 102), e um
+ * gatilho largo o bastante para achar "garantia de proposta" captura esta
+ * frase também — que fala de outra coisa (o CONTRATADO garantir a obra, não
+ * o licitante garantir a seriedade da proposta).
+ */
+const TRECHO_GARANTIA_EXECUCAO_APENAS = `18.1. O contratado deverá prestar garantia de execução contratual, nos
+termos dos arts. 96 a 102 da Lei nº 14.133/2021, no percentual de 5% (cinco
+por cento) do valor do contrato.`;
+
+describe("garantia de proposta — Art. 58 da Lei 14.133/2021", () => {
+  it("reconhece a exigência quando o texto pede a garantia de proposta", () => {
+    const r = extractInstitutionalRequirement(TRECHO_GARANTIA_PROPOSTA_EXIGIDA);
+    expect(r.requiresProposalBond).toBe(true);
+  });
+
+  it("reconhece a dispensa", () => {
+    const r = extractInstitutionalRequirement(TRECHO_GARANTIA_PROPOSTA_DISPENSADA);
+    expect(r.requiresProposalBond).toBe(false);
+  });
+
+  /**
+   * O teste que mais importa aqui: garantia de EXECUÇÃO não pode virar
+   * garantia de PROPOSTA por engano. Sem isto, qualquer edital real (que
+   * fala de garantia de execução o tempo todo) sairia dizendo "exige
+   * garantia de proposta" quando o texto não diz nada sobre isso.
+   */
+  it("NÃO confunde com garantia de execução contratual (arts. 96 a 102)", () => {
+    const r = extractInstitutionalRequirement(TRECHO_GARANTIA_EXECUCAO_APENAS);
+    expect(r.requiresProposalBond).toBeUndefined();
+    expect(r.limitations.some((l) => l.includes("garantia de proposta"))).toBe(true);
+  });
+
+  it("declara limitação, nunca palpite, quando a cláusula não aparece", () => {
+    const r = extractInstitutionalRequirement("Texto qualquer sem nenhuma cláusula de garantia.");
+    expect(r.requiresProposalBond).toBeUndefined();
+  });
+});
+
 describe("cláusulas institucionais, achadas no edital real de Santa Cruz do Sul/RS", () => {
   it("acha a vedação de consórcio no cabeçalho da lista, mesmo com o item bem mais adiante", () => {
     // A janela estreita ao redor de "consórcio" (item 3.8.9) não alcança o

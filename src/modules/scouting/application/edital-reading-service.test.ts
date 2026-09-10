@@ -160,6 +160,53 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
   });
 
   /**
+   * O gatilho automático da varredura chama assim: nenhuma licitação nova
+   * fica "a conferir" à toa esperando alguém clicar em algo que não existe.
+   */
+  describe("onlyPatternMatch — gatilho automático da varredura", () => {
+    const textoReal = `2.3. Empresas reunidas sob a forma de consórcio ou quaisquer outras
+modalidades de associação; 2.3.1. Justificativa da vedação de empresa em
+consórcio. Conforme Acordão do Tribunal de Contas da União 2831/2012, onde
+atribui à Administração a prerrogativa de admitir a participação de
+consórcios, desde que faça justificativa.`;
+
+    it("nunca chama a IA, nem verifica caso de uso aprovado", async () => {
+      const { service, extraction } = montar({
+        pdfText: { extract: vi.fn(async () => textoReal) },
+      });
+
+      const outcome = await service.read("t-1", auth, undefined, false, true);
+
+      expect(outcome.status).toBe("READ");
+      expect(extraction.approvedDefinition).not.toHaveBeenCalled();
+      expect(extraction.runEphemeral).not.toHaveBeenCalled();
+    });
+
+    it("lê e grava com readMethod PATTERN_MATCH, sem executionId", async () => {
+      const { service, readings } = montar({
+        pdfText: { extract: vi.fn(async () => textoReal) },
+      });
+
+      const outcome = await service.read("t-1", auth, undefined, false, true);
+
+      if (outcome.status !== "READ") throw new Error(outcome.status);
+      expect(outcome.reading.readMethod).toBe("PATTERN_MATCH");
+      expect(outcome.reading.executionId).toBeUndefined();
+      expect(outcome.reading.requirement.consortiumAllowed).toBe(false);
+      expect(vi.mocked(readings.save).mock.calls[0]?.[0].readMethod).toBe("PATTERN_MATCH");
+    });
+
+    it("nada legível ainda vira NOTHING_EXTRACTED, sem executionId", async () => {
+      const { service, readings } = montar(); // pdfText padrão: rejeita (fixture não é PDF real)
+      const outcome = await service.read("t-1", auth, undefined, false, true);
+
+      expect(outcome.status).toBe("NOTHING_EXTRACTED");
+      if (outcome.status === "NOTHING_EXTRACTED") expect(outcome.executionId).toBeUndefined();
+      expect(readings.save).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
    * Sem caso de uso aprovado a leitura não pode acontecer — e não pode nem
    * começar: baixar 12 MB para descobrir depois que não há autorização
    * gastaria banda à toa.

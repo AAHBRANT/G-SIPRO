@@ -36,6 +36,14 @@ export type EditalRequirement = Readonly<{
   consortiumAllowed?: boolean;
   requiresCat?: boolean;
   requiresSiteVisit?: boolean;
+  /**
+   * Garantia DE PROPOSTA (Lei 14.133/2021, art. 58) — opcional a critério do
+   * órgão, limitada a 1% do valor estimado, e diferente de garantia DE
+   * EXECUÇÃO contratual (arts. 96 a 102 — outra exigência, bem mais comum).
+   * `editalFields` sempre pediu este campo à IA; só nunca tinha sido lido de
+   * volta aqui.
+   */
+  requiresProposalBond?: boolean;
   /** 0 a 1, como a leitura declarou. */
   confidence?: number;
   /** O que a leitura não conseguiu determinar. */
@@ -55,7 +63,11 @@ const acha = (fields: readonly Field[], padrao: RegExp): string | undefined =>
 export function parseBoolean(value: string | undefined): boolean | undefined {
   if (!value) return undefined;
   const texto = value.toLowerCase();
-  if (/\b(n[aã]o|vedad|proibid|inadmit|n[aã]o ser[aá] permitid)/.test(texto)) return false;
+  // "Dispensad[ao]"/"isent[ao]" — não apareciam aqui, só no parser de texto
+  // cru: uma exigência opcional (garantia de proposta, por exemplo) tende a
+  // ser respondida assim, não como "vedada"/"proibida" (que soam estranho
+  // para algo que o próprio órgão pode simplesmente dispensar).
+  if (/\b(n[aã]o|vedad|proibid|inadmit|dispensad|isent|n[aã]o ser[aá] permitid)/.test(texto)) return false;
   if (/\b(sim|permitid|admitid|exigid|obrigat[oó]ri|ser[aá] permitid)/.test(texto)) return true;
   return undefined;
 }
@@ -194,6 +206,7 @@ export function parseEditalRequirement(
     consortiumAllowed: parseBoolean(acha(fields, /cons[oó]rcio/i)),
     requiresCat: parseBoolean(acha(fields, /crea|cau|\bcat\b/i)),
     requiresSiteVisit: parseBoolean(acha(fields, /visita/i)),
+    requiresProposalBond: parseBoolean(acha(fields, /garantia/i)),
     ...(extras.confidence !== undefined ? { confidence: extras.confidence } : {}),
     limitations: extras.limitations ?? [],
   };

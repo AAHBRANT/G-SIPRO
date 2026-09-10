@@ -93,13 +93,24 @@ describe("o que só o edital responde", () => {
     }
   });
 
-  it("com o edital lido, responde consórcio, CAT e visita", () => {
+  it("com o edital lido, responde consórcio, CAT, visita e garantia de proposta", () => {
     const lista = buildPrerequisites(entrada({
-      edital: { services: [], consortiumAllowed: true, requiresCat: true, requiresSiteVisit: false, limitations: [] },
+      edital: {
+        services: [], consortiumAllowed: true, requiresCat: true, requiresSiteVisit: false,
+        requiresProposalBond: true, limitations: [],
+      },
     }));
     expect(acha(lista, "consorcio")?.status).toBe("MET");
     expect(acha(lista, "cat")?.status).toBe("ATTENTION");
     expect(acha(lista, "visita")?.status).toBe("MET");
+    expect(acha(lista, "garantia")?.status).toBe("ATTENTION");
+  });
+
+  it("garantia de proposta não exigida atende", () => {
+    const lista = buildPrerequisites(entrada({
+      edital: { services: [], requiresProposalBond: false, limitations: [] },
+    }));
+    expect(acha(lista, "garantia")?.status).toBe("MET");
   });
 
   /**

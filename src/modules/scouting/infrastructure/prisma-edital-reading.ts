@@ -90,7 +90,7 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
       source: EditalSource;
       requirement: EditalRequirement;
     }>,
-    actorId: string,
+    actorId: string | undefined,
     correlationId: string,
   ) {
     const dados = {
@@ -106,7 +106,7 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
       requiresSiteVisit: input.requirement.requiresSiteVisit ?? null,
       confidence: input.requirement.confidence ?? null,
       limitations: input.requirement.limitations as unknown as object,
-      readById: actorId,
+      readById: actorId ?? null,
       // Reler zera a conferência: quem validou a leitura anterior não validou
       // esta. Manter o carimbo antigo diria que alguém conferiu o que ninguém viu.
       reviewedAt: null,
@@ -124,8 +124,8 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
       await tx.auditEvent.create({
         data: {
           id: randomUUID(),
-          actorType: "USER",
-          actorId,
+          actorType: actorId ? "USER" : "SYSTEM",
+          actorId: actorId ?? "scout-scan",
           action: "EDITAL_READING_RECORDED",
           entityType: "SCOUTED_TENDER_EDITAL_READING",
           entityId: linha.id,

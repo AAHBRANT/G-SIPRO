@@ -161,6 +161,9 @@ export function buildPrerequisites(input: PrerequisiteInput): readonly Prerequis
     simNao("visita", "Visita técnica", edital.requiresSiteVisit,
       { status: "ATTENTION", detail: "visita obrigatória: programar antes do prazo" },
       { status: "MET", detail: "não exige visita" }),
+    simNao("garantia", "Garantia de proposta", edital.requiresProposalBond,
+      { status: "ATTENTION", detail: "exige garantia de proposta: providenciar antes do envio" },
+      { status: "MET", detail: "não exige garantia de proposta" }),
   );
 
   if (edital.limitations.length > 0) {

@@ -119,6 +119,19 @@ function todasAsJanelas(textoOriginal: string, textoIndicePreservado: string, ga
 const CLAUSULA_CONSORCIO: readonly RegExp[] = [/consorcio/];
 const CLAUSULA_CAT: readonly RegExp[] = [/\bcat\b|atestado\s+de\s+(responsabilidade|capacidade)\s+tecnica|\bcrea\b|\bcau\b/];
 const CLAUSULA_VISITA: readonly RegExp[] = [/visita\s+tecnica|vistoria\s+tecnica/];
+/**
+ * "Garantia DE PROPOSTA" (Lei 14.133/2021, art. 58) — opcional a critério do
+ * órgão, limitada a 1% do valor estimado, e uma exigência bem mais rara do
+ * que "garantia DE EXECUÇÃO contratual" (arts. 96 a 102 — outra cláusula,
+ * presente em quase toda obra pública). O gatilho exige "proposta" ou
+ * "participação" logo depois de "garantia de/da" — "garantia de execução",
+ * "garantia contratual" e "garantia do contrato" nunca casam aqui, de
+ * propósito: um gatilho largo o bastante para achar a de proposta captura a
+ * de execução com frequência, e a confusão entre as duas é exatamente por
+ * isto que este campo nunca tinha sido lido antes (nem pela leitura por IA —
+ * `EditalRequirement` só ganhou o campo depois desta rodada).
+ */
+const CLAUSULA_GARANTIA_PROPOSTA: readonly RegExp[] = [/garantia\s+d[ae]\s+(?:proposta|participac)/];
 
 /**
  * Só o consórcio tem esta segunda tentativa: em edital real, a vedação às
@@ -173,6 +186,7 @@ export function extractInstitutionalRequirement(textoOriginal: string): Readonly
   consortiumAllowed?: boolean;
   requiresCat?: boolean;
   requiresSiteVisit?: boolean;
+  requiresProposalBond?: boolean;
   limitations: readonly string[];
 }> {
   const alvo = normalizeIndicePreservado(textoOriginal);
@@ -197,11 +211,16 @@ export function extractInstitutionalRequirement(textoOriginal: string): Readonly
   // as outras duas seguem a régua neutra (sim OU não, nunca um padrão).
   const requiresCat = ler(CLAUSULA_CAT, "exigência de CAT/CREA/CAU") ?? true;
   const requiresSiteVisit = ler(CLAUSULA_VISITA, "exigência de visita técnica");
+  // Sem viés de "assume exigido": ao contrário do CAT (quase universal), a
+  // garantia de proposta é genuinamente opcional — regra neutra, igual à de
+  // consórcio e visita.
+  const requiresProposalBond = ler(CLAUSULA_GARANTIA_PROPOSTA, "exigência de garantia de proposta");
 
   return {
     ...(consortiumAllowed !== undefined ? { consortiumAllowed } : {}),
     requiresCat,
     ...(requiresSiteVisit !== undefined ? { requiresSiteVisit } : {}),
+    ...(requiresProposalBond !== undefined ? { requiresProposalBond } : {}),
     limitations,
   };
 }
@@ -407,6 +426,7 @@ export function editalRequirementFromText(textoOriginal: string): EditalRequirem
     ...(institucional.consortiumAllowed !== undefined ? { consortiumAllowed: institucional.consortiumAllowed } : {}),
     requiresCat: institucional.requiresCat,
     ...(institucional.requiresSiteVisit !== undefined ? { requiresSiteVisit: institucional.requiresSiteVisit } : {}),
+    ...(institucional.requiresProposalBond !== undefined ? { requiresProposalBond: institucional.requiresProposalBond } : {}),
     limitations,
   };
 }

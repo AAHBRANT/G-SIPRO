@@ -3085,8 +3085,10 @@ model ScoutedTenderEditalReading {
   confidence        Decimal?               @db.Decimal(5, 4)
   /// O que a leitura declarou não ter conseguido determinar.
   limitations       Json
-  readById          String                 @db.Uuid
-  readBy            User                   @relation("EditalReadingReadBy", fields: [readById], references: [id], onDelete: Restrict)
+  /// Nulo quando a leitura foi disparada pela própria varredura, sem sessão
+  /// de usuário nenhuma — não existe humano para apontar ali.
+  readById          String?                @db.Uuid
+  readBy            User?                  @relation("EditalReadingReadBy", fields: [readById], references: [id], onDelete: Restrict)
   /// ⚠️ A leitura é ASSISTIVA até alguém conferir contra o PDF. Enquanto
   /// `reviewedAt` for nulo, a tela mostra os pré-requisitos do edital com a
   /// ressalva de que ninguém validou — parcela lida errado manda a equipe

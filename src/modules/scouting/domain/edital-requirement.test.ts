@@ -117,10 +117,22 @@ describe("os pontos de sim ou não", () => {
       campo("Permite consórcio", "Vedada a participação em consórcio"),
       campo("Exige atestado registrado no CREA/CAU (CAT)", "Sim, exigido"),
       campo("Exige visita técnica", "Não"),
+      campo("Garantia de proposta", "Exigida, no valor de 1% do estimado"),
     ]);
     expect(lido.consortiumAllowed).toBe(false);
     expect(lido.requiresCat).toBe(true);
     expect(lido.requiresSiteVisit).toBe(false);
+    expect(lido.requiresProposalBond).toBe(true);
+  });
+
+  /**
+   * `editalFields` sempre pediu este campo à IA (Lei 14.133/2021, art. 58);
+   * só nunca tinha sido lido de volta — a extração descartava a resposta em
+   * silêncio.
+   */
+  it("garantia de proposta dispensada", () => {
+    const lido = parseEditalRequirement([campo("Garantia de proposta", "Dispensada nesta licitação")]);
+    expect(lido.requiresProposalBond).toBe(false);
   });
 
   /** Silêncio da leitura ≠ silêncio do edital. Os dois viram "não sei". */
@@ -128,6 +140,7 @@ describe("os pontos de sim ou não", () => {
     const lido = parseEditalRequirement([]);
     expect(lido.consortiumAllowed).toBeUndefined();
     expect(lido.requiresCat).toBeUndefined();
+    expect(lido.requiresProposalBond).toBeUndefined();
     expect(lido.services).toEqual([]);
   });
 

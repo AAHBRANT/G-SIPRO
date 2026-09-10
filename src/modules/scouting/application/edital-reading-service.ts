@@ -134,7 +134,8 @@ export interface EditalReadingRepository {
       source: EditalSource;
       requirement: EditalRequirement;
     }>,
-    actorId: string,
+    /** Ausente quando a leitura foi disparada pela varredura, sem usuário. */
+    actorId: string | undefined,
     correlationId: string,
   ): Promise<StoredEditalReading>;
 }
@@ -207,11 +208,12 @@ const encurtar = (label: string): string =>
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : "Falha não identificada na leitura do edital.";
 
-/** Os três que só o edital responde, e que a tela mostra como pré-requisito. */
+/** Os quatro que só o edital responde, e que a tela mostra como pré-requisito. */
 const faltaInstitucional = (requirement: EditalRequirement): boolean =>
   requirement.consortiumAllowed === undefined
   || requirement.requiresCat === undefined
-  || requirement.requiresSiteVisit === undefined;
+  || requirement.requiresSiteVisit === undefined
+  || requirement.requiresProposalBond === undefined;
 
 const chaveServico = (descricao: string): string => normalizeText(descricao).replace(/\s+/g, " ").trim();
 
@@ -239,19 +241,22 @@ export function mergeReadings(
   const juntou = novos.length > 0
     || (base.consortiumAllowed === undefined && extra.consortiumAllowed !== undefined)
     || (base.requiresCat === undefined && extra.requiresCat !== undefined)
-    || (base.requiresSiteVisit === undefined && extra.requiresSiteVisit !== undefined);
+    || (base.requiresSiteVisit === undefined && extra.requiresSiteVisit !== undefined)
+    || (base.requiresProposalBond === undefined && extra.requiresProposalBond !== undefined);
 
   const confiancas = [base.confidence, extra.confidence].filter((c): c is number => c !== undefined);
   const primeiro = (a?: boolean, b?: boolean) => (a !== undefined ? a : b);
   const consortiumAllowed = primeiro(base.consortiumAllowed, extra.consortiumAllowed);
   const requiresCat = primeiro(base.requiresCat, extra.requiresCat);
   const requiresSiteVisit = primeiro(base.requiresSiteVisit, extra.requiresSiteVisit);
+  const requiresProposalBond = primeiro(base.requiresProposalBond, extra.requiresProposalBond);
 
   return {
     services: [...base.services, ...novos],
     ...(consortiumAllowed !== undefined ? { consortiumAllowed } : {}),
     ...(requiresCat !== undefined ? { requiresCat } : {}),
     ...(requiresSiteVisit !== undefined ? { requiresSiteVisit } : {}),
+    ...(requiresProposalBond !== undefined ? { requiresProposalBond } : {}),
     // A menor das confianças: o conjunto não é mais confiável do que a sua
     // parte mais fraca.
     ...(confiancas.length > 0 ? { confidence: Math.min(...confiancas) } : {}),
@@ -281,6 +286,11 @@ export class EditalReadingService {
     auth: AuthorizationContext,
     correlationId: string = randomUUID(),
     force = false,
+    // A varredura chama com isto: lê TODA licitação nova por casamento de
+    // padrão, sem esperar caso de uso de IA aprovado nem gastar chamada paga.
+    // 800+ licitações por domingo a ~250 s cada de IA seria um lote de dias;
+    // sem IA é leitura de texto, e roda no tempo da própria varredura.
+    onlyPatternMatch = false,
   ): Promise<EditalReadingOutcome> {
     const tender = await this.readings.tender(tenderId);
     if (!tender) return { status: "TENDER_NOT_FOUND" };
@@ -294,8 +304,10 @@ export class EditalReadingService {
     const existing = await this.readings.find(tenderId);
     if (existing && !force) return { status: "ALREADY_READ", reading: existing };
 
-    const definition = await this.extraction.approvedDefinition(EDITAL_DOCUMENT_TYPE);
-    if (!definition) return { status: "NOT_CONFIGURED" };
+    // Sem IA, não há caso de uso a aprovar: a governança de IA (ai.execute,
+    // caso de uso aprovado) simplesmente não se aplica a um parser de texto.
+    const definition = onlyPatternMatch ? undefined : await this.extraction.approvedDefinition(EDITAL_DOCUMENT_TYPE);
+    if (!onlyPatternMatch && !definition) return { status: "NOT_CONFIGURED" };
 
     const identifier = parsePncpIdentifier(tender.externalId);
     if (!identifier) return { status: "NO_IDENTIFIER", externalId: tender.externalId };
@@ -343,48 +355,62 @@ export class EditalReadingService {
         : ordenados.find((item) => item !== principal && item.ehEdital);
 
       const fileHash = createHash("sha256").update(bytes).digest("hex");
-      const execution = await this.extract(principal, bytes, fileHash, definition, tender.title, auth, correlationId);
+      let requirement: EditalRequirement;
+      let readMethod: EditalReadMethod;
+      let executionIdGravado: string | undefined;
 
-      const executionId = idOf(execution);
-      if (!executionId) return { status: "FAILED", reason: "A execução de IA não devolveu identificador." };
+      if (definition) {
+        const execution = await this.extract(principal, bytes, fileHash, definition, tender.title, auth, correlationId);
 
-      let requirement = interpret(execution);
-      // Qual execução responde pelo que foi gravado. Quando o provedor falha na
-      // primeira, a linha volta com status FAILED e sem saída, e apontar o
-      // rastro de auditoria para ela diria que a exigência veio de uma leitura
-      // que não leu nada — o conteúdo teria vindo todo da segunda.
-      let executionIdDoConteudo = deuCerto(execution) ? executionId : undefined;
+        const executionId = idOf(execution);
+        if (!executionId) return { status: "FAILED", reason: "A execução de IA não devolveu identificador." };
 
-      if (complemento && faltaInstitucional(requirement)) {
-        try {
-          const extraBytes = await complemento.read();
-          const extraHash = createHash("sha256").update(extraBytes).digest("hex");
-          const outra = await this.extract(
-            complemento, extraBytes, extraHash, definition, tender.title, auth, correlationId,
-          );
-          requirement = mergeReadings(requirement, interpret(outra), complemento.label);
-          executionIdDoConteudo ??= deuCerto(outra) ? idOf(outra) : undefined;
-        } catch {
-          // A leitura principal já vale por si. Perder o complemento deixa
-          // consórcio/CAT/visita em "a conferir", que é o estado honesto — e
-          // muito melhor do que descartar as parcelas já lidas.
+        requirement = interpret(execution);
+        // Qual execução responde pelo que foi gravado. Quando o provedor falha
+        // na primeira, a linha volta com status FAILED e sem saída, e apontar
+        // o rastro de auditoria para ela diria que a exigência veio de uma
+        // leitura que não leu nada — o conteúdo teria vindo todo da segunda.
+        let executionIdDoConteudo = deuCerto(execution) ? executionId : undefined;
+
+        if (complemento && faltaInstitucional(requirement)) {
+          try {
+            const extraBytes = await complemento.read();
+            const extraHash = createHash("sha256").update(extraBytes).digest("hex");
+            const outra = await this.extract(
+              complemento, extraBytes, extraHash, definition, tender.title, auth, correlationId,
+            );
+            requirement = mergeReadings(requirement, interpret(outra), complemento.label);
+            executionIdDoConteudo ??= deuCerto(outra) ? idOf(outra) : undefined;
+          } catch {
+            // A leitura principal já vale por si. Perder o complemento deixa
+            // consórcio/CAT/visita em "a conferir", que é o estado honesto — e
+            // muito melhor do que descartar as parcelas já lidas.
+          }
         }
-      }
 
-      let readMethod: EditalReadMethod = "AI";
-      let executionIdGravado: string | undefined = executionIdDoConteudo ?? executionId;
+        readMethod = "AI";
+        executionIdGravado = executionIdDoConteudo ?? executionId;
 
-      // Extração de IA que não devolveu campo nenhum não vira leitura gravada
-      // de cara: antes de desistir, tenta o mesmo par de documentos por
-      // casamento de padrão sobre o texto — mais fraco que a IA, mas
-      // gratuito, e às vezes acha o que a IA não achou (ou vice-versa).
-      // Qualquer falha aqui (PDF escaneado, extração que não converge) é
-      // tratada como "também não achou nada": nunca sobe como FAILED por
-      // conta do reforço, só perde o reforço.
-      if (requirement.services.length === 0 && requirement.consortiumAllowed === undefined
-        && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined) {
+        // Extração de IA que não devolveu campo nenhum não vira leitura
+        // gravada de cara: antes de desistir, tenta o mesmo par de documentos
+        // por casamento de padrão sobre o texto — mais fraco que a IA, mas
+        // gratuito, e às vezes acha o que a IA não achou (ou vice-versa).
+        // Qualquer falha aqui (PDF escaneado, extração que não converge) é
+        // tratada como "também não achou nada": nunca sobe como FAILED por
+        // conta do reforço, só perde o reforço.
+        if (requirement.services.length === 0 && requirement.consortiumAllowed === undefined
+          && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined
+          && requirement.requiresProposalBond === undefined) {
+          const semIA = await this.tentarSemIA(principal, bytes, complemento);
+          if (!semIA) return { status: "NOTHING_EXTRACTED", executionId };
+          requirement = semIA;
+          readMethod = "PATTERN_MATCH";
+          executionIdGravado = undefined;
+        }
+      } else {
+        // onlyPatternMatch: sem IA desde o início, não só como reforço.
         const semIA = await this.tentarSemIA(principal, bytes, complemento);
-        if (!semIA) return { status: "NOTHING_EXTRACTED", executionId };
+        if (!semIA) return { status: "NOTHING_EXTRACTED" };
         requirement = semIA;
         readMethod = "PATTERN_MATCH";
         executionIdGravado = undefined;
@@ -401,7 +427,8 @@ export class EditalReadingService {
           source: { uri: principal.uri, filename: principal.label, fileHash, fetchedAt: new Date() },
           requirement,
         },
-        auth.actorId,
+        // A varredura chama sem sessão de usuário — não há quem apontar.
+        onlyPatternMatch ? undefined : auth.actorId,
         correlationId,
       );
       return { status: "READ", reading };
@@ -542,7 +569,8 @@ export class EditalReadingService {
     }
 
     const vazio = requirement.services.length === 0 && requirement.consortiumAllowed === undefined
-      && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined;
+      && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined
+      && requirement.requiresProposalBond === undefined;
     return vazio ? undefined : requirement;
   }
 }
