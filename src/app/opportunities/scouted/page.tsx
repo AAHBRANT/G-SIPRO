@@ -448,7 +448,14 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                 </div>
 
                 <div className="bx-bloco bx-bloco-largo">
-                  <h3>Pré-requisitos</h3>
+                  {/* Mesma contagem que já aparece na linha fechada da fila —
+                      só que lá ("3/8 pré-requisitos") e aqui não, obrigando a
+                      pessoa a contar ✓/– na mão pra saber o que atende. */}
+                  <h3>
+                    Pré-requisitos — {tender.resumo.met} de {tender.resumo.total} atendidos
+                    {tender.resumo.notMet > 0 ? `, ${tender.resumo.notMet} não atende${tender.resumo.notMet > 1 ? "m" : ""}` : ""}
+                    {tender.resumo.unknown > 0 ? `, ${tender.resumo.unknown} a conferir` : ""}
+                  </h3>
                   {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
                   <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
                     {!tender.edital
