@@ -7,6 +7,7 @@ import {
   mergeReadings,
   type EditalExtractionPort,
   type EditalReadingRepository,
+  type PdfTextPort,
   type TenderFilesPort,
 } from "@/modules/scouting/application/edital-reading-service";
 import type { DownloadedFile, TenderFile } from "@/modules/scouting/infrastructure/pncp-files-client";
@@ -34,6 +35,7 @@ function montar(ajustes: {
   files?: Partial<TenderFilesPort>;
   extraction?: Partial<EditalExtractionPort>;
   readings?: Partial<EditalReadingRepository>;
+  pdfText?: Partial<PdfTextPort>;
 } = {}) {
   const files: TenderFilesPort = {
     list: vi.fn(async () => [arquivo()]),
@@ -54,7 +56,15 @@ function montar(ajustes: {
     save: vi.fn(async (input) => ({ ...input })),
     ...ajustes.readings,
   };
-  return { service: new EditalReadingService(files, extraction, readings), files, extraction, readings };
+  // Por padrão os bytes de teste não são um PDF de verdade (fixtures como
+  // `%PDF-1.4 texto` só existem para roteamento por extensão/mimetype) — a
+  // porta simula o mesmo desfecho que `pdfjs-dist` teria contra esse lixo:
+  // falha, tratada pelo serviço como "reforço sem IA também não achou nada".
+  const pdfText: PdfTextPort = {
+    extract: vi.fn(async () => { throw new Error("PDF ilegível (fixture de teste, não um PDF real)."); }),
+    ...ajustes.pdfText,
+  };
+  return { service: new EditalReadingService(files, extraction, readings, pdfText), files, extraction, readings, pdfText };
 }
 
 describe("leitura que dá certo", () => {
@@ -112,7 +122,7 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
     const { service, files, extraction } = montar({
       readings: {
         find: vi.fn(async () => ({
-          tenderId: "t-1", executionId: "exec-0",
+          tenderId: "t-1", executionId: "exec-0", readMethod: "AI" as const,
           source: { uri: "https://x", filename: "e.pdf", fileHash: "a".repeat(64), fetchedAt: new Date() },
           requirement: { services: [], limitations: [] },
         })),
@@ -174,6 +184,36 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
 
     expect(outcome.status).toBe("NOTHING_EXTRACTED");
     expect(readings.save).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Antes de desistir, o serviço tenta o mesmo PDF por casamento de padrão.
+   * Texto real, encurtado (Concorrência 17/2026 de Pedra Preta/MT) — o mesmo
+   * usado para validar `edital-text-requirement.ts` isoladamente.
+   */
+  it("IA sem achado cai para o leitor sem IA, e a leitura sai como PATTERN_MATCH", async () => {
+    const textoReal = `2.3. Empresas reunidas sob a forma de consórcio ou quaisquer outras
+modalidades de associação; 2.3.1. Justificativa da vedação de empresa em
+consórcio. Conforme Acordão do Tribunal de Contas da União 2831/2012, onde
+atribui à Administração a prerrogativa de admitir a participação de
+consórcios, desde que faça justificativa.`;
+    const { service, readings, extraction } = montar({
+      extraction: { runEphemeral: vi.fn(async () => execucao([{ field: "Objeto", value: "—" }])) },
+      pdfText: { extract: vi.fn(async () => textoReal) },
+    });
+
+    const outcome = await service.read("t-1", auth);
+
+    if (outcome.status !== "READ") throw new Error(outcome.status);
+    expect(outcome.reading.readMethod).toBe("PATTERN_MATCH");
+    expect(outcome.reading.executionId).toBeUndefined();
+    expect(outcome.reading.requirement.consortiumAllowed).toBe(false);
+    expect(readings.save).toHaveBeenCalledOnce();
+    expect(vi.mocked(readings.save).mock.calls[0]?.[0].executionId).toBeUndefined();
+    expect(vi.mocked(readings.save).mock.calls[0]?.[0].readMethod).toBe("PATTERN_MATCH");
+    // A IA foi tentada primeiro — o reforço não pula a etapa paga, só cobre a
+    // lacuna que ela deixou.
+    expect(extraction.runEphemeral).toHaveBeenCalledOnce();
   });
 
   /** Sem identificador da execução não há como reencontrar a fonte depois. */

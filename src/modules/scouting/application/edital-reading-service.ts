@@ -47,6 +47,7 @@ import {
   type EditalRequirement,
 } from "@/modules/scouting/domain/edital-requirement";
 import { editalRelevance, isEdital } from "@/modules/scouting/domain/edital-relevance";
+import { editalRequirementFromText } from "@/modules/scouting/domain/edital-text-requirement";
 import { parsePncpIdentifier } from "@/modules/scouting/domain/pncp-identifier";
 import { normalizeText } from "@/modules/scouting/domain/qualification";
 import { listArchive } from "@/modules/scouting/infrastructure/archive-files";
@@ -65,9 +66,14 @@ export type EditalSource = Readonly<{
   fetchedAt: Date;
 }>;
 
+/** Como a leitura chegou ao resultado gravado. */
+export type EditalReadMethod = "AI" | "PATTERN_MATCH";
+
 export type StoredEditalReading = Readonly<{
   tenderId: string;
-  executionId: string;
+  /** Ausente quando `readMethod` é `PATTERN_MATCH`: não houve execução de IA. */
+  executionId?: string;
+  readMethod: EditalReadMethod;
   source: EditalSource;
   requirement: EditalRequirement;
   reviewedAt?: Date;
@@ -86,7 +92,7 @@ export type EditalReadingOutcome =
   | Readonly<{ status: "NO_IDENTIFIER"; externalId: string }>
   | Readonly<{ status: "NO_FILE" }>
   | Readonly<{ status: "FILE_TOO_LARGE"; title: string }>
-  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId: string }>
+  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId?: string }>
   | Readonly<{ status: "FAILED"; reason: string }>;
 
 export interface TenderFilesPort {
@@ -123,13 +129,23 @@ export interface EditalReadingRepository {
   save(
     input: Readonly<{
       tenderId: string;
-      executionId: string;
+      executionId?: string;
+      readMethod: EditalReadMethod;
       source: EditalSource;
       requirement: EditalRequirement;
     }>,
     actorId: string,
     correlationId: string,
   ): Promise<StoredEditalReading>;
+}
+
+/**
+ * Texto puro de um PDF, para o leitor sem IA. Porta de propósito — o mesmo
+ * motivo de `TenderFilesPort`/`EditalExtractionPort`: o serviço não conhece
+ * `pdfjs-dist`, só sabe que existe algo que devolve texto a partir de bytes.
+ */
+export interface PdfTextPort {
+  extract(bytes: Buffer): Promise<string>;
 }
 
 /**
@@ -257,6 +273,7 @@ export class EditalReadingService {
     private readonly files: TenderFilesPort,
     private readonly extraction: EditalExtractionPort,
     private readonly readings: EditalReadingRepository,
+    private readonly pdfText: PdfTextPort,
   ) {}
 
   async read(
@@ -349,17 +366,30 @@ export class EditalReadingService {
         }
       }
 
-      // Extração que não devolveu campo nenhum não vira leitura gravada: a
-      // ausência de parcelas seria lida depois como "o edital não exige nada".
+      let readMethod: EditalReadMethod = "AI";
+      let executionIdGravado: string | undefined = executionIdDoConteudo ?? executionId;
+
+      // Extração de IA que não devolveu campo nenhum não vira leitura gravada
+      // de cara: antes de desistir, tenta o mesmo par de documentos por
+      // casamento de padrão sobre o texto — mais fraco que a IA, mas
+      // gratuito, e às vezes acha o que a IA não achou (ou vice-versa).
+      // Qualquer falha aqui (PDF escaneado, extração que não converge) é
+      // tratada como "também não achou nada": nunca sobe como FAILED por
+      // conta do reforço, só perde o reforço.
       if (requirement.services.length === 0 && requirement.consortiumAllowed === undefined
         && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined) {
-        return { status: "NOTHING_EXTRACTED", executionId };
+        const semIA = await this.tentarSemIA(principal, bytes, complemento);
+        if (!semIA) return { status: "NOTHING_EXTRACTED", executionId };
+        requirement = semIA;
+        readMethod = "PATTERN_MATCH";
+        executionIdGravado = undefined;
       }
 
       const reading = await this.readings.save(
         {
           tenderId,
-          executionId: executionIdDoConteudo ?? executionId,
+          executionId: executionIdGravado,
+          readMethod,
           // O endereço é o do arquivo PUBLICADO, mesmo quando o que foi lido
           // estava dentro dele: é esse o link que o cartão oferece, e é o que a
           // pessoa precisa abrir para baixar o pacote sem navegar o portal.
@@ -475,6 +505,40 @@ export class EditalReadingService {
       auth,
       correlationId,
     );
+  }
+
+  /**
+   * Último recurso antes de desistir: o mesmo par de documentos (principal e,
+   * se houver, o complemento institucional), lido por casamento de padrão em
+   * vez de IA. Nunca lança — um PDF escaneado ou ilegível aqui vale o mesmo
+   * que "não achou nada", exatamente como a IA já tratava esse caso.
+   */
+  private async tentarSemIA(
+    principal: Readable,
+    bytes: Buffer,
+    complemento: Readable | undefined,
+  ): Promise<EditalRequirement | undefined> {
+    let requirement: EditalRequirement;
+    try {
+      requirement = editalRequirementFromText(await this.pdfText.extract(bytes));
+    } catch {
+      return undefined;
+    }
+
+    if (complemento && faltaInstitucional(requirement)) {
+      try {
+        const extraBytes = await complemento.read();
+        const extraTexto = await this.pdfText.extract(extraBytes);
+        requirement = mergeReadings(requirement, editalRequirementFromText(extraTexto), complemento.label);
+      } catch {
+        // A leitura principal (sem IA) já vale por si — mesma régua do
+        // complemento por IA, algumas linhas acima.
+      }
+    }
+
+    const vazio = requirement.services.length === 0 && requirement.consortiumAllowed === undefined
+      && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined;
+    return vazio ? undefined : requirement;
   }
 }
 

@@ -2940,6 +2940,13 @@ enum ScoutSignalLevel {
   CUSTOM
 }
 
+enum EditalReadMethod {
+  /// Central IA (`AiExtractionExecution`), com `executionId` preenchido.
+  AI
+  /// `edital-text-requirement.ts` — casamento de padrão sobre o texto, sem IA.
+  PATTERN_MATCH
+}
+
 /// Configuração única dos filtros da varredura. Mantida como registro único
 /// (singleton) para que a equipe ajuste os critérios sem versionar cópias.
 model ScoutFilter {
@@ -3057,9 +3064,13 @@ model ScoutedTenderEditalReading {
   tender            ScoutedTender          @relation(fields: [tenderId], references: [id], onDelete: Cascade)
   /// Execução de IA que produziu esta leitura. É por ela que se chega ao
   /// modelo, à versão do prompt e aos trechos citados — o rastro que antes
-  /// passava pelo arquivo guardado.
-  executionId       String                 @db.Uuid
-  execution         AiExtractionExecution  @relation(fields: [executionId], references: [id], onDelete: Restrict)
+  /// passava pelo arquivo guardado. Nulo quando `readMethod` é `PATTERN_MATCH`:
+  /// aí não houve chamada de IA nenhuma para referenciar.
+  executionId       String?                @db.Uuid
+  execution         AiExtractionExecution? @relation(fields: [executionId], references: [id], onDelete: Restrict)
+  /// Como a leitura foi produzida. Existe porque `executionId` sozinho não
+  /// distingue "IA não configurada" (sem leitura) de "lida sem IA de propósito".
+  readMethod        EditalReadMethod       @default(AI)
   /// Endereço público do arquivo lido. É o link de download que a fila oferece.
   sourceUri         String                 @db.VarChar(1000)
   sourceFilename    String                 @db.VarChar(255)

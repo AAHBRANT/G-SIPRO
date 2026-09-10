@@ -22,6 +22,7 @@ import { PrismaAiExtractionRepository } from "@/modules/ai-extraction/infrastruc
 import type { AiExtractionProvider } from "@/modules/ai-extraction/domain/ai-extraction";
 import { EditalReadingService, type EditalExtractionPort, type TenderFilesPort } from "@/modules/scouting/application/edital-reading-service";
 import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
+import { PdfjsTextExtraction } from "@/modules/scouting/infrastructure/pdf-text";
 import { PrismaEditalExtraction, PrismaEditalReadingRepository, editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
 
 const db = getDatabase();
@@ -129,7 +130,7 @@ async function main() {
   };
 
   const auth = { actorId, permissions: new Set(["ai.execute", "documents.read"]) } as unknown as AuthorizationContext;
-  const service = new EditalReadingService(arquivos, extracao, new PrismaEditalReadingRepository());
+  const service = new EditalReadingService(arquivos, extracao, new PrismaEditalReadingRepository(), new PdfjsTextExtraction());
 
   console.log("\n1. leitura");
   const primeira = await service.read(tender.id, auth);

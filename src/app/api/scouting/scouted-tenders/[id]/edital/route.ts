@@ -5,6 +5,7 @@ import { ResourceNotFoundError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { EditalReadingService } from "@/modules/scouting/application/edital-reading-service";
+import { PdfjsTextExtraction } from "@/modules/scouting/infrastructure/pdf-text";
 import { PncpFilesClient } from "@/modules/scouting/infrastructure/pncp-files-client";
 import {
   PrismaEditalExtraction,
@@ -15,6 +16,7 @@ const service = () => new EditalReadingService(
   new PncpFilesClient(),
   new PrismaEditalExtraction(),
   new PrismaEditalReadingRepository(),
+  new PdfjsTextExtraction(),
 );
 
 /**

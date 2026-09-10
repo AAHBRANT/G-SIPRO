@@ -19,6 +19,7 @@ import { PrismaAiExtractionRepository } from "@/modules/ai-extraction/infrastruc
 import type {
   EditalExtractionPort,
   EditalReadingRepository,
+  EditalReadMethod,
   EditalSource,
   StoredEditalReading,
 } from "@/modules/scouting/application/edital-reading-service";
@@ -82,12 +83,19 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
   }
 
   async save(
-    input: Readonly<{ tenderId: string; executionId: string; source: EditalSource; requirement: EditalRequirement }>,
+    input: Readonly<{
+      tenderId: string;
+      executionId?: string;
+      readMethod: EditalReadMethod;
+      source: EditalSource;
+      requirement: EditalRequirement;
+    }>,
     actorId: string,
     correlationId: string,
   ) {
     const dados = {
-      executionId: input.executionId,
+      executionId: input.executionId ?? null,
+      readMethod: input.readMethod,
       sourceUri: input.source.uri,
       sourceFilename: input.source.filename,
       sourceFileHash: input.source.fileHash,
@@ -177,7 +185,8 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
 
 export type EditalReadingRow = Readonly<{
   tenderId: string;
-  executionId: string;
+  executionId: string | null;
+  readMethod: EditalReadMethod;
   sourceUri: string;
   sourceFilename: string;
   sourceFileHash: string;
@@ -195,7 +204,8 @@ export type EditalReadingRow = Readonly<{
 export function editalReadingFromRow(row: EditalReadingRow): StoredEditalReading {
   return {
     tenderId: row.tenderId,
-    executionId: row.executionId,
+    ...(row.executionId ? { executionId: row.executionId } : {}),
+    readMethod: row.readMethod,
     source: {
       uri: row.sourceUri,
       filename: row.sourceFilename,
