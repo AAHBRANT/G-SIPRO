@@ -67,10 +67,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       const source = new PncpClient({ finalDate, states });
       const data = await new ScoutService(repository, source).run(command.trigger);
 
-      // Nenhuma licitação nova fica "a conferir" à toa esperando um clique
-      // que não existe: lê o edital de cada uma, por casamento de padrão,
-      // ainda dentro desta mesma requisição.
-      await readEditaisDaVarredura(data.runId, context.correlationId);
+      // Nenhuma licitação fica "a conferir" à toa esperando um clique que não
+      // existe: lê o edital de quem ainda não tem leitura, por casamento de
+      // padrão, ainda dentro desta mesma requisição.
+      await readEditaisDaVarredura(context.correlationId);
 
       return NextResponse.json({ data, correlationId: context.correlationId });
     } catch (error) {
@@ -80,18 +80,40 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 /**
- * Lê o edital de cada licitação nova desta varredura — sem IA, sem sessão de
- * usuário (`readById` fica nulo: é a própria varredura, não uma pessoa).
+ * Teto de quantas licitações sem leitura uma varredura lê por vez.
+ *
+ * Sem teto, uma fila represada grande (achado real: licitações que já
+ * estavam na fila antes desta automação existir, sem nenhum jeito de serem
+ * cobertas depois) faria esta função rodar por tempo indeterminado dentro da
+ * mesma requisição HTTP do agendador. Com teto, o represado é absorvido aos
+ * poucos, a cada varredura, sempre pelas mais urgentes primeiro — e nunca
+ * fica para sempre sem leitura só porque entrou antes da automação existir.
+ */
+const LOTE_LEITURA_AUTOMATICA = 40;
+
+/**
+ * Lê o edital de quem ainda não tem leitura — sem IA, sem sessão de usuário
+ * (`readById` fica nulo: é a própria varredura, não uma pessoa).
+ *
+ * Cobre TANTO as licitações novas desta varredura QUANTO o represado (o que
+ * já estava pendente antes desta automação existir), pela mesma fila e na
+ * mesma ordem: prazo mais próximo primeiro. Sem isto, o texto que a tela já
+ * mostrava desde 04/09 — "a próxima chamada do agendador cobre a fila
+ * pendente por ordem de prazo" — era uma promessa que a automação, restrita
+ * só à varredura corrente, nunca cumpria para quem já estava na fila.
  *
  * Nunca deixa uma licitação ruim (PDF ilegível, PNCP fora do ar) derrubar as
  * outras: cada falha só significa que aquela continua "a conferir", e seguem
- * as próximas. Quem quiser tentar de novo manualmente tem o botão "Reler
- * edital" — este disparo automático não repete numa varredura futura, porque
- * só olha o `runId` de agora.
+ * as próximas.
  */
-async function readEditaisDaVarredura(runId: string, correlationId: string): Promise<void> {
+async function readEditaisDaVarredura(correlationId: string): Promise<void> {
   const pendentes = await getDatabase().scoutedTender.findMany({
-    where: { runId, editalReading: null },
+    where: { status: "PENDING", editalReading: null },
+    // "nulls: last" — sem prazo informado não é "mais urgente que todos": o
+    // padrão do Postgres para ASC é nulo primeiro, o que faria justamente o
+    // que não tem prazo nenhum furar a fila à frente de quem tem prazo apertado.
+    orderBy: { proposalClosesAt: { sort: "asc", nulls: "last" } },
+    take: LOTE_LEITURA_AUTOMATICA,
     select: { id: true },
   });
   if (pendentes.length === 0) return;
