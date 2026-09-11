@@ -20,6 +20,7 @@ import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/module
 import { AdherenceGauge } from "./adherence-gauge";
 import { RereadEditalAction } from "./reread-edital-action";
 import { filtersBootScript, ScoutedFilters, type FilterGroup } from "./scouted-filters";
+import { ShareTenderAction } from "./share-tender-action";
 import { Flag, SignalActions } from "./signal-actions";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
 import { TriageActions } from "./triage-actions";
@@ -160,7 +161,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   const shortDeadline = new Date(now.getTime() + SHORT_DEADLINE_DAYS * 86_400_000);
   const filter = await loadFilter();
 
-  const [rows, lastRun, facets, archive] = await Promise.all([
+  const [rows, lastRun, facets, archive, activeUsers] = await Promise.all([
     database.scoutedTender.findMany({ where, orderBy, take: QUEUE_CAP, include: { signal: true, editalReading: true } }),
     database.scoutRun.findFirst({ where: { status: "COMPLETED" }, orderBy: { startedAt: "desc" } }),
     // Projeção leve da fila inteira: alimenta os contadores dos cartões e das
@@ -172,7 +173,15 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     // O acervo é da empresa, não da licitação: uma consulta serve a fila
     // inteira. Buscar por linha faria centenas de idas ao banco por página.
     new PrismaArchiveEvidenceRepository().loadEvidence(),
+    // Lista pequena e estável (gente ativa na casa): serve o seletor de
+    // "compartilhar" de toda a fila, sem consulta por linha.
+    database.user.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, displayName: true, email: true },
+      orderBy: { displayName: "asc" },
+    }),
   ]);
+  const shareRecipients = activeUsers.map((user) => ({ id: user.id, label: `${user.displayName} (${user.email})` }));
 
   const scored = rows.map((tender) => {
     // Lida do edital quando existe leitura; deduzida do objeto quando não.
@@ -352,6 +361,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
           return <details
             className="bx-linha"
             data-sinalizada={signal ? "sim" : undefined}
+            id={tender.id}
             key={tender.id}
             style={signal ? ({ "--sig-claro": signal.light, "--sig-escuro": signal.dark } as CSSProperties) : undefined}
           >
@@ -427,6 +437,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                     Por isso não depende da alçada de decidir. */}
                 <div className="bx-mini-acoes">
                   <SignalActions id={tender.id} signal={signal ? { level: signal.level, label: signal.label, color: signal.color, ...(signal.note ? { note: signal.note } : {}) } : undefined}/>
+                  <ShareTenderAction id={tender.id} recipients={shareRecipients}/>
                 </div>
               </div>
             </summary>
