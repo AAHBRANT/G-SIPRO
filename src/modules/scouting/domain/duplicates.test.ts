@@ -40,6 +40,23 @@ describe("mesma obra publicada duas vezes", () => {
     expect(d.get("b")).toEqual(["a"]);
   });
 
+  /**
+   * O mesmo defeito do documento do órgão, uma camada abaixo: a versão
+   * anterior escolhia "processo OU objeto" por item, não por par. Uma
+   * licitação com processo capturado e sua gêmea sem processo (mesma
+   * armadilha: o campo nem sempre volta preenchido do PNCP) nunca se
+   * encontravam, mesmo com o objeto idêntico.
+   */
+  it("agrupa mesmo quando só um dos dois avisos veio com o número de processo", () => {
+    const objeto = "Contratação de empresa especializada para pavimentação asfáltica da avenida principal";
+    const d = findDuplicates([
+      item({ id: "a", authorityDocument: "07658917000127", processNumber: "2026-16974-0", subject: objeto }),
+      item({ id: "b", authorityDocument: "07658917000127", subject: objeto }),
+    ]);
+    expect(d.get("a")).toEqual(["b"]);
+    expect(d.get("b")).toEqual(["a"]);
+  });
+
   it("três avisos do mesmo processo apontam um para os outros dois", () => {
     const comum = { authorityDocument: "07658917000127", processNumber: "2026-16974-0" };
     const d = findDuplicates([item({ id: "a", ...comum }), item({ id: "b", ...comum }), item({ id: "c", ...comum })]);
