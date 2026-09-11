@@ -7,6 +7,8 @@ import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { EditalReadingService } from "@/modules/scouting/application/edital-reading-service";
 import { ScoutService } from "@/modules/scouting/application/scout-service";
+import { TriageService } from "@/modules/scouting/application/triage-service";
+import { resolveDuplicates } from "@/modules/scouting/domain/duplicates";
 import { PdfjsTextExtraction } from "@/modules/scouting/infrastructure/pdf-text";
 import { PncpClient } from "@/modules/scouting/infrastructure/pncp-client";
 import { PncpFilesClient } from "@/modules/scouting/infrastructure/pncp-files-client";
@@ -14,7 +16,7 @@ import {
   PrismaEditalExtraction,
   PrismaEditalReadingRepository,
 } from "@/modules/scouting/infrastructure/prisma-edital-reading";
-import { PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
+import { OpportunityFromScoutedTender, PrismaScoutRepository, PrismaTriageRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { requireScoutDispatcher } from "@/modules/scouting/infrastructure/scout-dispatch-auth";
 
 const commandSchema = z.object({
@@ -67,6 +69,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       const source = new PncpClient({ finalDate, states });
       const data = await new ScoutService(repository, source).run(command.trigger);
 
+      // Antes de ler edital de ninguém: descarta quem é duplicata (mesma
+      // obra, publicação mais antiga) — não vale gastar uma leitura de PDF
+      // numa licitação que já vai sair da fila.
+      await descartarDuplicatas();
+
       // Nenhuma licitação fica "a conferir" à toa esperando um clique que não
       // existe: lê o edital de quem ainda não tem leitura, por casamento de
       // padrão, ainda dentro desta mesma requisição.
@@ -77,6 +84,50 @@ export async function POST(request: Request): Promise<NextResponse> {
       return toApiError(error);
     }
   });
+}
+
+/**
+ * Descarta quem é a mesma obra publicada mais de uma vez, mantendo só a
+ * publicação mais recente na fila — decisão do usuário: duplicata não é
+ * mais só sinalizada, é excluída de verdade.
+ *
+ * Só olha quem ainda está PENDING: uma duplicata que alguém já decidiu
+ * (aprovou ou descartou por conta própria) nunca é tocada por aqui —
+ * `TriageService.discard()` já recusa quem não está mais pendente.
+ * `actorId` ausente: é a própria varredura, não uma pessoa: `decidedById`
+ * fica nulo e o motivo registrado explica que foi automático.
+ */
+async function descartarDuplicatas(): Promise<void> {
+  const pendentes = await getDatabase().scoutedTender.findMany({
+    where: { status: "PENDING" },
+    select: {
+      id: true, authorityDocument: true, authorityName: true, processNumber: true,
+      subject: true, proposalOpensAt: true, createdAt: true,
+    },
+  });
+  if (pendentes.length < 2) return;
+
+  const perdedores = resolveDuplicates(pendentes.map((tender) => ({
+    id: tender.id,
+    ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
+    authorityName: tender.authorityName,
+    ...(tender.processNumber ? { processNumber: tender.processNumber } : {}),
+    subject: tender.subject,
+    ...(tender.proposalOpensAt ? { publishedAt: tender.proposalOpensAt } : {}),
+    createdAt: tender.createdAt,
+  })));
+  if (perdedores.size === 0) return;
+
+  const service = new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender());
+  for (const [perdedorId, sobreviventeId] of perdedores) {
+    try {
+      await service.discard(perdedorId, undefined, `Duplicata automática: mesma obra que a licitação ${sobreviventeId}, publicada mais recentemente.`);
+    } catch {
+      // Corrida rara: alguém decidiu esta licitação entre a consulta acima e
+      // agora. TriageService.discard() já recusa quem não está mais
+      // PENDING — a decisão da pessoa vale, a automação só desiste desta.
+    }
+  }
 }
 
 /**

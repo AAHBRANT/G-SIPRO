@@ -154,3 +154,49 @@ export function findDuplicates(items: readonly DuplicateInput[]): DuplicateGroup
 
   return resultado;
 }
+
+export type DuplicateResolutionInput = DuplicateInput & Readonly<{
+  /** Quando o órgão publicou, se o PNCP informar. */
+  publishedAt?: Date | undefined;
+  /** Reserva: usada só quando nenhuma das duas tem `publishedAt`. */
+  createdAt: Date;
+}>;
+
+/**
+ * Decide, dentro de cada grupo de duplicatas, quem fica na fila.
+ *
+ * A publicação mais recente vence — republicação costuma ser retificação
+ * (prazo, valor ou exigência atualizados), então é a versão mais nova que a
+ * equipe deve ver. Sem data de publicação em nenhuma das duas, a mais
+ * recentemente CAPTADA por esta casa serve de aproximação.
+ *
+ * Devolve, para cada perdedor, o id de quem sobreviveu — nunca os dois lados
+ * de um mesmo par: cada licitação aparece no máximo uma vez, como perdedora
+ * de um único grupo.
+ */
+export function resolveDuplicates(items: readonly DuplicateResolutionInput[]): ReadonlyMap<string, string> {
+  const grupos = findDuplicates(items);
+  const porId = new Map(items.map((item) => [item.id, item]));
+  const referencia = (item: DuplicateResolutionInput) => item.publishedAt ?? item.createdAt;
+
+  const resultado = new Map<string, string>();
+  const processados = new Set<string>();
+
+  for (const [id, outros] of grupos) {
+    if (processados.has(id)) continue;
+    const membros = [id, ...outros];
+    for (const membro of membros) processados.add(membro);
+
+    const sobrevivente = membros.reduce((melhor, candidato) => {
+      const dataMelhor = referencia(porId.get(melhor)!);
+      const dataCandidato = referencia(porId.get(candidato)!);
+      return dataCandidato > dataMelhor ? candidato : melhor;
+    });
+
+    for (const membro of membros) {
+      if (membro !== sobrevivente) resultado.set(membro, sobrevivente);
+    }
+  }
+
+  return resultado;
+}

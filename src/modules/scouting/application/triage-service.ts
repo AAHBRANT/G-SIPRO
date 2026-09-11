@@ -37,7 +37,8 @@ export type OpportunitySeed = Readonly<{
 export interface TriageRepository {
   findById(id: string): Promise<ScoutedTenderRecord | null>;
   markApproved(id: string, opportunityId: string, actorId: string, decidedAt: Date): Promise<void>;
-  markDiscarded(id: string, actorId: string, reason: string, decidedAt: Date): Promise<void>;
+  /** `actorId` ausente quando o descarte é automático (duplicata resolvida pela varredura). */
+  markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<void>;
   countPending(): Promise<number>;
 }
 
@@ -96,7 +97,7 @@ export class TriageService {
     return opportunityId;
   }
 
-  async discard(id: string, actorId: string, reason: unknown, decidedAt: Date = new Date()): Promise<void> {
+  async discard(id: string, actorId: string | undefined, reason: unknown, decidedAt: Date = new Date()): Promise<void> {
     await this.requirePending(id);
     await this.repository.markDiscarded(id, actorId, discardReasonSchema.parse(reason), decidedAt);
   }

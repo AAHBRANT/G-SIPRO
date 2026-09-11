@@ -156,10 +156,13 @@ export class PrismaTriageRepository implements TriageRepository {
     });
   }
 
-  async markDiscarded(id: string, actorId: string, reason: string, decidedAt: Date): Promise<void> {
+  async markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<void> {
     await getDatabase().scoutedTender.update({
       where: { id },
-      data: { status: "DISCARDED", decidedById: actorId, decisionReason: reason, decidedAt },
+      // Ausente quando o descarte é automático (duplicata resolvida pela
+      // própria varredura, sem sessão de usuário) — `decidedById` já é
+      // opcional no banco por causa disto.
+      data: { status: "DISCARDED", decidedById: actorId ?? null, decisionReason: reason, decidedAt },
     });
   }
 

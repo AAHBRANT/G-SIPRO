@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { findDuplicates, type DuplicateInput } from "@/modules/scouting/domain/duplicates";
+import {
+  findDuplicates,
+  resolveDuplicates,
+  type DuplicateInput,
+  type DuplicateResolutionInput,
+} from "@/modules/scouting/domain/duplicates";
 
 const item = (parcial: Partial<DuplicateInput> & { id: string }): DuplicateInput => ({
   authorityName: "MUNICÍPIO DE EXEMPLO",
   subject: "Contratação de empresa especializada para execução de ponte em concreto armado sobre o rio Preto",
+  ...parcial,
+});
+
+const itemComData = (parcial: Partial<DuplicateResolutionInput> & { id: string }): DuplicateResolutionInput => ({
+  ...item(parcial),
+  createdAt: new Date("2026-01-01T00:00:00Z"),
   ...parcial,
 });
 
@@ -96,5 +107,44 @@ describe("o que NÃO pode ser agrupado", () => {
 
   it("lista vazia não quebra", () => {
     expect(findDuplicates([]).size).toBe(0);
+  });
+});
+
+describe("quem sobrevive quando é a mesma obra", () => {
+  it("a publicação mais recente vence", () => {
+    const r = resolveDuplicates([
+      itemComData({ id: "antiga", authorityDocument: "07658917000127", publishedAt: new Date("2026-07-01") }),
+      itemComData({ id: "nova", authorityDocument: "07658917000127", publishedAt: new Date("2026-08-15") }),
+    ]);
+    expect(r.get("antiga")).toBe("nova");
+    expect(r.has("nova")).toBe(false);
+  });
+
+  it("sem data de publicação em nenhuma das duas, usa quando foi captada", () => {
+    const r = resolveDuplicates([
+      itemComData({ id: "capturada-primeiro", authorityDocument: "07658917000127", createdAt: new Date("2026-08-01") }),
+      itemComData({ id: "capturada-depois", authorityDocument: "07658917000127", createdAt: new Date("2026-08-20") }),
+    ]);
+    expect(r.get("capturada-primeiro")).toBe("capturada-depois");
+  });
+
+  it("grupo de três: só as duas mais antigas perdem, e as duas apontam pra mesma sobrevivente", () => {
+    const r = resolveDuplicates([
+      itemComData({ id: "a", authorityDocument: "07658917000127", processNumber: "2026-16974-0", publishedAt: new Date("2026-06-01") }),
+      itemComData({ id: "b", authorityDocument: "07658917000127", processNumber: "2026-16974-0", publishedAt: new Date("2026-07-01") }),
+      itemComData({ id: "c", authorityDocument: "07658917000127", processNumber: "2026-16974-0", publishedAt: new Date("2026-08-01") }),
+    ]);
+    expect(r.get("a")).toBe("c");
+    expect(r.get("b")).toBe("c");
+    expect(r.has("c")).toBe(false);
+  });
+
+  it("licitação sem par não aparece no mapa", () => {
+    const r = resolveDuplicates([itemComData({ id: "a", authorityDocument: "07658917000127" })]);
+    expect(r.size).toBe(0);
+  });
+
+  it("lista vazia não quebra", () => {
+    expect(resolveDuplicates([]).size).toBe(0);
   });
 });
