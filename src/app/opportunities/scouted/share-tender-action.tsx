@@ -2,7 +2,20 @@
 
 import { useState, useTransition } from "react";
 
-export type ShareRecipient = Readonly<{ id: string; label: string }>;
+export type ShareRecipient = Readonly<{ id: string; email: string; label: string }>;
+
+/**
+ * Link de chat do próprio Teams (não é chamada de API, é navegação pura) —
+ * abre o Teams direto numa conversa 1:1 com a pessoa, com a licitação já como
+ * rascunho da mensagem. Documentado pela Microsoft como "deep link to a
+ * specific chat"; não precisa de nenhuma permissão nova no Graph porque quem
+ * efetivamente manda a mensagem é a própria pessoa, clicando Enviar do lado
+ * dela — o app só monta o link.
+ */
+function linkDaConversa(email: string, mensagem: string): string {
+  const parametros = new URLSearchParams({ users: email, message: mensagem });
+  return `https://teams.microsoft.com/l/chat/0/0?${parametros.toString()}`;
+}
 
 /**
  * Compartilha a licitação com alguém já cadastrado no G-SIPRO, pelo Teams
@@ -10,13 +23,14 @@ export type ShareRecipient = Readonly<{ id: string; label: string }>;
  * servidor — não existe endpoint de busca de usuário aqui, é a mesma lista
  * pequena de gente ativa na casa.
  */
-export function ShareTenderAction({ id, recipients }: { id: string; recipients: readonly ShareRecipient[] }) {
+export function ShareTenderAction({ id, subject, recipients }: { id: string; subject: string; recipients: readonly ShareRecipient[] }) {
   const [open, setOpen] = useState(false);
   const [recipientId, setRecipientId] = useState(recipients[0]?.id ?? "");
   const [note, setNote] = useState("");
   const [resultado, setResultado] = useState<string>();
   const [erro, setErro] = useState<string>();
   const [pending, startTransition] = useTransition();
+  const destinatario = recipients.find((recipient) => recipient.id === recipientId);
 
   function fechar() {
     setOpen(false);
@@ -87,7 +101,21 @@ export function ShareTenderAction({ id, recipients }: { id: string; recipients: 
           value={note}
         />
         {erro && <p className="bx-erro" style={{ marginTop: 8 }}>{erro}</p>}
-        {resultado && <p className="bx-nota" style={{ marginTop: 8 }}>{resultado}</p>}
+        {resultado && <>
+          <p className="bx-nota" style={{ marginTop: 8 }}>{resultado}</p>
+          {destinatario && <a
+            className="bx-link forte"
+            href={linkDaConversa(
+              destinatario.email,
+              `${subject.slice(0, 200)}${note.trim() ? ` — ${note.trim()}` : ""} — ${typeof window !== "undefined" ? `${window.location.origin}/opportunities/scouted#${id}` : ""}`,
+            )}
+            rel="noreferrer"
+            style={{ marginTop: 10 }}
+            target="_blank"
+          >
+            Abrir conversa no Teams com {destinatario.label.split(" (")[0]}
+          </a>}
+        </>}
       </div>
 
       <div className="bx-modal-pe">

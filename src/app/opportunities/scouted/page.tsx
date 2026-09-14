@@ -181,7 +181,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       orderBy: { displayName: "asc" },
     }),
   ]);
-  const shareRecipients = activeUsers.map((user) => ({ id: user.id, label: `${user.displayName} (${user.email})` }));
+  const shareRecipients = activeUsers.map((user) => ({ id: user.id, email: user.email, label: `${user.displayName} (${user.email})` }));
 
   const scored = rows.map((tender) => {
     // Lida do edital quando existe leitura; deduzida do objeto quando não.
@@ -437,7 +437,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                     Por isso não depende da alçada de decidir. */}
                 <div className="bx-mini-acoes">
                   <SignalActions id={tender.id} signal={signal ? { level: signal.level, label: signal.label, color: signal.color, ...(signal.note ? { note: signal.note } : {}) } : undefined}/>
-                  <ShareTenderAction id={tender.id} recipients={shareRecipients}/>
+                  <ShareTenderAction id={tender.id} recipients={shareRecipients} subject={tender.subject}/>
                 </div>
               </div>
             </summary>
