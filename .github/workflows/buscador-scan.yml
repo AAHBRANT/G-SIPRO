@@ -54,3 +54,18 @@ jobs:
           done
           echo "lotes com falha: ${falhas}"
           test "${falhas}" -lt 6
+
+      # Passo à parte, de propósito: resolução de duplicata e leitura de
+      # edital já tentaram rodar dentro da varredura acima e o ingress cortou
+      # a conexão perto dos 240 s (504 em sequência, 11/09/2026 e 13/09/2026).
+      # Rota própria, orçamento próprio (150 s, dentro da rota) — o represado
+      # que não couber nesta chamada é coberto na próxima.
+      - name: Resolver duplicata e ler edital do represado
+        run: |
+          set -uo pipefail
+          curl --fail --silent --show-error \
+            --max-time 200 \
+            --request POST \
+            --header "Authorization: Bearer ${SCOUT_DISPATCH_TOKEN}" \
+            "${GSIPRO_URL}/api/scouting/process-backlog" \
+          || echo "::warning::processamento do represado não pôde ser concluído — a próxima chamada tenta de novo"
