@@ -33,7 +33,14 @@ export const proxy = auth((request: NextAuthRequest): NextResponse => {
   // rota nova autenticada por token de agendador (Bearer), sem sessão de
   // usuário. Sem esta exceção, o middleware rejeita com 401 antes mesmo de a
   // rota validar o token do Buscador.
-  if (request.nextUrl.pathname === "/api/scouting/scan") {
+  //
+  // ⚠️ /api/scouting/process-backlog caiu nesta MESMA lacuna no dia em que foi
+  // criada (14/09/2026): o workflow chamava a rota nova com o token certo, e
+  // voltava 401 do middleware — não da própria rota, que nunca chegava a
+  // rodar. O log de erro (curl: (22) 401) não deixava rastro nenhum de qual
+  // camada recusou, exatamente como já tinha acontecido com
+  // /api/support/triage/dispatch em 2026-08-03.
+  if (request.nextUrl.pathname === "/api/scouting/scan" || request.nextUrl.pathname === "/api/scouting/process-backlog") {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-correlation-id", correlationId);
     const response = NextResponse.next({ request: { headers: requestHeaders } });
