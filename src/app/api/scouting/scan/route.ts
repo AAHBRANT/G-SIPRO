@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import type { AuthorizationContext } from "@/core/authorization/policy";
-import { getDatabase } from "@/core/database/prisma";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
-import { EditalReadingService } from "@/modules/scouting/application/edital-reading-service";
 import { ScoutService } from "@/modules/scouting/application/scout-service";
-import { TriageService } from "@/modules/scouting/application/triage-service";
-import { resolveDuplicates } from "@/modules/scouting/domain/duplicates";
-import { PdfjsTextExtraction } from "@/modules/scouting/infrastructure/pdf-text";
 import { PncpClient } from "@/modules/scouting/infrastructure/pncp-client";
-import { PncpFilesClient } from "@/modules/scouting/infrastructure/pncp-files-client";
-import {
-  PrismaEditalExtraction,
-  PrismaEditalReadingRepository,
-} from "@/modules/scouting/infrastructure/prisma-edital-reading";
-import { OpportunityFromScoutedTender, PrismaScoutRepository, PrismaTriageRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
+import { PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { requireScoutDispatcher } from "@/modules/scouting/infrastructure/scout-dispatch-auth";
 
 const commandSchema = z.object({
@@ -39,6 +28,15 @@ const HORIZON_MONTHS = 12;
 /**
  * Dispara a varredura semanal do Buscador. Chamada pelo agendador (domingo),
  * autenticada por token dedicado — não por sessão de usuário.
+ *
+ * ⚠️ Só busca, qualifica e salva — nada mais. Resolução de duplicata e leitura
+ * de edital já moraram aqui e foram tiradas: o ingress do Container App corta
+ * a conexão perto dos 240 s (achado rodando contra o ambiente de verdade,
+ * 11/09/2026 — os 6 lotes voltaram 504 em sequência), e somar aquelas duas
+ * rotinas — rede por licitação, sem teto previsível — estourava esse tempo
+ * quase sempre que havia mais que um punhado de pendências. Ver
+ * `/api/scouting/process-backlog`, chamada como um passo separado do mesmo
+ * workflow (`.github/workflows/buscador-scan.yml`).
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
@@ -69,123 +67,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       const source = new PncpClient({ finalDate, states });
       const data = await new ScoutService(repository, source).run(command.trigger);
 
-      // Antes de ler edital de ninguém: descarta quem é duplicata (mesma
-      // obra, publicação mais antiga) — não vale gastar uma leitura de PDF
-      // numa licitação que já vai sair da fila.
-      await descartarDuplicatas();
-
-      // Nenhuma licitação fica "a conferir" à toa esperando um clique que não
-      // existe: lê o edital de quem ainda não tem leitura, por casamento de
-      // padrão, ainda dentro desta mesma requisição.
-      await readEditaisDaVarredura(context.correlationId);
-
       return NextResponse.json({ data, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }
   });
-}
-
-/**
- * Descarta quem é a mesma obra publicada mais de uma vez, mantendo só a
- * publicação mais recente na fila — decisão do usuário: duplicata não é
- * mais só sinalizada, é excluída de verdade.
- *
- * Só olha quem ainda está PENDING: uma duplicata que alguém já decidiu
- * (aprovou ou descartou por conta própria) nunca é tocada por aqui —
- * `TriageService.discard()` já recusa quem não está mais pendente.
- * `actorId` ausente: é a própria varredura, não uma pessoa: `decidedById`
- * fica nulo e o motivo registrado explica que foi automático.
- */
-async function descartarDuplicatas(): Promise<void> {
-  const pendentes = await getDatabase().scoutedTender.findMany({
-    where: { status: "PENDING" },
-    select: {
-      id: true, authorityDocument: true, authorityName: true, processNumber: true,
-      subject: true, proposalOpensAt: true, createdAt: true,
-    },
-  });
-  if (pendentes.length < 2) return;
-
-  const perdedores = resolveDuplicates(pendentes.map((tender) => ({
-    id: tender.id,
-    ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
-    authorityName: tender.authorityName,
-    ...(tender.processNumber ? { processNumber: tender.processNumber } : {}),
-    subject: tender.subject,
-    ...(tender.proposalOpensAt ? { publishedAt: tender.proposalOpensAt } : {}),
-    createdAt: tender.createdAt,
-  })));
-  if (perdedores.size === 0) return;
-
-  const service = new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender());
-  for (const [perdedorId, sobreviventeId] of perdedores) {
-    try {
-      await service.discard(perdedorId, undefined, `Duplicata automática: mesma obra que a licitação ${sobreviventeId}, publicada mais recentemente.`);
-    } catch {
-      // Corrida rara: alguém decidiu esta licitação entre a consulta acima e
-      // agora. TriageService.discard() já recusa quem não está mais
-      // PENDING — a decisão da pessoa vale, a automação só desiste desta.
-    }
-  }
-}
-
-/**
- * Teto de quantas licitações sem leitura uma varredura lê por vez.
- *
- * Sem teto, uma fila represada grande (achado real: licitações que já
- * estavam na fila antes desta automação existir, sem nenhum jeito de serem
- * cobertas depois) faria esta função rodar por tempo indeterminado dentro da
- * mesma requisição HTTP do agendador. Com teto, o represado é absorvido aos
- * poucos, a cada varredura, sempre pelas mais urgentes primeiro — e nunca
- * fica para sempre sem leitura só porque entrou antes da automação existir.
- */
-const LOTE_LEITURA_AUTOMATICA = 40;
-
-/**
- * Lê o edital de quem ainda não tem leitura — sem IA, sem sessão de usuário
- * (`readById` fica nulo: é a própria varredura, não uma pessoa).
- *
- * Cobre TANTO as licitações novas desta varredura QUANTO o represado (o que
- * já estava pendente antes desta automação existir), pela mesma fila e na
- * mesma ordem: prazo mais próximo primeiro. Sem isto, o texto que a tela já
- * mostrava desde 04/09 — "a próxima chamada do agendador cobre a fila
- * pendente por ordem de prazo" — era uma promessa que a automação, restrita
- * só à varredura corrente, nunca cumpria para quem já estava na fila.
- *
- * Nunca deixa uma licitação ruim (PDF ilegível, PNCP fora do ar) derrubar as
- * outras: cada falha só significa que aquela continua "a conferir", e seguem
- * as próximas.
- */
-async function readEditaisDaVarredura(correlationId: string): Promise<void> {
-  const pendentes = await getDatabase().scoutedTender.findMany({
-    where: { status: "PENDING", editalReading: null },
-    // "nulls: last" — sem prazo informado não é "mais urgente que todos": o
-    // padrão do Postgres para ASC é nulo primeiro, o que faria justamente o
-    // que não tem prazo nenhum furar a fila à frente de quem tem prazo apertado.
-    orderBy: { proposalClosesAt: { sort: "asc", nulls: "last" } },
-    take: LOTE_LEITURA_AUTOMATICA,
-    select: { id: true },
-  });
-  if (pendentes.length === 0) return;
-
-  const service = new EditalReadingService(
-    new PncpFilesClient(),
-    new PrismaEditalExtraction(),
-    new PrismaEditalReadingRepository(),
-    new PdfjsTextExtraction(),
-  );
-  // Sem sessão de usuário: nenhuma permissão é checada aqui dentro (a
-  // governança de IA nem se aplica — `onlyPatternMatch` nunca chama IA), e
-  // `readById` sai nulo por causa do actorId vazio ser descartado no serviço.
-  const auth: AuthorizationContext = { actorId: "", permissions: new Set() };
-
-  for (const tender of pendentes) {
-    try {
-      await service.read(tender.id, auth, correlationId, false, true);
-    } catch {
-      // Ver o comentário da função: uma licitação ruim não pode custar as
-      // outras. Fica "a conferir" e a varredura segue.
-    }
-  }
 }
