@@ -58,14 +58,34 @@ jobs:
       # Passo à parte, de propósito: resolução de duplicata e leitura de
       # edital já tentaram rodar dentro da varredura acima e o ingress cortou
       # a conexão perto dos 240 s (504 em sequência, 11/09/2026 e 13/09/2026).
-      # Rota própria, orçamento próprio (150 s, dentro da rota) — o represado
-      # que não couber nesta chamada é coberto na próxima.
+      # Rota própria, orçamento próprio (150 s, dentro da rota).
+      #
+      # ⚠️ Uma chamada só não bastava: a rota lê até 80 por vez, e com a fila
+      # represada grande (259 pendentes, 182 com prazo curto, achado em
+      # produção 18/09/2026) uma vez por semana não alcançava — a maioria
+      # continuava "edital não lido" dias depois do mecanismo já existir, e a
+      # exigência técnica ficava presa perto de 100% (o palpite pelo objeto,
+      # não a leitura real). Por isso repete a chamada várias vezes na mesma
+      # rodada, parando assim que a resposta disser que não sobrou represado —
+      # o teto é só contra rodar sem fim se algo estiver errado.
       - name: Resolver duplicata e ler edital do represado
         run: |
           set -uo pipefail
-          curl --fail --silent --show-error \
-            --max-time 200 \
-            --request POST \
-            --header "Authorization: Bearer ${SCOUT_DISPATCH_TOKEN}" \
-            "${GSIPRO_URL}/api/scouting/process-backlog" \
-          || echo "::warning::processamento do represado não pôde ser concluído — a próxima chamada tenta de novo"
+          teto=10
+          for i in $(seq 1 "$teto"); do
+            echo "chamada ${i}/${teto}"
+            if ! resposta=$(curl --fail --silent --show-error \
+              --max-time 200 \
+              --request POST \
+              --header "Authorization: Bearer ${SCOUT_DISPATCH_TOKEN}" \
+              "${GSIPRO_URL}/api/scouting/process-backlog"); then
+              echo "::warning::chamada ${i} do represado falhou — a próxima varredura tenta de novo"
+              break
+            fi
+            echo "${resposta}"
+            total=$(echo "${resposta}" | jq -r '.data.editais.total // 0')
+            if [ "${total}" -eq 0 ]; then
+              echo "represado de leitura zerado"
+              break
+            fi
+          done
