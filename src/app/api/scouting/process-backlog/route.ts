@@ -144,10 +144,13 @@ const LOTE_LEITURA_AUTOMATICA = 80;
  * `porStatus` fica para dizer O QUE está impedindo quem continua sem
  * leitura, em vez de um número só que não distingue as duas coisas.
  */
+/** Poucas amostras bastam para diagnosticar — texto igual não precisa se repetir. */
+const MAX_AMOSTRAS_DE_ERRO = 5;
+
 async function readEditaisDaVarredura(
   correlationId: string,
   deadline: number,
-): Promise<{ lidas: number; total: number; porStatus: Record<string, number> }> {
+): Promise<{ lidas: number; total: number; porStatus: Record<string, number>; amostrasDeErro: readonly string[] }> {
   const pendentes = await getDatabase().scoutedTender.findMany({
     where: { status: "PENDING", editalReading: null },
     // "nulls: last" — sem prazo informado não é "mais urgente que todos": o
@@ -157,7 +160,7 @@ async function readEditaisDaVarredura(
     take: LOTE_LEITURA_AUTOMATICA,
     select: { id: true },
   });
-  if (pendentes.length === 0) return { lidas: 0, total: 0, porStatus: {} };
+  if (pendentes.length === 0) return { lidas: 0, total: 0, porStatus: {}, amostrasDeErro: [] };
 
   const service = new EditalReadingService(
     new PncpFilesClient(),
@@ -172,17 +175,26 @@ async function readEditaisDaVarredura(
 
   let lidas = 0;
   const porStatus: Record<string, number> = {};
+  // ⚠️ `porStatus` sozinho (achado em produção, 19/09/2026) só disse QUE
+  // tudo terminava em "FAILED" — não disse POR QUE. `reason` é o texto que
+  // `EditalReadingService.read()` já captura do erro real (`message(error)`)
+  // e descartava em silêncio; um conjunto (não lista) porque o mesmo erro se
+  // repete em centenas de licitações, e ver "reason X 200 vezes" não ajuda
+  // mais do que ver uma vez.
+  const amostrasDeErro = new Set<string>();
   for (const tender of pendentes) {
     if (Date.now() >= deadline) break;
     try {
       const resultado = await service.read(tender.id, auth, correlationId, false, true);
       porStatus[resultado.status] = (porStatus[resultado.status] ?? 0) + 1;
       if (resultado.status === "READ") lidas += 1;
-    } catch {
+      else if (resultado.status === "FAILED" && amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(resultado.reason);
+    } catch (erro) {
       // Ver o comentário da função: uma licitação ruim não pode custar as
       // outras. Fica "a conferir" e a varredura segue.
       porStatus.EXCEPTION = (porStatus.EXCEPTION ?? 0) + 1;
+      if (amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(erro instanceof Error ? erro.message : String(erro));
     }
   }
-  return { lidas, total: pendentes.length, porStatus };
+  return { lidas, total: pendentes.length, porStatus, amostrasDeErro: [...amostrasDeErro] };
 }
