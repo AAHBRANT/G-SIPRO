@@ -132,8 +132,22 @@ const LOTE_LEITURA_AUTOMATICA = 80;
  * Nunca deixa uma licitação ruim (PDF ilegível, PNCP fora do ar) derrubar as
  * outras: cada falha só significa que aquela continua "a conferir", e seguem
  * as próximas.
+ *
+ * ⚠️ `lidas` só conta `status === "READ"` — achado em produção (19/09/2026):
+ * a versão anterior somava QUALQUER chamada que não lançasse exceção, e
+ * `EditalReadingService.read()` devolve um status sem lançar exceção nos
+ * casos "não deu para ler" (`NO_FILE`, `FILE_TOO_LARGE`, `NOTHING_EXTRACTED`,
+ * `NO_IDENTIFIER`, `FAILED`) — nenhum deles grava leitura nenhuma. O número
+ * relatado (milhares de "lidas") não batia com o que a tela mostrava
+ * (licitação de alto valor, mesmo prazo, "edital não lido" depois de três
+ * rodadas inteiras) porque a métrica contava tentativa, não sucesso.
+ * `porStatus` fica para dizer O QUE está impedindo quem continua sem
+ * leitura, em vez de um número só que não distingue as duas coisas.
  */
-async function readEditaisDaVarredura(correlationId: string, deadline: number): Promise<{ lidas: number; total: number }> {
+async function readEditaisDaVarredura(
+  correlationId: string,
+  deadline: number,
+): Promise<{ lidas: number; total: number; porStatus: Record<string, number> }> {
   const pendentes = await getDatabase().scoutedTender.findMany({
     where: { status: "PENDING", editalReading: null },
     // "nulls: last" — sem prazo informado não é "mais urgente que todos": o
@@ -143,7 +157,7 @@ async function readEditaisDaVarredura(correlationId: string, deadline: number): 
     take: LOTE_LEITURA_AUTOMATICA,
     select: { id: true },
   });
-  if (pendentes.length === 0) return { lidas: 0, total: 0 };
+  if (pendentes.length === 0) return { lidas: 0, total: 0, porStatus: {} };
 
   const service = new EditalReadingService(
     new PncpFilesClient(),
@@ -157,15 +171,18 @@ async function readEditaisDaVarredura(correlationId: string, deadline: number): 
   const auth: AuthorizationContext = { actorId: "", permissions: new Set() };
 
   let lidas = 0;
+  const porStatus: Record<string, number> = {};
   for (const tender of pendentes) {
     if (Date.now() >= deadline) break;
     try {
-      await service.read(tender.id, auth, correlationId, false, true);
-      lidas += 1;
+      const resultado = await service.read(tender.id, auth, correlationId, false, true);
+      porStatus[resultado.status] = (porStatus[resultado.status] ?? 0) + 1;
+      if (resultado.status === "READ") lidas += 1;
     } catch {
       // Ver o comentário da função: uma licitação ruim não pode custar as
       // outras. Fica "a conferir" e a varredura segue.
+      porStatus.EXCEPTION = (porStatus.EXCEPTION ?? 0) + 1;
     }
   }
-  return { lidas, total: pendentes.length };
+  return { lidas, total: pendentes.length, porStatus };
 }
