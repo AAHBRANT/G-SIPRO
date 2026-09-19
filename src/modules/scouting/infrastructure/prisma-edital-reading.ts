@@ -106,7 +106,14 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
       requiresSiteVisit: input.requirement.requiresSiteVisit ?? null,
       confidence: input.requirement.confidence ?? null,
       limitations: input.requirement.limitations as unknown as object,
-      readById: actorId ?? null,
+      // `?? null` não bastava: a varredura automática manda `actorId: ""`
+      // (nunca `undefined`), e "" não é null nem undefined — ia direto para
+      // uma coluna `@db.Uuid`, que o Postgres rejeita como UUID inválido em
+      // TODA gravação automática. Achado em produção (19/09/2026): a leitura
+      // automática relatava "lida" (nenhuma exceção capturada ali), mas 100%
+      // das tentativas terminavam em FAILED aqui dentro — string vazia é
+      // falsy, `?? ` só troca null/undefined.
+      readById: actorId || null,
       // Reler zera a conferência: quem validou a leitura anterior não validou
       // esta. Manter o carimbo antigo diria que alguém conferiu o que ninguém viu.
       reviewedAt: null,
@@ -125,7 +132,11 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
         data: {
           id: randomUUID(),
           actorType: actorId ? "USER" : "SYSTEM",
-          actorId: actorId ?? "scout-scan",
+          // Mesma pegadinha do `readById` acima: `actorId` chega "" (não
+          // undefined) na varredura automática, e `??` só troca null/
+          // undefined — "" não é nenhum dos dois, então passava direto em
+          // vez de cair no rótulo do sistema.
+          actorId: actorId || "scout-scan",
           action: "EDITAL_READING_RECORDED",
           entityType: "SCOUTED_TENDER_EDITAL_READING",
           entityId: linha.id,
