@@ -68,10 +68,18 @@ jobs:
       # não a leitura real). Por isso repete a chamada várias vezes na mesma
       # rodada, parando assim que a resposta disser que não sobrou represado —
       # o teto é só contra rodar sem fim se algo estiver errado.
+      #
+      # ⚠️ 10 chamadas não bastavam: medido em produção (19/09/2026), cada
+      # chamada só lê ~10 editais dentro do orçamento de 150 s (rede + PDF por
+      # licitação é mais lento que o esperado), e as 10 chamadas originais
+      # sempre voltavam com o represado ainda cheio ("total": 80, o teto da
+      # consulta, em toda chamada). 30 chamadas cobrem ~300 leituras por
+      # rodada — o suficiente para zerar o represado observado numa única
+      # execução, ainda dentro de um teto seguro contra loop sem fim.
       - name: Resolver duplicata e ler edital do represado
         run: |
           set -uo pipefail
-          teto=10
+          teto=30
           for i in $(seq 1 "$teto"); do
             echo "chamada ${i}/${teto}"
             if ! resposta=$(curl --fail --silent --show-error \
