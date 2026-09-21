@@ -262,18 +262,25 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
     };
   });
 
-  // Filtro e ordenação por EXIGÊNCIA TÉCNICA (acervo puro), não pelo apanhado
-  // de pré-requisitos — que trava perto de 38% em toda licitação enquanto o
-  // edital não é lido, e um piso configurado contra ele esconderia a fila
-  // inteira. Ver o comentário em adherence-gauge.tsx.
+  /**
+   * O FILTRO corta por exigência técnica (acervo puro) e a ORDENAÇÃO ordena
+   * por pré-requisitos. Divergem de propósito, não é descuido:
+   *
+   * - A ordem tem de bater com o número que o medidor da linha mostra
+   *   (`tender.score`, desde 21/09/2026), senão a fila fica ordenada por um
+   *   número que não aparece em lugar nenhum da tela.
+   * - O piso continua no acervo porque licitação com edital ainda não lido
+   *   tem pré-requisitos baixos por FALTA DE DADO. Um piso contra esse número
+   *   esconderia justamente o represado que ainda precisa ser lido.
+   */
   const kept = adherenceFloor > 0
     ? comRequisitos.filter((tender) => tender.archive.score >= adherenceFloor)
     : comRequisitos;
   const ordered = sort === "aderencia"
-    // Sem acervo julgado, vai para o fim: é dado que falta, não zero de verdade.
-    ? [...kept].sort((a, b) => (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1)
-        // Empate em acervo: quem atende mais pré-requisitos vem antes.
-        || b.score - a.score)
+    ? [...kept].sort((a, b) => b.score - a.score
+        // Empate em pré-requisitos: decide o acervo, e sem acervo julgado vai
+        // para o fim — é dado que falta, não zero de verdade.
+        || (b.archive.determined ? b.archive.score : -1) - (a.archive.determined ? a.archive.score : -1))
     : kept;
   const tenders = ordered.slice(0, PAGE_SIZE);
 
@@ -418,18 +425,24 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
               </div>
 
               <div className="bx-medidor-caixa">
-                {/* O medidor grande responde UMA pergunta: dos serviços que
-                    este tipo de obra exige, quantos o acervo comprova? É a
-                    pergunta de antes de gastar uma leitura de edital — não o
-                    apanhado de porte/prazo/valor/edital, que trava perto de
-                    38% em toda licitação enquanto o edital não é lido
-                    (ver adherence-gauge.tsx). */}
+                {/* O medidor grande mostra o MESMO número do selo da aba
+                    Pré-requisitos: dos requisitos que esta licitação exige,
+                    quantos a empresa atende (acervo, porte, prazo, valor,
+                    consórcio, CAT, visita, garantia).
+
+                    Mudou em 21/09/2026, a pedido do dono. Até então media só
+                    acervo, porque o apanhado travava perto de 38% em toda
+                    licitação enquanto o edital não era lido — e o que impedia
+                    a leitura era o bug do pdf.worker.mjs no build de produção,
+                    corrigido em adea724. Com a leitura funcionando, o número
+                    voltou a separar uma licitação da outra. Ver
+                    adherence-gauge.tsx. */}
                 <AdherenceGauge
-                  aria={tender.archive.determined
-                    ? `Exigência técnica: ${tender.archive.required.length - tender.archive.missing.length} de ${tender.archive.required.length} serviços comprovados${tender.archive.requirementInferred ? ", estimado do objeto" : ""}`
-                    : "Exigência técnica não avaliada — acervo não julgado"}
-                  score={tender.archive.score}
-                  undetermined={!tender.archive.determined}
+                  aria={tender.resumo.total === 0
+                    ? "Pré-requisitos não avaliados"
+                    : `Pré-requisitos atendidos: ${tender.resumo.met} de ${tender.resumo.total}`}
+                  score={tender.score}
+                  undetermined={tender.resumo.total === 0}
                 />
                 {canDecide ? <TriageActions id={tender.id}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
                 {/* Sinalizar orienta a equipe; não aprova nem descarta nada.
@@ -638,18 +651,26 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                       : <p className="bx-nota">
                         Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
                       </p>}
+                    {/* O link forte leva à PÁGINA da licitação no PNCP, que
+                        é onde fica a aba "Arquivos" com TODOS os documentos
+                        publicados pelo órgão. O `edital.source.uri` é só o
+                        arquivo que a IA leu: `edital-relevance` escolhe o que
+                        traz as parcelas com quantitativo, que quase nunca é o
+                        "EDITAL.pdf". Essa escolha está certa para a leitura e
+                        errada para quem quer os documentos — por isso são dois
+                        links, cada um com o rótulo do que ele é de verdade. */}
                     <div className="bx-links">
-                      {tender.edital && <a className="bx-link forte" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
+                      {tender.noticeUrl && <a className="bx-link forte" href={tender.noticeUrl} rel="noreferrer" target="_blank">
                         <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
-                        Baixar o edital
+                        Baixar edital e anexos
                       </a>}
-                      {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
-                        Abrir no PNCP
+                      {tender.edital && <a className="bx-link" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
+                        Arquivo lido pela IA
                         <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
                       </a>}
                     </div>
                     {tender.edital && <p className="bx-nota">
-                      O arquivo não fica guardado no G-SIPRO: o link busca direto na origem, e por isso pode responder erro se o órgão o tirar do ar.
+                      Nenhum dos dois fica guardado no G-SIPRO: os links buscam direto na origem, e por isso podem responder erro se o órgão tirar o arquivo do ar.
                     </p>}
                   </div>
                 </dl>

@@ -1,25 +1,23 @@
 /**
- * Velocímetro de EXIGÊNCIA TÉCNICA, 0 a 100.
+ * Velocímetro de PRÉ-REQUISITOS, 0 a 100.
  *
- * Mede só uma coisa: dos serviços que este tipo de obra exige, quantos o
- * acervo comprova. É a pergunta que decide ANTES de gastar uma leitura de
- * edital (paga) — "vale a pena olhar essa licitação de perto?".
+ * Mede a fração dos requisitos da licitação que a empresa atende: acervo,
+ * porte, prazo, valor, consórcio, CAT, visita e garantia. É o MESMO número do
+ * selo na aba "Pré-requisitos", de propósito — dois números diferentes na
+ * mesma linha, um grande e um pequeno, era exatamente o que confundia.
  *
- * ⚠️ Por que não é "pré-requisitos atendidos" (o que já foi, e voltou a ser
- * medido em 04/09/2026): aquele número mistura acervo com porte, prazo, valor
- * e o que só o edital responde. Cinco dos oito itens nunca fecham enquanto o
- * edital não é lido — e por isso a nota travava em ~38% em TODA licitação,
- * não importa se o acervo era ótimo ou péssimo. Misturado, o número não
- * ajudava a decidir o que vale ler; separado, ele ajuda.
+ * ⚠️ Mediu só EXIGÊNCIA TÉCNICA (acervo puro) de 04/09 a 21/09/2026, e o
+ * motivo daquela escolha não vale mais: o apanhado travava perto de ~38% em
+ * TODA licitação porque cinco dos oito itens só o edital responde — e o edital
+ * nunca era lido de verdade, porque o `pdf.worker.mjs` não chegava ao build de
+ * produção (corrigido em adea724). Com a leitura funcionando, o número voltou
+ * a separar uma licitação da outra. Antes disso já foi "aderência ao perfil" e
+ * "cobertura de acervo"; as duas eram medidas diferentes desta.
  *
- * ⚠️ Isto AINDA é estimativa quando `requirementInferred` (o edital não foi
- * lido): a exigência vem só do objeto, uma frase — não das parcelas de maior
- * relevância de verdade. Objeto genérico tende a mostrar número alto mesmo
- * quando a real exigência do edital é outra. Alto aqui não é "aprovado";
- * é "nada óbvio faltando pelo que dá para saber sem ler o edital ainda".
- *
- * Já mediu "aderência ao perfil" e depois "cobertura de acervo" com porte
- * embutido; as duas eram medidas diferentes desta.
+ * ⚠️ Licitação cujo edital ainda NÃO foi lido mostra número baixo por falta de
+ * dado, não por ser ruim — esperado enquanto o represado não zera. É por isso
+ * que o piso de aderência mínima continua cortando por acervo, e não por este
+ * número: ver o comentário do filtro em page.tsx.
  *
  * Renderiza no servidor: é desenho puro, sem estado nem interação, então não
  * precisa atravessar a fronteira para o navegador.
@@ -54,7 +52,7 @@ export function AdherenceGauge({ score, undetermined, aria }: { score: number; u
 
   return (
     <svg
-      aria-label={aria ?? (undetermined ? "Exigência técnica não avaliada" : `Exigência técnica atendida: ${value}%`)}
+      aria-label={aria ?? (undetermined ? "Pré-requisitos não avaliados" : `Pré-requisitos atendidos: ${value}%`)}
       className="bx-medidor"
       height="74"
       role="img"
@@ -84,7 +82,7 @@ export function AdherenceGauge({ score, undetermined, aria }: { score: number; u
         {undetermined ? "—" : `${value}%`}
       </text>
       <text className="bx-medidor-rot" x={CX} y={CY + 26}>
-        exigência técnica
+        pré-requisitos
       </text>
     </svg>
   );
