@@ -132,11 +132,16 @@ describe("o que só o edital responde", () => {
     expect(acha(lista, "consorcio")?.detail).toContain("não foi encontrado");
   });
 
-  it("mostra o que a leitura não conseguiu determinar", () => {
+  /**
+   * `limitations` não vira item de pré-requisito — lia como ruído cru dentro
+   * de um checklist de sim/não (achado 21/09/2026, na tela real), e a mesma
+   * lista já aparece no bloco "Parcelas exigidas pelo edital".
+   */
+  it("o que a leitura não conseguiu determinar não vira item de pré-requisito", () => {
     const lista = buildPrerequisites(entrada({
       edital: { services: [], limitations: ["capital mínimo não localizado"], consortiumAllowed: true },
     }));
-    expect(acha(lista, "leitura")?.detail).toContain("capital mínimo");
+    expect(acha(lista, "leitura")).toBeUndefined();
   });
 });
 

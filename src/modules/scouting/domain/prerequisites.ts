@@ -166,10 +166,11 @@ export function buildPrerequisites(input: PrerequisiteInput): readonly Prerequis
       { status: "MET", detail: "não exige garantia de proposta" }),
   );
 
-  if (edital.limitations.length > 0) {
-    lista.push(item("leitura", "Leitura do edital", "ATTENTION", "EDITAL",
-      `a leitura não determinou: ${edital.limitations.join("; ")}`));
-  }
+  // `edital.limitations` não vira item de pré-requisito, de propósito: um
+  // item "Leitura do edital" juntando várias frases técnicas com "; " lia
+  // como ruído cru dentro de um checklist de sim/não (achado 21/09/2026, na
+  // tela real) — e a MESMA lista já aparece no bloco "Parcelas exigidas pelo
+  // edital", num lugar mais apropriado para ela.
 
   return lista;
 }
