@@ -92,7 +92,7 @@ export type EditalReadingOutcome =
   | Readonly<{ status: "NO_IDENTIFIER"; externalId: string }>
   | Readonly<{ status: "NO_FILE" }>
   | Readonly<{ status: "FILE_TOO_LARGE"; title: string }>
-  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId?: string; textoChars: number }>
+  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId?: string; textoChars: number; erroExtracao?: string }>
   | Readonly<{ status: "FAILED"; reason: string }>;
 
 export interface TenderFilesPort {
@@ -402,7 +402,9 @@ export class EditalReadingService {
           && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined
           && requirement.requiresProposalBond === undefined) {
           const semIA = await this.tentarSemIA(principal, bytes, complemento);
-          if (!semIA.requirement) return { status: "NOTHING_EXTRACTED", executionId, textoChars: semIA.textoChars };
+          if (!semIA.requirement) {
+            return { status: "NOTHING_EXTRACTED", executionId, textoChars: semIA.textoChars, ...(semIA.erroExtracao ? { erroExtracao: semIA.erroExtracao } : {}) };
+          }
           requirement = semIA.requirement;
           readMethod = "PATTERN_MATCH";
           executionIdGravado = undefined;
@@ -410,7 +412,9 @@ export class EditalReadingService {
       } else {
         // onlyPatternMatch: sem IA desde o início, não só como reforço.
         const semIA = await this.tentarSemIA(principal, bytes, complemento);
-        if (!semIA.requirement) return { status: "NOTHING_EXTRACTED", textoChars: semIA.textoChars };
+        if (!semIA.requirement) {
+          return { status: "NOTHING_EXTRACTED", textoChars: semIA.textoChars, ...(semIA.erroExtracao ? { erroExtracao: semIA.erroExtracao } : {}) };
+        }
         requirement = semIA.requirement;
         readMethod = "PATTERN_MATCH";
         executionIdGravado = undefined;
@@ -559,20 +563,20 @@ export class EditalReadingService {
     principal: Readable,
     bytes: Buffer,
     complemento: Readable | undefined,
-  ): Promise<Readonly<{ requirement: EditalRequirement | undefined; textoChars: number }>> {
+  ): Promise<Readonly<{ requirement: EditalRequirement | undefined; textoChars: number; erroExtracao?: string }>> {
     let texto: string;
     try {
       texto = await this.pdfText.extract(bytes);
-    } catch {
-      return { requirement: undefined, textoChars: -1 };
+    } catch (erro) {
+      return { requirement: undefined, textoChars: -1, erroExtracao: message(erro).slice(0, 300) };
     }
     const textoChars = texto.length;
 
     let requirement: EditalRequirement;
     try {
       requirement = editalRequirementFromText(texto);
-    } catch {
-      return { requirement: undefined, textoChars };
+    } catch (erro) {
+      return { requirement: undefined, textoChars, erroExtracao: message(erro).slice(0, 300) };
     }
 
     if (complemento && faltaInstitucional(requirement)) {

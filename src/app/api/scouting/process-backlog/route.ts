@@ -203,8 +203,12 @@ async function readEditaisDaVarredura(
       porStatus[resultado.status] = (porStatus[resultado.status] ?? 0) + 1;
       if (resultado.status === "READ") lidas += 1;
       else if (resultado.status === "FAILED" && amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(resultado.reason);
-      else if (resultado.status === "NOTHING_EXTRACTED" && amostrasDeTextoChars.length < MAX_AMOSTRAS_DE_ERRO) {
-        amostrasDeTextoChars.push(resultado.textoChars);
+      else if (resultado.status === "NOTHING_EXTRACTED") {
+        if (amostrasDeTextoChars.length < MAX_AMOSTRAS_DE_ERRO) amostrasDeTextoChars.push(resultado.textoChars);
+        // Mesmo texto de erro do FAILED acima, só que capturado DENTRO do
+        // casamento de padrão (onde vira "nada extraído", não "falhou") — ver
+        // o comentário de `tentarSemIA` em edital-reading-service.ts.
+        if (resultado.erroExtracao && amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(resultado.erroExtracao);
       }
     } catch (erro) {
       // Ver o comentário da função: uma licitação ruim não pode custar as
