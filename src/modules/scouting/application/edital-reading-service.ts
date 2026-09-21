@@ -92,7 +92,7 @@ export type EditalReadingOutcome =
   | Readonly<{ status: "NO_IDENTIFIER"; externalId: string }>
   | Readonly<{ status: "NO_FILE" }>
   | Readonly<{ status: "FILE_TOO_LARGE"; title: string }>
-  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId?: string }>
+  | Readonly<{ status: "NOTHING_EXTRACTED"; executionId?: string; textoChars: number }>
   | Readonly<{ status: "FAILED"; reason: string }>;
 
 export interface TenderFilesPort {
@@ -402,16 +402,16 @@ export class EditalReadingService {
           && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined
           && requirement.requiresProposalBond === undefined) {
           const semIA = await this.tentarSemIA(principal, bytes, complemento);
-          if (!semIA) return { status: "NOTHING_EXTRACTED", executionId };
-          requirement = semIA;
+          if (!semIA.requirement) return { status: "NOTHING_EXTRACTED", executionId, textoChars: semIA.textoChars };
+          requirement = semIA.requirement;
           readMethod = "PATTERN_MATCH";
           executionIdGravado = undefined;
         }
       } else {
         // onlyPatternMatch: sem IA desde o início, não só como reforço.
         const semIA = await this.tentarSemIA(principal, bytes, complemento);
-        if (!semIA) return { status: "NOTHING_EXTRACTED" };
-        requirement = semIA;
+        if (!semIA.requirement) return { status: "NOTHING_EXTRACTED", textoChars: semIA.textoChars };
+        requirement = semIA.requirement;
         readMethod = "PATTERN_MATCH";
         executionIdGravado = undefined;
       }
@@ -545,16 +545,34 @@ export class EditalReadingService {
    * vez de IA. Nunca lança — um PDF escaneado ou ilegível aqui vale o mesmo
    * que "não achou nada", exatamente como a IA já tratava esse caso.
    */
+  /**
+   * ⚠️ `textoChars` sempre volta, mesmo em falha — é o que separa "extraiu
+   * texto normal e não achou nada reconhecível" (formato fora dos 3
+   * municípios validados) de "não extraiu texto nenhum aqui dentro" (achado
+   * em produção, 21/09/2026: `porStatus` sozinho só dizia NOTHING_EXTRACTED
+   * para praticamente todo mundo, sem dizer qual dos dois — e testado local,
+   * com o MESMO `PdfjsTextExtraction` e os MESMOS documentos reais, a
+   * extração funcionava normalmente. `-1` sinaliza que nem a extração em si
+   * rodou; texto vazio de verdade também é possível e volta como `0`.
+   */
   private async tentarSemIA(
     principal: Readable,
     bytes: Buffer,
     complemento: Readable | undefined,
-  ): Promise<EditalRequirement | undefined> {
+  ): Promise<Readonly<{ requirement: EditalRequirement | undefined; textoChars: number }>> {
+    let texto: string;
+    try {
+      texto = await this.pdfText.extract(bytes);
+    } catch {
+      return { requirement: undefined, textoChars: -1 };
+    }
+    const textoChars = texto.length;
+
     let requirement: EditalRequirement;
     try {
-      requirement = editalRequirementFromText(await this.pdfText.extract(bytes));
+      requirement = editalRequirementFromText(texto);
     } catch {
-      return undefined;
+      return { requirement: undefined, textoChars };
     }
 
     if (complemento && faltaInstitucional(requirement)) {
@@ -571,7 +589,7 @@ export class EditalReadingService {
     const vazio = requirement.services.length === 0 && requirement.consortiumAllowed === undefined
       && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined
       && requirement.requiresProposalBond === undefined;
-    return vazio ? undefined : requirement;
+    return { requirement: vazio ? undefined : requirement, textoChars };
   }
 }
 

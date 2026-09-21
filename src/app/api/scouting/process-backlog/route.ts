@@ -150,7 +150,13 @@ const MAX_AMOSTRAS_DE_ERRO = 5;
 async function readEditaisDaVarredura(
   correlationId: string,
   deadline: number,
-): Promise<{ lidas: number; total: number; porStatus: Record<string, number>; amostrasDeErro: readonly string[] }> {
+): Promise<{
+  lidas: number;
+  total: number;
+  porStatus: Record<string, number>;
+  amostrasDeErro: readonly string[];
+  amostrasDeTextoChars: readonly number[];
+}> {
   const pendentes = await getDatabase().scoutedTender.findMany({
     where: { status: "PENDING", editalReading: null },
     // "nulls: last" — sem prazo informado não é "mais urgente que todos": o
@@ -160,7 +166,7 @@ async function readEditaisDaVarredura(
     take: LOTE_LEITURA_AUTOMATICA,
     select: { id: true },
   });
-  if (pendentes.length === 0) return { lidas: 0, total: 0, porStatus: {}, amostrasDeErro: [] };
+  if (pendentes.length === 0) return { lidas: 0, total: 0, porStatus: {}, amostrasDeErro: [], amostrasDeTextoChars: [] };
 
   const service = new EditalReadingService(
     new PncpFilesClient(),
@@ -182,6 +188,14 @@ async function readEditaisDaVarredura(
   // repete em centenas de licitações, e ver "reason X 200 vezes" não ajuda
   // mais do que ver uma vez.
   const amostrasDeErro = new Set<string>();
+  // ⚠️ Achado em produção (21/09/2026): "NOTHING_EXTRACTED" sozinho não dizia
+  // se o pdfjs extraiu texto normal e o padrão não reconheceu o formato, ou
+  // se a extração em si não rendeu nada DENTRO DO CONTÊINER — testado local
+  // com os MESMOS documentos reais e a MESMA classe `PdfjsTextExtraction`, a
+  // extração funcionava sempre. `textoChars` (-1 = a extração nem rodou, 0 =
+  // rodou e voltou vazio, N = rodou e achou N caracteres) é o que decide qual
+  // dos dois é — sem isto, o próximo passo seria chute de novo.
+  const amostrasDeTextoChars: number[] = [];
   for (const tender of pendentes) {
     if (Date.now() >= deadline) break;
     try {
@@ -189,6 +203,9 @@ async function readEditaisDaVarredura(
       porStatus[resultado.status] = (porStatus[resultado.status] ?? 0) + 1;
       if (resultado.status === "READ") lidas += 1;
       else if (resultado.status === "FAILED" && amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(resultado.reason);
+      else if (resultado.status === "NOTHING_EXTRACTED" && amostrasDeTextoChars.length < MAX_AMOSTRAS_DE_ERRO) {
+        amostrasDeTextoChars.push(resultado.textoChars);
+      }
     } catch (erro) {
       // Ver o comentário da função: uma licitação ruim não pode custar as
       // outras. Fica "a conferir" e a varredura segue.
@@ -196,5 +213,5 @@ async function readEditaisDaVarredura(
       if (amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(erro instanceof Error ? erro.message : String(erro));
     }
   }
-  return { lidas, total: pendentes.length, porStatus, amostrasDeErro: [...amostrasDeErro] };
+  return { lidas, total: pendentes.length, porStatus, amostrasDeErro: [...amostrasDeErro], amostrasDeTextoChars };
 }
