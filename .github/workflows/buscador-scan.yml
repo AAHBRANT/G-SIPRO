@@ -76,7 +76,17 @@ jobs:
       # consulta, em toda chamada). 30 chamadas cobrem ~300 leituras por
       # rodada — o suficiente para zerar o represado observado numa única
       # execução, ainda dentro de um teto seguro contra loop sem fim.
+      #
+      # ⚠️ `if: always()`: achado em produção (21/09/2026) — o PNCP tem DUAS
+      # APIs independentes (a de busca, que a varredura usa, e a de arquivo,
+      # que a leitura usa) e elas caem em momentos DIFERENTES, às vezes uma no
+      # ar e a outra não, no mesmo instante. Sem `always()`, a varredura
+      # falhando (busca fora do ar) pulava este passo inteiro — mesmo com a
+      # API de arquivo respondendo normalmente, o represado nunca era tocado.
+      # Os dois passos não dependem um do outro: cada um trabalha com o que já
+      # está no banco, então um não tem por que ficar refém do outro.
       - name: Resolver duplicata e ler edital do represado
+        if: always()
         run: |
           set -uo pipefail
           teto=30
