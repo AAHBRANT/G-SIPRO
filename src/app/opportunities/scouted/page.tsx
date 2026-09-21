@@ -18,7 +18,6 @@ import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkTyp
 import { themeVariants } from "@/modules/scouting/domain/signal";
 import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { AdherenceGauge } from "./adherence-gauge";
-import { RereadEditalAction } from "./reread-edital-action";
 import { filtersBootScript, ScoutedFilters, type FilterGroup } from "./scouted-filters";
 import { ShareTenderAction } from "./share-tender-action";
 import { Flag, SignalActions } from "./signal-actions";
@@ -443,179 +442,218 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
             </summary>
 
             <div className="bx-painel">
-              <dl className="bx-paineis">
-                <div className="bx-bloco">
-                  <h3>Identificação</h3>
-                  <Linha rotulo="Órgão" valor={tender.authorityName}/>
-                  <Linha rotulo="Esfera" valor={sphereLabels[tender.sphere] ?? tender.sphere}/>
-                  <Linha rotulo="Modalidade" valor={tender.modality}/>
-                  <Linha rotulo="Processo" valor={tender.processNumber ?? "—"}/>
-                  <Linha rotulo="Localidade" valor={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}/>
+              {/* Abas em vez de grade de cartões — achado 22/09/2026: mostrar
+                  6 a 8 blocos ao mesmo tempo (Identificação, Prazos, Pré-
+                  requisitos, Parcelas, Acervo, Aderência, Edital) ocupava a
+                  tela inteira só de moldura, a maior parte vazia. Rádio+label
+                  em CSS puro, mesma técnica já usada no tema e na barra de
+                  filtros recolhível — sem JS, sem virar client component. Cada
+                  input tem nome único por licitação (`aba-${tender.id}`), e a
+                  aba certa aparece por posição (nth-of-type do rádio marcado
+                  até o painel de mesma posição), não por id — assim funciona
+                  igual mesmo quando uma aba condicional (Parcelas, Sinalização)
+                  não existe para esta licitação. */}
+              <div className="bx-abas-painel">
+                <div className="bx-abas-nav" role="tablist">
+                  <input aria-controls={`${tender.id}-p1`} className="bx-aba-rd" defaultChecked id={`${tender.id}-a1`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                  <label className="bx-aba-lbl" htmlFor={`${tender.id}-a1`}>Identificação</label>
+                  <input aria-controls={`${tender.id}-p2`} className="bx-aba-rd" id={`${tender.id}-a2`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                  <label className="bx-aba-lbl" htmlFor={`${tender.id}-a2`}>Prazos</label>
+                  <input aria-controls={`${tender.id}-p3`} className="bx-aba-rd" id={`${tender.id}-a3`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                  <label className="bx-aba-lbl" htmlFor={`${tender.id}-a3`}>
+                    Pré-requisitos
+                    {/* É este o número que decide participar — % dos requisitos
+                        da LICITAÇÃO atendidos (acervo, porte, prazo, valor, e o
+                        que o edital exige), nunca preferência de perfil. */}
+                    <span className="bx-aba-selo">{tender.score}%</span>
+                  </label>
+                  {tender.edital && <>
+                    <input aria-controls={`${tender.id}-p4`} className="bx-aba-rd" id={`${tender.id}-a4`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                    <label className="bx-aba-lbl" htmlFor={`${tender.id}-a4`}>Parcelas exigidas</label>
+                  </>}
+                  <input aria-controls={`${tender.id}-p5`} className="bx-aba-rd" id={`${tender.id}-a5`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                  <label className="bx-aba-lbl" htmlFor={`${tender.id}-a5`}>Acervo técnico</label>
+                  <input aria-controls={`${tender.id}-p6`} className="bx-aba-rd" id={`${tender.id}-a6`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                  <label className="bx-aba-lbl" htmlFor={`${tender.id}-a6`}>Aderência ao perfil</label>
+                  {signal?.note && <>
+                    <input aria-controls={`${tender.id}-p7`} className="bx-aba-rd" id={`${tender.id}-a7`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                    <label className="bx-aba-lbl" htmlFor={`${tender.id}-a7`}>Sinalização</label>
+                  </>}
+                  <input aria-controls={`${tender.id}-p8`} className="bx-aba-rd" id={`${tender.id}-a8`} name={`aba-${tender.id}`} role="tab" type="radio"/>
+                  <label className="bx-aba-lbl" htmlFor={`${tender.id}-a8`}>Edital</label>
                 </div>
 
-                <div className="bx-bloco">
-                  <h3>Prazos</h3>
-                  <Linha rotulo="Abertura das propostas" valor={tender.proposalOpensAt?.toLocaleDateString("pt-BR") ?? "—"}/>
-                  <Linha rotulo="Encerramento" valor={tender.proposalClosesAt?.toLocaleDateString("pt-BR") ?? "—"}/>
-                  <Linha rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
-                  <Linha rotulo="Captada em" valor={tender.createdAt.toLocaleDateString("pt-BR")}/>
-                </div>
+                <dl className="bx-abas-corpo">
+                  <div className="bx-aba-painel" id={`${tender.id}-p1`}>
+                    <Linha rotulo="Órgão" valor={tender.authorityName}/>
+                    <Linha rotulo="Esfera" valor={sphereLabels[tender.sphere] ?? tender.sphere}/>
+                    <Linha rotulo="Modalidade" valor={tender.modality}/>
+                    <Linha rotulo="Processo" valor={tender.processNumber ?? "—"}/>
+                    <Linha rotulo="Localidade" valor={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}/>
+                  </div>
 
-                <div className="bx-bloco bx-bloco-largo">
-                  {/* Mesma contagem que já aparece na linha fechada da fila —
-                      só que lá ("3/8 pré-requisitos") e aqui não, obrigando a
-                      pessoa a contar ✓/– na mão pra saber o que atende. */}
-                  <h3>
-                    Pré-requisitos — {tender.resumo.met} de {tender.resumo.total} atendidos
-                    {tender.resumo.notMet > 0 ? `, ${tender.resumo.notMet} não atende${tender.resumo.notMet > 1 ? "m" : ""}` : ""}
-                    {tender.resumo.unknown > 0 ? `, ${tender.resumo.unknown} a conferir` : ""}
-                  </h3>
-                  {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
-                  <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
-                    {!tender.edital
-                      ? <>O que está marcado como <strong>a conferir</strong> depende de ler o edital. A leitura automática ainda não passou por esta licitação — a próxima chamada do agendador cobre a fila pendente por ordem de prazo.</>
-                      : tender.edital.reviewedAt
-                        ? <>Edital lido e <strong>conferido</strong> por uma pessoa em {tender.edital.reviewedAt.toLocaleDateString("pt-BR")}.</>
-                        : <>Edital lido automaticamente e <strong>ainda não conferido</strong> por uma pessoa. Antes de montar proposta ou consórcio, confira as parcelas contra o PDF.</>}
-                  </p>
-                </div>
+                  <div className="bx-aba-painel" id={`${tender.id}-p2`}>
+                    <Linha rotulo="Abertura das propostas" valor={tender.proposalOpensAt?.toLocaleDateString("pt-BR") ?? "—"}/>
+                    <Linha rotulo="Encerramento" valor={tender.proposalClosesAt?.toLocaleDateString("pt-BR") ?? "—"}/>
+                    <Linha rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
+                    <Linha rotulo="Captada em" valor={tender.createdAt.toLocaleDateString("pt-BR")}/>
+                  </div>
 
-                {tender.edital && <div className="bx-bloco bx-bloco-largo">
-                  <h3>Parcelas exigidas pelo edital</h3>
-                  {tender.edital.requirement.services.length > 0
-                    ? <div className="bx-parcelas">
-                      {tender.edital.requirement.services.map((parcela, indice) => <div className="bx-parcela" key={indice}>
-                        <span className="bx-parcela-nome">{parcela.description}</span>
-                        <span className="bx-parcela-qtd">
-                          {parcela.quantity === undefined
-                            ? "—"
-                            : `${parcela.quantity.toLocaleString("pt-BR")}${parcela.unit ? ` ${parcela.unit}` : ""}`}
-                        </span>
-                      </div>)}
-                    </div>
-                    : <p className="bx-nota">A leitura não localizou lista de parcelas de maior relevância neste edital.</p>}
-                  {tender.archive.unreadable.length > 0 && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
-                    <strong>Não conferido contra o acervo:</strong> {tender.archive.unreadable.join("; ")}. O sistema não soube classificar esta(s) parcela(s) — confira à mão.
-                  </p>}
-                  {tender.edital.requirement.limitations.length > 0 && <p className="bx-nota">
-                    <strong>A leitura não conseguiu determinar:</strong> {tender.edital.requirement.limitations.join("; ")}.
-                  </p>}
-                </div>}
+                  <div className="bx-aba-painel" id={`${tender.id}-p3`}>
+                    {/* Mesma contagem que já aparece na linha fechada da fila —
+                        só que lá ("3/8 pré-requisitos") e aqui não, obrigando a
+                        pessoa a contar ✓/– na mão pra saber o que atende. */}
+                    <p className="bx-aba-resumo">
+                      {tender.resumo.met} de {tender.resumo.total} atendidos
+                      {tender.resumo.notMet > 0 ? `, ${tender.resumo.notMet} não atende${tender.resumo.notMet > 1 ? "m" : ""}` : ""}
+                      {tender.resumo.unknown > 0 ? `, ${tender.resumo.unknown} a conferir` : ""}
+                    </p>
+                    {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
+                    <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                      {!tender.edital
+                        ? <>O que está marcado como <strong>a conferir</strong> depende de ler o edital. A leitura automática ainda não passou por esta licitação — a próxima chamada do agendador cobre a fila pendente por ordem de prazo.</>
+                        : tender.edital.reviewedAt
+                          ? <>Edital lido e <strong>conferido</strong> por uma pessoa em {tender.edital.reviewedAt.toLocaleDateString("pt-BR")}.</>
+                          : <>Edital lido automaticamente e <strong>ainda não conferido</strong> por uma pessoa. Antes de montar proposta ou consórcio, confira as parcelas contra o PDF.</>}
+                    </p>
+                  </div>
 
-                <div className="bx-bloco bx-bloco-largo">
-                  {/* O título conta o placar antes de qualquer coisa: é a
-                      pergunta que a pessoa faz ao abrir a licitação — de quantos
-                      serviços exigidos eu tenho prova? */}
-                  <h3>Acervo técnico — {tender.archive.determined
-                    ? `${tender.archive.required.length - tender.archive.missing.length} de ${tender.archive.required.length} serviço(s)`
-                    : "não julgado"}</h3>
-
-                  {tender.archive.determined && <div className="bx-placar">
-                    <span className="tem"><b>{tender.archive.required.length - tender.archive.missing.length}</b> comprovados</span>
-                    <span className="falta"><b>{tender.archive.missing.length}</b> faltando</span>
-                    {tender.archive.unreadable.length > 0
-                      && <span className="duvida"><b>{tender.archive.unreadable.length}</b> não conferidos</span>}
+                  {tender.edital && <div className="bx-aba-painel" id={`${tender.id}-p4`}>
+                    {tender.edital.requirement.services.length > 0
+                      ? <div className="bx-parcelas">
+                        {tender.edital.requirement.services.map((parcela, indice) => <div className="bx-parcela" key={indice}>
+                          <span className="bx-parcela-nome">{parcela.description}</span>
+                          <span className="bx-parcela-qtd">
+                            {parcela.quantity === undefined
+                              ? "—"
+                              : `${parcela.quantity.toLocaleString("pt-BR")}${parcela.unit ? ` ${parcela.unit}` : ""}`}
+                          </span>
+                        </div>)}
+                      </div>
+                      : <p className="bx-nota">A leitura não localizou lista de parcelas de maior relevância neste edital.</p>}
+                    {tender.archive.unreadable.length > 0 && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                      <strong>Não conferido contra o acervo:</strong> {tender.archive.unreadable.join("; ")}. O sistema não soube classificar esta(s) parcela(s) — confira à mão.
+                    </p>}
+                    {tender.edital.requirement.limitations.length > 0 && <p className="bx-nota">
+                      <strong>A leitura não conseguiu determinar:</strong> {tender.edital.requirement.limitations.join("; ")}.
+                    </p>}
                   </div>}
 
-                  {/* Serviço a serviço: é a lista do que falta que vira a
-                      conversa de consórcio. */}
-                  {tender.archive.required.map((item) => <Motivo
-                    key={item.categoryId}
-                    met={item.covered}
-                    rotulo={item.quantity
-                      ? `${item.label} — ${item.quantity.explanation}`
-                      : item.covered ? `${item.label} — ${item.evidenceCount} atestado(s) no acervo` : `${item.label} — nenhum atestado no acervo`}
-                    skipped={false}
-                  />)}
+                  <div className="bx-aba-painel" id={`${tender.id}-p5`}>
+                    {/* O placar antes de qualquer coisa: é a pergunta que a
+                        pessoa faz ao abrir a licitação — de quantos serviços
+                        exigidos eu tenho prova? */}
+                    <p className="bx-aba-resumo">
+                      {tender.archive.determined
+                        ? `${tender.archive.required.length - tender.archive.missing.length} de ${tender.archive.required.length} serviço(s)`
+                        : "não julgado"}
+                    </p>
 
-                  {/* Exigência que o catálogo não soube classificar não é
-                      "coberta" nem "faltando": ninguém a conferiu. */}
-                  {tender.archive.unreadable.map((texto) =>
-                    <Motivo key={texto} met={false} rotulo={`${texto} — o sistema não soube classificar; confira à mão`} skipped/>)}
+                    {tender.archive.determined && <div className="bx-placar">
+                      <span className="tem"><b>{tender.archive.required.length - tender.archive.missing.length}</b> comprovados</span>
+                      <span className="falta"><b>{tender.archive.missing.length}</b> faltando</span>
+                      {tender.archive.unreadable.length > 0
+                        && <span className="duvida"><b>{tender.archive.unreadable.length}</b> não conferidos</span>}
+                    </div>}
 
-                  {!tender.archive.determined && tender.archive.reasons.map((reason) =>
-                    <Motivo key={reason} met={false} rotulo={reason} skipped/>)}
+                    {/* Serviço a serviço: é a lista do que falta que vira a
+                        conversa de consórcio. */}
+                    {tender.archive.required.map((item) => <Motivo
+                      key={item.categoryId}
+                      met={item.covered}
+                      rotulo={item.quantity
+                        ? `${item.label} — ${item.quantity.explanation}`
+                        : item.covered ? `${item.label} — ${item.evidenceCount} atestado(s) no acervo` : `${item.label} — nenhum atestado no acervo`}
+                      skipped={false}
+                    />)}
 
-                  {/* O PORTE sempre aparece, inclusive quando não deu para
-                      julgar. Ele saiu da nota justamente porque ficava invisível
-                      ali dentro, derrubando toda licitação para o mesmo número
-                      sem dizer por quê. */}
-                  {tender.archive.determined && (
-                    tender.archive.scale === "COVERED" && tender.archive.largestExecuted !== undefined
-                      ? <Motivo met rotulo={`Porte — já executou obra de ${dinheiroCurto(tender.archive.largestExecuted)}`} skipped={false}/>
-                      : tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined
-                        ? <Motivo met={false} rotulo={`Porte — maior obra executada foi ${dinheiroCurto(tender.archive.largestExecuted)}, contra ${tender.estimatedValue !== null && !tender.valueUndisclosed ? dinheiroCurto(Number(tender.estimatedValue)) : "o valor desta"}`} skipped={false}/>
-                        : <Motivo met={false} skipped rotulo={tender.valueUndisclosed || tender.estimatedValue === null
-                            ? "Porte — não comparável: o órgão não revelou o orçamento"
-                            : "Porte — não comparável: os atestados do acervo não têm valor de contrato cadastrado"}/>
-                  )}
-                  {tender.archive.needsPartner && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
-                    <strong>Indica consórcio.</strong>{" "}
-                    {tender.archive.missing.length > 0
-                      ? `O acervo não comprova ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}.`
-                      : "A obra é maior que qualquer uma já executada."}
-                  </p>}
-                  {tender.archive.requirementInferred && tender.archive.determined && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
-                    Serviços <strong>estimados a partir do objeto</strong>. As parcelas de maior relevância exigidas de fato só constam do edital, que ainda não é lido automaticamente.
-                  </p>}
-                </div>
+                    {/* Exigência que o catálogo não soube classificar não é
+                        "coberta" nem "faltando": ninguém a conferiu. */}
+                    {tender.archive.unreadable.map((texto) =>
+                      <Motivo key={texto} met={false} rotulo={`${texto} — o sistema não soube classificar; confira à mão`} skipped/>)}
 
-                <div className="bx-bloco">
-                  <h3>
-                    Aderência ao perfil — {tender.adherence.undetermined ? "não calculada" : `${tender.combined.score}%`}
-                    {!tender.combined.determined && !tender.adherence.undetermined && " (acervo não avaliado)"}
-                  </h3>
-                  {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
-                  {/* O perfil (tipo/valor/prazo/esfera) é só metade da conta — a
-                      outra metade é o acervo sustentar o que a licitação exige.
-                      Sem isto, "100% de perfil" e "sem nenhum acervo" ficavam
-                      em blocos separados que ninguém somava na cabeça. */}
-                  <Motivo
-                    met={tender.archive.determined && tender.archive.score === 100}
-                    rotulo={tender.archive.determined
-                      ? `acervo sustenta ${tender.archive.score}% do exigido`
-                      : "acervo ainda não avaliado"}
-                    skipped={!tender.archive.determined}
-                  />
-                </div>
+                    {!tender.archive.determined && tender.archive.reasons.map((reason) =>
+                      <Motivo key={reason} met={false} rotulo={reason} skipped/>)}
 
-                {signal?.note && <div className="bx-bloco">
-                  <h3>Sinalização — {signal.label}</h3>
-                  <p className="bx-nota">{signal.note}</p>
-                </div>}
-
-                <div className="bx-bloco">
-                  <h3>{tender.edital ? "Edital lido" : "Edital"}</h3>
-                  {tender.edital
-                    ? <>
-                      {/* Procedência: sem cópia guardada, é isto que diz QUAL
-                          arquivo foi lido — e o hash é o que denuncia edital
-                          retificado depois da leitura. */}
-                      <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
-                      <Linha rotulo="Lido em" valor={tender.edital.source.fetchedAt.toLocaleDateString("pt-BR")}/>
-                      <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
-                      {tender.edital.requirement.confidence !== undefined
-                        && <Linha rotulo="Confiança da leitura" valor={`${Math.round(tender.edital.requirement.confidence * 100)}%`}/>}
-                    </>
-                    : <p className="bx-nota">
-                      Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
+                    {/* O PORTE sempre aparece, inclusive quando não deu para
+                        julgar. Ele saiu da nota justamente porque ficava invisível
+                        ali dentro, derrubando toda licitação para o mesmo número
+                        sem dizer por quê. */}
+                    {tender.archive.determined && (
+                      tender.archive.scale === "COVERED" && tender.archive.largestExecuted !== undefined
+                        ? <Motivo met rotulo={`Porte — já executou obra de ${dinheiroCurto(tender.archive.largestExecuted)}`} skipped={false}/>
+                        : tender.archive.scale === "BELOW" && tender.archive.largestExecuted !== undefined
+                          ? <Motivo met={false} rotulo={`Porte — maior obra executada foi ${dinheiroCurto(tender.archive.largestExecuted)}, contra ${tender.estimatedValue !== null && !tender.valueUndisclosed ? dinheiroCurto(Number(tender.estimatedValue)) : "o valor desta"}`} skipped={false}/>
+                          : <Motivo met={false} skipped rotulo={tender.valueUndisclosed || tender.estimatedValue === null
+                              ? "Porte — não comparável: o órgão não revelou o orçamento"
+                              : "Porte — não comparável: os atestados do acervo não têm valor de contrato cadastrado"}/>
+                    )}
+                    {tender.archive.needsPartner && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                      <strong>Indica consórcio.</strong>{" "}
+                      {tender.archive.missing.length > 0
+                        ? `O acervo não comprova ${tender.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}.`
+                        : "A obra é maior que qualquer uma já executada."}
                     </p>}
-                  <div className="bx-links">
-                    {tender.edital && <a className="bx-link forte" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
-                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
-                      Baixar o edital
-                    </a>}
-                    {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
-                      Abrir no PNCP
-                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
-                    </a>}
-                    {tender.edital && <RereadEditalAction id={tender.id}/>}
+                    {/* `requirementInferred` fica true nos dois casos — sem edital
+                        lido, e com edital lido cuja lista de parcelas saiu vazia
+                        (formato de tabela não reconhecido). A mensagem tinha só uma
+                        frase para os dois ("ainda não é lido automaticamente"),
+                        dizendo "não lido" bem ao lado do bloco "Edital lido"
+                        mostrando data — achado 21/09/2026, na tela real. */}
+                    {tender.archive.requirementInferred && tender.archive.determined && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+                      Serviços <strong>estimados a partir do objeto</strong>.{" "}
+                      {tender.edital
+                        ? "O edital foi lido, mas a leitura não reconheceu a lista de parcelas de maior relevância nele — confira o PDF à mão."
+                        : "As parcelas de maior relevância exigidas de fato só constam do edital, que ainda não foi lido automaticamente."}
+                    </p>}
                   </div>
-                  {tender.edital && <p className="bx-nota">
-                    O arquivo não fica guardado no G-SIPRO: o link busca direto na origem, e por isso pode responder erro se o órgão o tirar do ar.
-                  </p>}
-                </div>
-              </dl>
+
+                  <div className="bx-aba-painel" id={`${tender.id}-p6`}>
+                    {/* Só o que é PREFERÊNCIA configurada — tipo de obra, valor,
+                        prazo, esfera. Não é o que decide participar (isso é a
+                        aba Pré-requisitos, com o % de verdade) — achado
+                        22/09/2026: misturar as duas coisas num "100%" só fazia
+                        parecer que a licitação estava liberada quando só o
+                        gosto configurado batia, não a exigência real. */}
+                    {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
+                  </div>
+
+                  {signal?.note && <div className="bx-aba-painel" id={`${tender.id}-p7`}>
+                    <p className="bx-aba-resumo">{signal.label}</p>
+                    <p className="bx-nota">{signal.note}</p>
+                  </div>}
+
+                  <div className="bx-aba-painel" id={`${tender.id}-p8`}>
+                    {tender.edital
+                      ? <>
+                        {/* Procedência: sem cópia guardada, é isto que diz QUAL
+                            arquivo foi lido — e o hash é o que denuncia edital
+                            retificado depois da leitura. */}
+                        <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
+                        <Linha rotulo="Lido em" valor={tender.edital.source.fetchedAt.toLocaleDateString("pt-BR")}/>
+                        <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
+                        {tender.edital.requirement.confidence !== undefined
+                          && <Linha rotulo="Confiança da leitura" valor={`${Math.round(tender.edital.requirement.confidence * 100)}%`}/>}
+                      </>
+                      : <p className="bx-nota">
+                        Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
+                      </p>}
+                    <div className="bx-links">
+                      {tender.edital && <a className="bx-link forte" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
+                        <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+                        Baixar o edital
+                      </a>}
+                      {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
+                        Abrir no PNCP
+                        <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
+                      </a>}
+                    </div>
+                    {tender.edital && <p className="bx-nota">
+                      O arquivo não fica guardado no G-SIPRO: o link busca direto na origem, e por isso pode responder erro se o órgão o tirar do ar.
+                    </p>}
+                  </div>
+                </dl>
+              </div>
             </div>
           </details>;
         })}
