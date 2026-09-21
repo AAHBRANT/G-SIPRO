@@ -19,6 +19,21 @@ export type PrerequisiteStatus = (typeof prerequisiteStatuses)[number];
 export const prerequisiteSources = ["SISTEMA", "EDITAL"] as const;
 export type PrerequisiteSource = (typeof prerequisiteSources)[number];
 
+/**
+ * Uma linha do desdobramento de um pré-requisito — hoje só o acervo se
+ * desdobra, serviço a serviço.
+ *
+ * Existe porque "2 serviço(s) comprovados" não diz QUAIS, e quem monta
+ * consórcio precisa do nome do serviço que falta, não da contagem. A lista
+ * completa vive na aba "Acervo técnico"; aqui ela aparece junto da decisão,
+ * que é onde a pergunta é feita.
+ */
+export type PrerequisiteBreakdownItem = Readonly<{
+  label: string;
+  status: PrerequisiteStatus;
+  detail: string;
+}>;
+
 export type Prerequisite = Readonly<{
   id: string;
   label: string;
@@ -26,6 +41,8 @@ export type Prerequisite = Readonly<{
   source: PrerequisiteSource;
   /** Frase curta com o porquê, para não obrigar a abrir outra tela. */
   detail: string;
+  /** Item a item, quando o pré-requisito é a soma de várias exigências. */
+  breakdown?: readonly PrerequisiteBreakdownItem[];
 }>;
 
 export type PrerequisiteInput = Readonly<{
@@ -48,7 +65,33 @@ const item = (
   status: PrerequisiteStatus,
   source: PrerequisiteSource,
   detail: string,
-): Prerequisite => ({ id, label, status, source, detail });
+  breakdown?: readonly PrerequisiteBreakdownItem[],
+): Prerequisite => ({ id, label, status, source, detail, ...(breakdown && breakdown.length > 0 ? { breakdown } : {}) });
+
+/**
+ * Cada serviço que o edital exige, dito pelo nome, com o veredito do acervo.
+ *
+ * `required` já traz cobertos e não cobertos (`missing` é um recorte dele), e
+ * `unreadable` são as parcelas que o catálogo não classificou — essas não são
+ * "não atende", são "ninguém conferiu", e virar cruz aqui faria descartar obra
+ * que a empresa sabe fazer.
+ */
+const detalharAcervo = (archive: ArchiveAdherence): readonly PrerequisiteBreakdownItem[] => [
+  ...archive.required.map((servico): PrerequisiteBreakdownItem => ({
+    label: servico.label,
+    status: servico.covered ? "MET" : "NOT_MET",
+    detail: servico.quantity
+      ? servico.quantity.explanation
+      : servico.covered
+        ? `${servico.evidenceCount} atestado(s) no acervo`
+        : "nenhum atestado no acervo",
+  })),
+  ...archive.unreadable.map((texto): PrerequisiteBreakdownItem => ({
+    label: texto,
+    status: "UNKNOWN",
+    detail: "o sistema não soube classificar; confira à mão",
+  })),
+];
 
 const dinheiro = (valor: number) =>
   `R$ ${(valor / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
@@ -88,7 +131,8 @@ export function buildPrerequisites(input: PrerequisiteInput): readonly Prerequis
     // proposta contando com acervo que ninguém conferiu.
     lista.push(item(
       "acervo", "Acervo técnico", "ATTENTION", "SISTEMA",
-      `${input.archive.required.length} serviço(s) comprovados, mas ${input.archive.unreadable.length} parcela(s) do edital o sistema não soube classificar: ${input.archive.unreadable.join("; ")}`,
+      `${input.archive.required.length} serviço(s) comprovados, mas ${input.archive.unreadable.length} parcela(s) do edital o sistema não soube classificar`,
+      detalharAcervo(input.archive),
     ));
   } else if (input.archive.missing.length === 0) {
     const comQuantitativo = input.archive.required.filter((r) => r.quantity);
@@ -97,11 +141,13 @@ export function buildPrerequisites(input: PrerequisiteInput): readonly Prerequis
       comQuantitativo.length > 0
         ? `${input.archive.required.length} serviço(s) comprovados, com quantitativo conferido`
         : `${input.archive.required.length} serviço(s) comprovados no acervo`,
+      detalharAcervo(input.archive),
     ));
   } else {
     lista.push(item(
       "acervo", "Acervo técnico", "NOT_MET", "SISTEMA",
       `falta ${input.archive.missing.map((m) => m.label.toLowerCase()).join(", ")}`,
+      detalharAcervo(input.archive),
     ));
   }
 

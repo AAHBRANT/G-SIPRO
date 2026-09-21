@@ -767,6 +767,13 @@
 .bx-motivo.pulado { color: var(--texto-3); }
 .bx-motivo.pulado .marca { color: var(--texto-3); }
 
+/* Desdobramento de um pré-requisito: os serviços exigidos, um a um. Recuado e
+   com fio à esquerda para ler como "parte de", e não como requisito solto. */
+.bx-subitens { border-left: 2px solid var(--fio); margin: 0 0 6px 24px; }
+.bx-subitem { font-size: 11.5px; padding: 3px 11px; }
+.bx-subitem .marca { height: 11px; width: 11px; }
+.bx-subitem-nota { color: var(--texto-3); }
+
 .bx-nota { color: var(--texto-2); font-size: 12px; line-height: 1.6; padding: 10px 11px; }
 
 .bx-link {

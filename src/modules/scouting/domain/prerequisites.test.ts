@@ -164,10 +164,63 @@ describe("parcela que o sistema não soube classificar", () => {
   it("acervo vira atenção, e não atendido", () => {
     const p = acha(buildPrerequisites(entrada({ archive: acervo({ unreadable: ["Linha de transmissão 138 kV"] }) })), "acervo");
     expect(p?.status).toBe("ATTENTION");
-    expect(p?.detail).toContain("Linha de transmissão");
+    // O nome da parcela continua tendo de chegar à pessoa; desde 21/09/2026
+    // ele chega pelo desdobramento, e não mais empilhado no `detail` — repetir
+    // o mesmo texto nos dois lugares o mostraria duas vezes na mesma tela.
+    expect(p?.breakdown?.map((b) => b.label)).toContain("Linha de transmissão 138 kV");
+    expect(p?.detail).toContain("não soube classificar");
   });
 
   it("sem parcela obscura, segue atendido", () => {
     expect(acha(buildPrerequisites(entrada()), "acervo")?.status).toBe("MET");
+  });
+});
+
+/**
+ * "os serviços requeridos ali têm de ser explícitos, e quais a gente atende ou
+ * não" — a contagem sozinha não serve para montar consórcio: é o NOME do
+ * serviço que falta que vira a conversa com o parceiro.
+ */
+describe("desdobramento do acervo, serviço a serviço", () => {
+  it("nomeia cada serviço exigido e o veredito de cada um", () => {
+    const misto = acervo({
+      required: [
+        { categoryId: "pavimentacao", label: "Pavimentação asfáltica", covered: true, evidenceCount: 3, examples: [] },
+        { categoryId: "drenagem", label: "Drenagem urbana", covered: false, evidenceCount: 0, examples: [] },
+      ],
+      missing: [{ categoryId: "drenagem", label: "Drenagem urbana", covered: false, evidenceCount: 0, examples: [] }],
+      needsPartner: true,
+    });
+    const p = acha(buildPrerequisites(entrada({ archive: misto })), "acervo");
+
+    expect(p?.breakdown?.map((b) => [b.label, b.status])).toEqual([
+      ["Pavimentação asfáltica", "MET"],
+      ["Drenagem urbana", "NOT_MET"],
+    ]);
+    expect(p?.breakdown?.[0]?.detail).toContain("3 atestado(s)");
+    expect(p?.breakdown?.[1]?.detail).toContain("nenhum atestado");
+  });
+
+  /**
+   * Parcela que o catálogo não classificou não é "não atende": ninguém
+   * conferiu. Virar cruz aqui faria descartar obra que a empresa sabe fazer.
+   */
+  it("parcela não classificada entra como a conferir, nunca como reprovada", () => {
+    const comDuvida = acervo({ unreadable: ["Execução de muro de gabião"] });
+    const p = acha(buildPrerequisites(entrada({ archive: comDuvida })), "acervo");
+    const duvida = p?.breakdown?.find((b) => b.label === "Execução de muro de gabião");
+
+    expect(duvida?.status).toBe("UNKNOWN");
+    expect(p?.breakdown?.some((b) => b.status === "NOT_MET")).toBe(false);
+  });
+
+  it("acervo não julgado não inventa desdobramento", () => {
+    const p = acha(buildPrerequisites(entrada({ archive: acervo({ determined: false, reasons: ["nenhum acervo cadastrado"] }) })), "acervo");
+    expect(p?.breakdown).toBeUndefined();
+  });
+
+  it("os demais pré-requisitos seguem sem desdobramento", () => {
+    const lista = buildPrerequisites(entrada());
+    expect(lista.filter((p) => p.breakdown !== undefined).map((p) => p.id)).toEqual(["acervo"]);
   });
 });

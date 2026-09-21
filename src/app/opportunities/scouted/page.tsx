@@ -651,27 +651,36 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                       : <p className="bx-nota">
                         Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
                       </p>}
-                    {/* O link forte leva à PÁGINA da licitação no PNCP, que
-                        é onde fica a aba "Arquivos" com TODOS os documentos
-                        publicados pelo órgão. O `edital.source.uri` é só o
-                        arquivo que a IA leu: `edital-relevance` escolhe o que
-                        traz as parcelas com quantitativo, que quase nunca é o
-                        "EDITAL.pdf". Essa escolha está certa para a leitura e
-                        errada para quem quer os documentos — por isso são dois
-                        links, cada um com o rótulo do que ele é de verdade. */}
+                    {/* Três destinos diferentes, e é por isso que são três
+                        links — a versão de 21/09/2026 que apontava o botão de
+                        download para a PÁGINA do PNCP só abria o site, sem
+                        baixar nada, e o rótulo prometia download.
+
+                        1. O pacote: a rota busca no PNCP e devolve um zip com
+                           todos os documentos publicados pelo órgão.
+                        2. O arquivo que a IA leu: `edital-relevance` o escolhe
+                           pelas parcelas com quantitativo, e quase nunca é o
+                           "EDITAL.pdf" — serve para conferir a leitura, não
+                           para montar proposta.
+                        3. A origem: saída manual quando o pacote não fecha
+                           (órgão fora do ar, anexo gigante). */}
                     <div className="bx-links">
-                      {tender.noticeUrl && <a className="bx-link forte" href={tender.noticeUrl} rel="noreferrer" target="_blank">
+                      <a className="bx-link forte" download href={`/api/scouting/scouted-tenders/${tender.id}/documentos`}>
                         <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
                         Baixar edital e anexos
-                      </a>}
+                      </a>
                       {tender.edital && <a className="bx-link" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
                         Arquivo lido pela IA
                         <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
                       </a>}
+                      {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
+                        Abrir no PNCP
+                        <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
+                      </a>}
                     </div>
-                    {tender.edital && <p className="bx-nota">
-                      Nenhum dos dois fica guardado no G-SIPRO: os links buscam direto na origem, e por isso podem responder erro se o órgão tirar o arquivo do ar.
-                    </p>}
+                    <p className="bx-nota">
+                      O download é montado na hora, direto do PNCP — nada fica guardado no G-SIPRO. Vem um <strong>.zip</strong> com todos os documentos, ou o próprio arquivo quando o órgão publica um só. Licitação com muitos projetos demora, e o que não couber vem listado num <strong>_NAO-INCLUIDOS.txt</strong> dentro do zip.
+                    </p>
                   </div>
                 </dl>
               </div>
@@ -719,14 +728,36 @@ const marcaDoEstado = {
   UNKNOWN: { icone: dash, classe: "pulado" },
 } as const;
 
+/**
+ * Um pré-requisito e, quando ele é a soma de várias exigências, cada uma delas
+ * pelo nome.
+ *
+ * O desdobramento nasceu de "os serviços requeridos ali têm de ser explícitos,
+ * e quais a gente atende ou não" (21/09/2026): "2 serviço(s) comprovados" não
+ * responde qual serviço falta, e é o nome do serviço que vira a conversa de
+ * consórcio. A mesma lista existe na aba "Acervo técnico" — a repetição é de
+ * propósito, porque é aqui que se decide participar, e mandar a pessoa trocar
+ * de aba no meio da decisão era o atrito que se queria tirar.
+ */
 function PreRequisito({ requisito }: { requisito: Prerequisite }) {
   const marca = marcaDoEstado[requisito.status];
-  return <div className={`bx-motivo ${marca.classe}`}>
-    {marca.icone}
-    <span>
-      <strong>{requisito.label}</strong>
-      {" — "}{requisito.detail}
-    </span>
+  return <div>
+    <div className={`bx-motivo ${marca.classe}`}>
+      {marca.icone}
+      <span>
+        <strong>{requisito.label}</strong>
+        {" — "}{requisito.detail}
+      </span>
+    </div>
+    {requisito.breakdown && <div className="bx-subitens">
+      {requisito.breakdown.map((servico) => {
+        const submarca = marcaDoEstado[servico.status];
+        return <div className={`bx-motivo bx-subitem ${submarca.classe}`} key={servico.label}>
+          {submarca.icone}
+          <span>{servico.label}<span className="bx-subitem-nota"> — {servico.detail}</span></span>
+        </div>;
+      })}
+    </div>}
   </div>;
 }
 
