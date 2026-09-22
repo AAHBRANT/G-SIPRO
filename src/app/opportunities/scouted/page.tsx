@@ -12,6 +12,7 @@ import { combineAdherence } from "@/modules/scouting/domain/combined-adherence";
 import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import { rotulosDeEsfera as sphereLabels } from "@/modules/scouting/domain/esfera";
+import { compararAcervo, type SituacaoDoServico } from "@/modules/scouting/domain/comparativo-de-acervo";
 import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
 import { editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
@@ -571,16 +572,28 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                         && <span className="duvida"><b>{tender.archive.unreadable.length}</b> não conferidos</span>}
                     </div>}
 
-                    {/* Serviço a serviço: é a lista do que falta que vira a
-                        conversa de consórcio. */}
-                    {tender.archive.required.map((item) => <Motivo
-                      key={item.categoryId}
-                      met={item.covered}
-                      rotulo={item.quantity
-                        ? `${item.label} — ${item.quantity.explanation}`
-                        : item.covered ? `${item.label} — ${item.evidenceCount} atestado(s) no acervo` : `${item.label} — nenhum atestado no acervo`}
-                      skipped={false}
-                    />)}
+                    {/* Confronto item a item, em vez de uma frase por serviço.
+                        Pedido de 22/09/2026: "preciso de especificidade, não só
+                        que a gente tem tantos atestados — comparativo
+                        qualitativo e quantitativo do acervo exigido pela
+                        licitação e quanto a gente tem em atestados". Os números
+                        já eram calculados e descartados; agora ficam lado a
+                        lado, exigência contra acervo. */}
+                    {tender.archive.required.length > 0 && <div className="bx-comparativo">
+                      <div className="bx-comp-cab">
+                        <span>Serviço exigido</span>
+                        <span>A licitação exige</span>
+                        <span>Nosso acervo</span>
+                        <span>Situação</span>
+                      </div>
+                      {compararAcervo(tender.archive.required).map((linha) => <div className="bx-comp-linha" key={linha.servico}>
+                        <span className="bx-comp-servico">{linha.servico}</span>
+                        <span className="bx-comp-num" data-rotulo="Exige">{linha.exigido}</span>
+                        <span className="bx-comp-num" data-rotulo="Temos">{linha.acervo}</span>
+                        <span className={`bx-comp-sit ${situacaoClasse[linha.situacao]}`}>{situacaoRotulo[linha.situacao]}</span>
+                        {linha.ressalva && <span className="bx-comp-ressalva">{linha.ressalva}</span>}
+                      </div>)}
+                    </div>}
 
                     {/* Exigência que o catálogo não soube classificar não é
                         "coberta" nem "faltando": ninguém a conferiu. */}
@@ -721,6 +734,21 @@ const tick = <svg aria-hidden="true" className="marca" fill="none" stroke="curre
 const cross = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>;
 const dash = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>;
 const bang = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.6" viewBox="0 0 24 24"><path d="M12 6v8M12 18h.01"/></svg>;
+
+/** Como cada situação do comparativo de acervo aparece na tela. */
+const situacaoRotulo: Record<SituacaoDoServico, string> = {
+  ATENDE: "Atende",
+  NAO_ALCANCA: "Não alcança",
+  FALTA: "Falta",
+  SEM_COMPARACAO: "Sem comparar",
+};
+
+const situacaoClasse: Record<SituacaoDoServico, string> = {
+  ATENDE: "atende",
+  NAO_ALCANCA: "falha",
+  FALTA: "falha",
+  SEM_COMPARACAO: "pulado",
+};
 
 const marcaDoEstado = {
   MET: { icone: tick, classe: "atende" },
