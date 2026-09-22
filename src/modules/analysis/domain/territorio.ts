@@ -116,6 +116,8 @@ export type Filtro = Readonly<{
   meses?: ReadonlySet<string> | null;
   esfera?: Esfera | null;
   regiao?: Regiao | null;
+  /** Sigla da unidade da federação. */
+  uf?: string | null;
   /** Chave `nome normalizado|UF` de um município. */
   municipio?: string | null;
 }>;
@@ -128,7 +130,7 @@ export type Filtro = Readonly<{
  * filtro por região.
  */
 export function filtrar(celulas: readonly CelulaTerritorial[], filtro: Filtro = {}): readonly CelulaTerritorial[] {
-  const { meses, esfera, regiao, municipio } = filtro;
+  const { meses, esfera, regiao, uf: siglaUf, municipio } = filtro;
   return celulas.filter((celula) => {
     if (meses && meses.size > 0 && !meses.has(celula.mes)) return false;
     if (esfera && esferaConhecida(celula.esfera) !== esfera) return false;
@@ -136,6 +138,7 @@ export function filtrar(celulas: readonly CelulaTerritorial[], filtro: Filtro = 
       const uf = ufPorSigla(celula.uf);
       if (!uf || uf.regiao !== regiao) return false;
     }
+    if (siglaUf && ufPorSigla(celula.uf)?.sigla !== siglaUf) return false;
     if (municipio && chaveDaCelula(celula) !== municipio) return false;
     return true;
   });
@@ -515,4 +518,138 @@ export function filtrarRegistros(
     }
     return true;
   });
+}
+
+/* ============================================================
+   Zoom do mapa
+   ============================================================ */
+
+export type Caixa = Readonly<{ x: number; y: number; largura: number; altura: number }>;
+
+/** O Brasil inteiro, no sistema de `VIEWBOX_DO_BRASIL`. */
+export const CAIXA_DO_BRASIL: Caixa = { x: 0, y: 0, largura: 730, altura: 680 };
+
+/** Folga em volta do estado ampliado, como no protótipo aprovado. */
+const FOLGA_DA_UF = 0.18;
+
+export const ZOOM_MINIMO = 1;
+export const ZOOM_MAXIMO = 8;
+
+/**
+ * Mantém o zoom dentro dos limites — e nunca deixa virar NaN.
+ *
+ * ⚠️ NaN e infinito caem em lados opostos de propósito: NaN é "não sei quanto
+ * é" e volta ao mapa inteiro, que é o estado seguro; infinito é "muito maior
+ * que o teto" e prende no teto. Mandar os dois para o mínimo faria um gesto
+ * de ampliar exagerado devolver o país inteiro, que é o contrário do pedido.
+ */
+export function limitarZoom(zoom: number): number {
+  if (Number.isNaN(zoom)) return ZOOM_MINIMO;
+  return Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, zoom));
+}
+
+/**
+ * A caixa de partida do mapa: o país, ou o estado escolhido com folga em
+ * volta. É o que faz "entrar no estado" ao selecioná-lo.
+ */
+export function caixaBase(uf: Readonly<{ caixa: Caixa }> | undefined | null): Caixa {
+  if (!uf) return CAIXA_DO_BRASIL;
+  const folga = Math.max(uf.caixa.largura, uf.caixa.altura) * FOLGA_DA_UF;
+  return {
+    x: uf.caixa.x - folga,
+    y: uf.caixa.y - folga,
+    largura: uf.caixa.largura + 2 * folga,
+    altura: uf.caixa.altura + 2 * folga,
+  };
+}
+
+/**
+ * Aplica zoom e deslocamento sobre a caixa base.
+ *
+ * ⚠️ O resultado é preso DENTRO da caixa base: sem isso, arrastar leva o mapa
+ * para fora da tela e não há como voltar a não ser adivinhando o caminho de
+ * volta. `centro` é onde o usuário arrastou, em unidades do próprio SVG.
+ */
+export function caixaComZoom(base: Caixa, zoom: number, centro: Readonly<{ x: number; y: number }> | null): Caixa {
+  const fator = limitarZoom(zoom);
+  const largura = base.largura / fator;
+  const altura = base.altura / fator;
+  const alvoX = centro && Number.isFinite(centro.x) ? centro.x : base.x + base.largura / 2;
+  const alvoY = centro && Number.isFinite(centro.y) ? centro.y : base.y + base.altura / 2;
+  return {
+    x: Math.min(base.x + base.largura - largura, Math.max(base.x, alvoX - largura / 2)),
+    y: Math.min(base.y + base.altura - altura, Math.max(base.y, alvoY - altura / 2)),
+    largura,
+    altura,
+  };
+}
+
+/** A caixa no formato que o atributo `viewBox` espera. */
+export function viewBoxDe(caixa: Caixa): string {
+  return `${caixa.x.toFixed(1)} ${caixa.y.toFixed(1)} ${caixa.largura.toFixed(1)} ${caixa.altura.toFixed(1)}`;
+}
+
+/**
+ * Quanto um elemento precisa encolher para MANTER O TAMANHO NA TELA depois do
+ * zoom.
+ *
+ * ⚠️ Sem isto, ampliar um estado transforma cada ponto numa bolha e cada nome
+ * numa faixa que cobre o mapa: o SVG escala tudo junto, inclusive o que
+ * deveria ficar do mesmo tamanho.
+ */
+export function unidadeNaTela(caixa: Caixa): number {
+  if (!Number.isFinite(caixa.largura) || caixa.largura <= 0) return 1;
+  return caixa.largura / CAIXA_DO_BRASIL.largura;
+}
+
+export type PontoRotulavel = Readonly<{ chave: string; nome: string; x: number; y: number }>;
+
+/**
+ * Quais pontos podem exibir o nome sem um cobrir o outro.
+ *
+ * ⚠️ Cidades vizinhas — Belo Horizonte, Contagem e Betim, por exemplo — ficam
+ * a poucos pixels uma da outra, e rotular todas produz uma pilha de texto
+ * ilegível justamente onde há mais atividade. Percorre na ordem recebida (a
+ * tela manda da maior para a menor) e só rotula quem não colide com um rótulo
+ * já aceito, de modo que o maior sempre ganha o nome.
+ *
+ * `unidade` é a compensação de zoom: o rótulo tem tamanho fixo NA TELA, então
+ * a caixa que ele ocupa no sistema do SVG encolhe quando o mapa amplia — é
+ * por isso que ampliar faz caber mais nome, como se espera de um zoom.
+ */
+export function rotulosSemColisao(
+  pontos: readonly PontoRotulavel[],
+  unidade: number,
+  obrigatorio: string | null = null,
+): ReadonlySet<string> {
+  const escala = Number.isFinite(unidade) && unidade > 0 ? unidade : 1;
+  const alturaDoTexto = 13 * escala;
+  const caixas: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const aceitos = new Set<string>();
+
+  const cabe = (caixa: { x1: number; y1: number; x2: number; y2: number }) =>
+    !caixas.some((outra) => caixa.x1 < outra.x2 && caixa.x2 > outra.x1 && caixa.y1 < outra.y2 && caixa.y2 > outra.y1);
+
+  const caixaDe = (ponto: PontoRotulavel) => {
+    // 6,4 px por caractere é a largura média da Arial no corpo usado aqui.
+    const largura = (12 + ponto.nome.length * 6.4) * escala;
+    return { x1: ponto.x, y1: ponto.y - alturaDoTexto / 2, x2: ponto.x + largura, y2: ponto.y + alturaDoTexto / 2 };
+  };
+
+  // O selecionado entra primeiro: ele é a resposta à ação do usuário e não
+  // pode perder o nome para um vizinho maior.
+  const escolhido = obrigatorio ? pontos.find((ponto) => ponto.chave === obrigatorio) : undefined;
+  if (escolhido) {
+    caixas.push(caixaDe(escolhido));
+    aceitos.add(escolhido.chave);
+  }
+
+  for (const ponto of pontos) {
+    if (aceitos.has(ponto.chave)) continue;
+    const caixa = caixaDe(ponto);
+    if (!cabe(caixa)) continue;
+    caixas.push(caixa);
+    aceitos.add(ponto.chave);
+  }
+  return aceitos;
 }

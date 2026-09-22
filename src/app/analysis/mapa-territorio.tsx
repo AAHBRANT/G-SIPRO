@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { etapasDoFunil, type EtapaDoFunil } from "@/modules/analysis/domain/funil-comercial";
-import { REGIOES, UNIDADES_FEDERATIVAS, VIEWBOX_DO_BRASIL, ufPorSigla, type Regiao } from "@/modules/analysis/domain/malha-uf";
+import { REGIOES, UNIDADES_FEDERATIVAS, ufPorSigla, type Regiao } from "@/modules/analysis/domain/malha-uf";
 import {
   NIVEIS_DA_ESCALA,
   SEM_OCORRENCIA,
+  ZOOM_MAXIMO,
+  ZOOM_MINIMO,
+  caixaBase,
+  caixaComZoom,
   distribuicaoPorEsfera,
   filtrar,
   filtrarRegistros,
@@ -21,6 +25,7 @@ import {
   porRegiao,
   porUf,
   projetar,
+  rotulosSemColisao,
   resumosRegionais,
   rotuloCurtoTerritorial,
   rotuloDaEsfera,
@@ -29,6 +34,8 @@ import {
   tabelaDeAtuacao,
   total,
   ultimaEtapa,
+  unidadeNaTela,
+  viewBoxDe,
   type CelulaTerritorial,
   type Esfera,
   type LicitacaoDoRecorte,
@@ -102,6 +109,20 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
   const [municipio, setMunicipio] = useState<string | null>(null);
   const [esfera, setEsfera] = useState<Esfera | null>(null);
   const [pagina, setPagina] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  /** Centro do recorte, em unidades do SVG. Nulo = centro da caixa base. */
+  const [centro, setCentro] = useState<{ x: number; y: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  /** Guarda o arraste em curso. Em ref, não em estado: muda a cada pixel. */
+  const arraste = useRef<{ x: number; y: number; centro: { x: number; y: number } } | null>(null);
+  /** Distingue arrastar de clicar — sem isto, todo arraste selecionava um estado. */
+  const arrastou = useRef(false);
+  /**
+   * Só para trocar o cursor. É estado, e não ref, porque o render precisa
+   * dele: ler ref durante o render é justamente o que dá resultado errado
+   * quando o React re-renderiza por outro motivo.
+   */
+  const [arrastando, setArrastando] = useState(false);
 
   const doPeriodo = useMemo(() => filtrar(celulas, { meses }), [celulas, meses]);
 
@@ -110,7 +131,7 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
    * filtrados, a esfera escolhida mostraria 100% e as outras zero, perdendo
    * exatamente a comparação que faz o controle servir para alguma coisa.
    */
-  const antesDaEsfera = useMemo(() => filtrar(doPeriodo, { regiao, municipio }), [doPeriodo, regiao, municipio]);
+  const antesDaEsfera = useMemo(() => filtrar(doPeriodo, { regiao, uf, municipio }), [doPeriodo, regiao, uf, municipio]);
   const recorte = useMemo(() => filtrar(antesDaEsfera, { esfera }), [antesDaEsfera, esfera]);
 
   /**
@@ -139,12 +160,6 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
 
   const nomesMunicipais = useMemo(() => nomesDeMunicipios(doPeriodo), [doPeriodo]);
 
-  /** O recorte territorial, restrito ao estado selecionado quando há um. */
-  const selecionado = useMemo(() => {
-    const alvo = uf ? recorte.filter((c) => ufPorSigla(c.uf)?.sigla === uf) : recorte;
-    return Object.fromEntries(etapasDoFunil.map((e) => [e, total(alvo, e)])) as Record<EtapaDoFunil, TotalTerritorial>;
-  }, [recorte, uf]);
-
   const nomeDoEscopo = useMemo(() => {
     if (municipio) return nomesMunicipais.get(municipio)?.nome ?? municipio;
     if (uf) return `${uf} · ${ufPorSigla(uf)?.nome ?? uf}`;
@@ -160,7 +175,7 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
    */
   const ranking = useMemo((): readonly LinhaDeRanking[] => {
     if (uf) {
-      const mapa = porMunicipio(recorte.filter((c) => ufPorSigla(c.uf)?.sigla === uf), etapa);
+      const mapa = porMunicipio(recorte, etapa);
       return ordenarRanking(
         [...mapa.entries()].map(([chave, item]) => ({
           chave,
@@ -199,7 +214,7 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
   );
 
   const atuacao = useMemo(() => {
-    const alvo = uf ? recorte.filter((c) => ufPorSigla(c.uf)?.sigla === uf) : recorte;
+    const alvo = recorte;
     const linhas = uf
       ? [...porMunicipio(alvo, "aderentes").keys()].map((chave) => ({
         chave,
@@ -259,6 +274,9 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
   const trocarRegiao = (nova: Regiao | null) => {
     setRegiao(nova);
     setPagina(0);
+    // Zoom herdado de outro recorte mostraria o pedaço errado do mapa.
+    setZoom(1);
+    setCentro(null);
     if (uf && nova && ufPorSigla(uf)?.regiao !== nova) {
       setUf(null);
       setMunicipio(null);
@@ -268,6 +286,8 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
   const trocarUf = (nova: string | null) => {
     setUf(nova);
     setPagina(0);
+    setZoom(1);
+    setCentro(null);
     if (nova === null) setMunicipio(null);
     else if (municipio && nomesMunicipais.get(municipio)?.uf !== nova) setMunicipio(null);
   };
@@ -295,6 +315,51 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
     setMunicipio(null);
     setEsfera(null);
     setPagina(0);
+    setZoom(1);
+    setCentro(null);
+  };
+
+  /**
+   * ⚠️ O mapa entra no estado ao selecioná-lo: a caixa base passa a ser a do
+   * estado, com folga. O zoom manual e o arraste trabalham por cima dessa
+   * base, e o recorte é preso dentro dela — arrastar não leva o mapa para
+   * fora da tela sem caminho de volta.
+   */
+  const base = useMemo(() => caixaBase(uf ? ufPorSigla(uf) : null), [uf]);
+  const recorteDoMapa = useMemo(() => caixaComZoom(base, zoom, centro), [base, zoom, centro]);
+  /** Quanto ponto e rótulo precisam encolher para não crescer junto. */
+  const unidade = unidadeNaTela(recorteDoMapa);
+  const ampliado = Boolean(uf) || zoom > 1;
+
+  /**
+   * Quem pode mostrar o nome sem cobrir o vizinho. `pontos.visiveis` já vem
+   * do maior para o menor, então o maior sempre ganha o rótulo na disputa.
+   */
+  const comNome = useMemo(
+    () => rotulosSemColisao(
+      pontos.visiveis.map((ponto) => ({ chave: ponto.chave, nome: ponto.nome, ...projetar(ponto.latitude, ponto.longitude) })),
+      unidade,
+      municipio,
+    ),
+    [pontos.visiveis, unidade, municipio],
+  );
+
+  /** Converte pixels da tela em unidades do SVG, para o arraste andar certo. */
+  const porPixel = useCallback(() => {
+    const largura = svgRef.current?.getBoundingClientRect().width ?? 0;
+    return largura > 0 ? recorteDoMapa.largura / largura : 0;
+  }, [recorteDoMapa.largura]);
+
+  const centroAtual = () => centro ?? {
+    x: recorteDoMapa.x + recorteDoMapa.largura / 2,
+    y: recorteDoMapa.y + recorteDoMapa.altura / 2,
+  };
+
+  const mudarZoom = (novo: number) => {
+    const alvo = Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, novo));
+    if (alvo === ZOOM_MINIMO) { setZoom(ZOOM_MINIMO); setCentro(null); return; }
+    setCentro(centroAtual());
+    setZoom(alvo);
   };
 
   const semDados = totalNacional.quantidade === 0;
@@ -453,10 +518,66 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
             <div className="an-terr-grade">
               <figure className="an-mapa">
                 <figcaption className="an-mapa-titulo">
-                  {rotuloCurtoTerritorial[etapa]}
-                  <span>{uf ? "Clique no estado de novo para voltar ao Brasil" : "Clique em um estado para ver seus municípios"}</span>
+                  <span className="an-mapa-h">
+                    {uf ? `${ufPorSigla(uf)?.nome ?? uf} · visão estadual` : rotuloCurtoTerritorial[etapa]}
+                  </span>
+                  <span>
+                    {uf
+                      ? "Arraste para mover. Clique no estado de novo para voltar ao Brasil."
+                      : "Clique em um estado para entrar nele. Use + e − para aproximar."}
+                  </span>
+                  <span className="an-zoom" role="group" aria-label="Zoom do mapa">
+                    <button
+                      aria-label="Afastar"
+                      disabled={zoom <= ZOOM_MINIMO}
+                      onClick={() => mudarZoom(zoom / 1.6)}
+                      type="button"
+                    >−</button>
+                    <b>{zoom.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}×</b>
+                    <button
+                      aria-label="Aproximar"
+                      disabled={zoom >= ZOOM_MAXIMO}
+                      onClick={() => mudarZoom(zoom * 1.6)}
+                      type="button"
+                    >+</button>
+                    <button
+                      disabled={!ampliado}
+                      onClick={() => { trocarUf(null); setRegiao(null); }}
+                      type="button"
+                    >Ver o Brasil</button>
+                  </span>
                 </figcaption>
-                <svg aria-label={`Mapa do Brasil — ${rotuloCurtoTerritorial[etapa]}`} role="img" viewBox={VIEWBOX_DO_BRASIL}>
+                <svg
+                  aria-label={`Mapa do Brasil — ${rotuloCurtoTerritorial[etapa]}`}
+                  className={`${ampliado ? "ampliado" : ""}${arrastando ? " arrastando" : ""}${uf ? " em-estado" : ""}`}
+                  onPointerDown={(e) => {
+                    if (zoom <= ZOOM_MINIMO && !uf) return;
+                    arraste.current = { x: e.clientX, y: e.clientY, centro: centroAtual() };
+                    arrastou.current = false;
+                    setArrastando(true);
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  }}
+                  onPointerMove={(e) => {
+                    const inicio = arraste.current;
+                    if (!inicio) return;
+                    const escala = porPixel();
+                    if (escala <= 0) return;
+                    const dx = e.clientX - inicio.x;
+                    const dy = e.clientY - inicio.y;
+                    // Alguns pixels de tremor não são um arraste; sem esta
+                    // margem, todo clique com a mão trêmula deixaria de selecionar.
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) arrastou.current = true;
+                    setCentro({ x: inicio.centro.x - dx * escala, y: inicio.centro.y - dy * escala });
+                  }}
+                  onPointerUp={(e) => {
+                    arraste.current = null;
+                    setArrastando(false);
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                  }}
+                  ref={svgRef}
+                  role="img"
+                  viewBox={viewBoxDe(recorteDoMapa)}
+                >
                   <defs>
                     {/* Estado sem medida conhecida. Hachura, não uma cor: vazio e
                         desconhecido precisam ser distinguíveis de relance. */}
@@ -469,7 +590,10 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
                     // Ausente da agregação = não teve licitação: zero conhecido.
                     const dele = pintura.get(item.sigla) ?? SEM_OCORRENCIA;
                     const ativo = uf === item.sigla || (!uf && regiao === item.regiao);
-                    const apagado = Boolean((regiao && item.regiao !== regiao) || (uf && item.sigla !== uf));
+                    // Ampliado, o protótipo esconde as outras UFs; fora dele, só
+                    // recua as que não são do recorte, para não perder a referência.
+                    const apagado = Boolean(regiao && item.regiao !== regiao);
+                    const escondido = Boolean(uf && item.sigla !== uf);
                     const texto = dele.quantidade === 0
                       ? "sem ocorrência"
                       : medidaDe(dele, medida) === null
@@ -478,10 +602,10 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
                     return (
                       <path
                         aria-label={`${item.nome}: ${texto}`}
-                        className={`an-uf n${nivelDeCor(medidaDe(dele, medida), teto) ?? "x"}${ativo ? " sel" : ""}${apagado ? " fora" : ""}`}
+                        className={`an-uf n${nivelDeCor(medidaDe(dele, medida), teto) ?? "x"}${ativo ? " sel" : ""}${apagado ? " fora" : ""}${escondido ? " oculto" : ""}`}
                         d={item.contorno}
                         key={item.sigla}
-                        onClick={() => clicarNoMapa(item.sigla)}
+                        onClick={() => { if (!arrastou.current) clicarNoMapa(item.sigla); }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clicarNoMapa(item.sigla); }
                         }}
@@ -492,8 +616,16 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
                       </path>
                     );
                   })}
-                  {UNIDADES_FEDERATIVAS.map((item) => (
-                    <text className="an-uf-sigla" key={`t-${item.sigla}`} x={item.rotuloX} y={item.rotuloY}>{item.sigla}</text>
+                  {/* No estado ampliado a sigla vira ruído: o nome já está no
+                      título, e as vizinhas estão escondidas. */}
+                  {uf ? null : UNIDADES_FEDERATIVAS.map((item) => (
+                    <text
+                      className="an-uf-sigla"
+                      key={`t-${item.sigla}`}
+                      style={{ fontSize: `${(9.5 * unidade).toFixed(2)}px`, strokeWidth: `${(2.4 * unidade).toFixed(2)}px` }}
+                      x={item.rotuloX}
+                      y={item.rotuloY}
+                    >{item.sigla}</text>
                   ))}
                   {pontos.visiveis.map((ponto) => {
                     const { x, y } = projetar(ponto.latitude, ponto.longitude);
@@ -503,31 +635,37 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
                         aria-label={`${ponto.nome}, ${ponto.uf}: ${exibir(ponto.total, medida)}`}
                         className={`an-ponto${escolhido ? " sel" : ""}`}
                         key={ponto.chave}
-                        onClick={() => escolherPonto(ponto, escolhido)}
+                        onClick={() => { if (!arrastou.current) escolherPonto(ponto, escolhido); }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); escolherPonto(ponto, escolhido); }
                         }}
                         role="button"
                         tabIndex={0}
-                        transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
+                        transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${unidade.toFixed(3)})`}
                       >
                         <title>{`${ponto.nome} · ${ponto.uf} — sede do município`}</title>
                         <circle className="an-ponto-alvo" r="11"/>
                         <circle className="an-ponto-bola" r={escolhido ? 6 : 4}/>
-                        {escolhido ? <text className="an-ponto-nome" x="12" y="4">{ponto.nome}</text> : null}
+                        {/* Nome só onde cabe: ver `rotulosSemColisao`. Fora do
+                            zoom, só o escolhido — no país inteiro os nomes se
+                            empilham mesmo sem colidir formalmente. */}
+                        {escolhido || (ampliado && comNome.has(ponto.chave))
+                          ? <text className="an-ponto-nome" x="12" y="4">{ponto.nome}</text>
+                          : null}
                       </g>
                     );
                   })}
                 </svg>
-                <div className="an-mapa-escala">
+                <div className="an-mapa-escala" hidden={Boolean(uf)}>
                   <span>0</span>
                   {Array.from({ length: NIVEIS_DA_ESCALA }, (_, i) => <i className={`n${i + 1}`} key={i}/>)}
                   <span>{teto === null ? "—" : medida === "qtd" ? num(teto) : brl(teto)}</span>
                   <b>{medida === "qtd" ? "licitações" : "valor estimado"}</b>
                 </div>
                 <p className="an-fonte">
-                  Quanto mais escuro, maior o volume — escala nacional da etapa, período e esfera ativos.
-                  Cinza claro: sem ocorrência. Hachurado: sem valor informado.
+                  {uf
+                    ? "Dentro de um estado a cor não compara nada, então o contorno fica neutro e a informação são os pontos. "
+                    : "Quanto mais escuro, maior o volume — escala nacional da etapa, período e esfera ativos. Cinza claro: sem ocorrência. Hachurado: sem valor informado. "}
                   {pontos.visiveis.length > 0
                     ? ` Pontos = sedes de ${num(pontos.visiveis.length)} município(s), não endereços das licitações.`
                     : ""}
@@ -540,17 +678,17 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
                 <div className="an-terr-sel">
                   <p className="an-rot">Território selecionado</p>
                   <p className="an-terr-escopo">{nomeDoEscopo}</p>
-                  <p className="an-n">{exibir(selecionado[etapa], medida)}</p>
+                  <p className="an-n">{exibir(doRecorte[etapa], medida)}</p>
                   <p className="an-obs">
-                    {rotuloCurtoTerritorial[etapa]} · {complemento(selecionado[etapa], medida)} ·{" "}
-                    {pct(participacao(medidaDe(selecionado[etapa], medida), medidaDe(totalNacional, medida)))} do total
+                    {rotuloCurtoTerritorial[etapa]} · {complemento(doRecorte[etapa], medida)} ·{" "}
+                    {pct(participacao(medidaDe(doRecorte[etapa], medida), medidaDe(totalNacional, medida)))} do total
                     nacional desta etapa
                   </p>
                   <dl className="an-terr-etapas">
                     {etapasDoFunil.map((item) => (
                       <div key={item}>
                         <dt>{rotuloCurtoTerritorial[item]}</dt>
-                        <dd>{num(selecionado[item].quantidade)}<small>{brl(selecionado[item].valor)}</small></dd>
+                        <dd>{num(doRecorte[item].quantidade)}<small>{brl(doRecorte[item].valor)}</small></dd>
                       </div>
                     ))}
                   </dl>

@@ -180,6 +180,36 @@ describe("mapa do território", () => {
   });
 });
 
+describe("zoom do mapa", () => {
+  const html = render();
+
+  it("abre com o país inteiro no viewBox", () => {
+    expect(html).toContain('viewBox="0.0 0.0 730.0 680.0"');
+  });
+
+  it("oferece os controles de aproximar, afastar e voltar ao Brasil", () => {
+    expect(html).toContain('aria-label="Aproximar"');
+    expect(html).toContain('aria-label="Afastar"');
+    expect(html).toContain("Ver o Brasil");
+  });
+
+  /** Sem estado escolhido não há para onde arrastar nem de onde voltar. */
+  it("no país inteiro, afastar e voltar começam desligados", () => {
+    const afastar = html.slice(html.indexOf('aria-label="Afastar"'));
+    expect(afastar.slice(0, 120)).toContain("disabled");
+    const voltar = html.slice(html.indexOf("Ver o Brasil") - 200, html.indexOf("Ver o Brasil"));
+    expect(voltar).toContain("disabled");
+  });
+
+  it("o mapa só fica arrastável quando há para onde arrastar", () => {
+    expect(html).not.toContain('class="ampliado');
+  });
+
+  it("nenhum viewBox inválido chega ao HTML", () => {
+    expect(html).not.toMatch(/viewBox="[^"]*(NaN|Infinity)/);
+  });
+});
+
 describe("pontos dos municípios", () => {
   const html = render();
 
