@@ -11,10 +11,13 @@ export type ScoutedTenderRecord = Readonly<{
   subject: string;
   authorityName: string;
   authorityDocument?: string;
+  /** Esfera como o PNCP entrega: uma letra (F, E, M, D). */
+  sphere?: string;
   city?: string;
   state?: string;
   estimatedValue?: number;
   valueUndisclosed: boolean;
+  proposalOpensAt?: Date;
   proposalClosesAt?: Date;
   noticeUrl?: string;
   status: ScoutedTenderStatus;
@@ -29,7 +32,12 @@ export type OpportunitySeed = Readonly<{
   subject: string;
   authorityName: string;
   authorityDocument?: string;
+  /** Letra da esfera e localidade: é com elas que o órgão nasce cadastrado. */
+  sphere?: string;
+  city?: string;
+  state?: string;
   estimatedValue?: number;
+  publishedAt?: Date;
   deliveryAt?: Date;
   ownerId: string;
 }>;
@@ -86,7 +94,11 @@ export class TriageService {
         subject: record.subject,
         authorityName: record.authorityName,
         authorityDocument: record.authorityDocument,
+        sphere: record.sphere,
+        city: record.city,
+        state: record.state,
         estimatedValue: record.estimatedValue,
+        publishedAt: record.proposalOpensAt,
         deliveryAt: record.proposalClosesAt,
         ownerId: actorId,
       },

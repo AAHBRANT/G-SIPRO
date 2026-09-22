@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { getDatabase } from "@/core/database/prisma";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
@@ -9,6 +11,7 @@ import type {
   TriageRepository,
 } from "@/modules/scouting/application/triage-service";
 import type { ArchiveEvidence } from "@/modules/scouting/domain/archive-adherence";
+import { rotuloDaEsfera } from "@/modules/scouting/domain/esfera";
 import { fieldsFromExtractionOutput, servicesFromExtraction } from "@/modules/technical-archive/domain/extracted-services";
 import type { SignalRecord, SignalRepository } from "@/modules/scouting/application/signal-service";
 import { scoutFilterSchema, type ScoutFilter } from "@/modules/scouting/domain/scout-filter";
@@ -139,8 +142,10 @@ export class PrismaTriageRepository implements TriageRepository {
       subject: stored.subject,
       authorityName: stored.authorityName,
       authorityDocument: stored.authorityDocument ?? undefined,
+      sphere: stored.sphere ?? undefined,
       city: stored.city ?? undefined,
       state: stored.state ?? undefined,
+      proposalOpensAt: stored.proposalOpensAt ?? undefined,
       estimatedValue: toNumber(stored.estimatedValue),
       valueUndisclosed: stored.valueUndisclosed,
       proposalClosesAt: stored.proposalClosesAt ?? undefined,
@@ -181,14 +186,24 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
   private readonly service = new OpportunityService(new PrismaOpportunityRepository());
 
   async createFromScoutedTender(seed: OpportunitySeed, actorId: string, correlationId: string): Promise<string> {
-    // Vincula ao órgão já cadastrado quando o nome coincide. Nunca cria órgão
-    // novo: o cadastro de órgãos é dado mestre e permanece sob curadoria da
-    // equipe. Sem correspondência, a oportunidade nasce sem vínculo e o nome do
-    // órgão fica registrado na fila de rastreadas.
+    // Vincula ao órgão já cadastrado quando o nome coincide; quando não existe,
+    // CADASTRA o órgão em vez de deixar a oportunidade órfã.
+    //
+    // Até 21/09/2026 aqui nunca se criava órgão — cadastro de órgão era dado
+    // mestre sob curadoria da equipe. A regra mudou a pedido do dono ("ao ser
+    // aprovada ela já virar oportunidade... o sistema já tem que fazer tudo
+    // automático"), porque o efeito prático era pior que o risco: a
+    // oportunidade nascia sem órgão nenhum e alguém redigitava nome, esfera e
+    // localidade que o PNCP já tinha entregue.
+    //
+    // O que entra é dado oficial do portal, não digitação: nome, CNPJ, esfera e
+    // município. O registro nasce marcado em `identifiers.revisarCadastro` para
+    // a equipe conferir — a curadoria continua existindo, só deixou de ser
+    // pré-requisito para a oportunidade existir.
     const authority = await getDatabase().contractingAuthority.findFirst({
       where: { active: true, name: { equals: seed.authorityName, mode: "insensitive" } },
       select: { id: true },
-    });
+    }) ?? await this.cadastrarOrgao(seed, actorId);
 
     const created = await this.service.create(
       {
@@ -197,7 +212,14 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
         ownerId: seed.ownerId,
         ...(authority ? { contractingAuthorityId: authority.id } : {}),
         ...(seed.estimatedValue !== undefined ? { estimatedValue: seed.estimatedValue, currency: "BRL", valueSource: VALUE_SOURCE } : {}),
-        ...(seed.deliveryAt ? { deliveryAt: seed.deliveryAt, datesSource: DATES_SOURCE, datesTimeZone: DATES_TIME_ZONE } : {}),
+        ...(seed.publishedAt || seed.deliveryAt
+          ? {
+            ...(seed.publishedAt ? { publishedAt: seed.publishedAt } : {}),
+            ...(seed.deliveryAt ? { deliveryAt: seed.deliveryAt } : {}),
+            datesSource: DATES_SOURCE,
+            datesTimeZone: DATES_TIME_ZONE,
+          }
+          : {}),
       },
       actorId,
       correlationId,
@@ -206,6 +228,34 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
     // "Em análise" é o estado em que a equipe recebe a oportunidade.
     await this.service.transition(created.id, "QUALIFICATION", actorId, {}, correlationId);
     return created.id;
+  }
+
+  /**
+   * Cadastra o órgão com o que o PNCP informou, marcado para conferência.
+   *
+   * `identifiers` guarda o CNPJ e a procedência. É por `revisarCadastro` que a
+   * equipe acha depois o que nasceu automático — sem isso, órgão criado pelo
+   * buscador ficaria indistinguível do que foi curado à mão.
+   */
+  private async cadastrarOrgao(seed: OpportunitySeed, actorId: string): Promise<{ id: string }> {
+    const localidade = [seed.city, seed.state].filter(Boolean).join(" / ");
+    return getDatabase().contractingAuthority.create({
+      data: {
+        id: randomUUID(),
+        name: seed.authorityName,
+        ...(rotuloDaEsfera(seed.sphere) ? { sphere: rotuloDaEsfera(seed.sphere) } : {}),
+        ...(localidade ? { locality: localidade } : {}),
+        identifiers: {
+          ...(seed.authorityDocument ? { cnpj: seed.authorityDocument } : {}),
+          origem: "BUSCADOR",
+          revisarCadastro: true,
+        },
+        active: true,
+        createdBy: actorId,
+        updatedBy: actorId,
+      },
+      select: { id: true },
+    });
   }
 }
 

@@ -109,3 +109,42 @@ describe("TriageService.pendingCount", () => {
     await expect(new TriageService(repository, opportunities).pendingCount()).resolves.toBe(7);
   });
 });
+
+/**
+ * "o sistema nao esta lendo e preenchendo a licitação depois de aprovada é
+ * como se o ususario tivesse que fazer o cadastro todo de novo" — o que o
+ * portal já entregou não pode voltar a ser digitado. O seed é o contrato
+ * dessa promessa: o que não passar por aqui some na aprovação.
+ */
+describe("o que a aprovação leva para a oportunidade", () => {
+  it("carrega esfera, município e data de abertura, além do que já levava", async () => {
+    const record = buildRecord({
+      sphere: "M",
+      city: "Vitória",
+      state: "ES",
+      proposalOpensAt: new Date("2026-08-01T13:00:00.000Z"),
+    });
+    const { repository, opportunities, seeds } = buildDependencies(record);
+
+    await new TriageService(repository, opportunities).approve(record.id, "ator-1", "corr-1", decidedAt);
+
+    expect(seeds[0]).toMatchObject({
+      subject: record.subject,
+      authorityName: record.authorityName,
+      authorityDocument: record.authorityDocument,
+      sphere: "M",
+      city: "Vitória",
+      state: "ES",
+      publishedAt: new Date("2026-08-01T13:00:00.000Z"),
+      deliveryAt: record.proposalClosesAt,
+      ownerId: "ator-1",
+    });
+  });
+
+  /** Licitação sem data de abertura não pode inventar uma. */
+  it("não inventa data de abertura quando o órgão não informou", async () => {
+    const { repository, opportunities, seeds } = buildDependencies(buildRecord());
+    await new TriageService(repository, opportunities).approve("scouted-1", "ator-1", "corr-1", decidedAt);
+    expect(seeds[0]?.publishedAt).toBeUndefined();
+  });
+});
