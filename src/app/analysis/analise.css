@@ -1,0 +1,251 @@
+/*
+ * Tela de Análise — estilos próprios do módulo.
+ *
+ * Tudo escopado em .an-* para não vazar para o resto do sistema, como o
+ * buscador já faz com bx-*. Paleta AAHBRANT: nenhuma cor fora dos seis
+ * tokens oficiais; os neutros são alfas do preto e do cinza da norma.
+ * Tipografia Arial, a alternativa oficial ao Montserrat.
+ */
+/* ============================================================
+     Layout aprovado, com os consertos por baixo.
+     Paleta AAHBRANT: vinho #670000, vinho claro #7A0101, preto,
+     branco, bege #EBE9AD, cinza #787878. Os neutros são alfas do
+     preto e do cinza oficiais — nenhuma matiz nova.
+     Tipografia: Arial (alternativa oficial da norma).
+     ============================================================ */
+  .an {
+  color: var(--texto);
+  font-family: Arial, "Aptos", Calibri, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+    --vinho: #670000;
+    --vinho-claro: #7A0101;
+    --bege: #EBE9AD;
+    --cinza: #787878;
+
+    --fundo: rgba(120, 120, 120, 0.07);
+    --mesa: #FFFFFF;
+    --texto: #000000;
+    --texto-2: rgba(0, 0, 0, 0.72);
+    --texto-3: rgba(0, 0, 0, 0.60);
+    --fio: rgba(120, 120, 120, 0.30);
+    --fio-fraco: rgba(120, 120, 120, 0.16);
+    --trilha: #C9C9C9;
+    --base-grafico: #8C8C8C;
+    --sombra: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  
+  
+
+  .an-sr { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+
+  .an a:focus-visible, .an button:focus-visible, .an select:focus-visible, .an [tabindex]:focus-visible  {
+    outline: 2px solid var(--vinho); outline-offset: 2px;
+  }
+
+  /* ---------- cabeçalho ---------- */
+
+  .an-topo {
+    align-items: flex-end;
+    border-bottom: 2px solid var(--vinho);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    justify-content: space-between;
+    padding: 24px 0 14px;
+  }
+  .an-topo-marca { align-items: center; display: flex; gap: 20px; }
+  .an-topo-marca img { display: block; height: 30px; width: auto; }
+  .an-migalha { color: var(--texto-3); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .an-migalha b { color: var(--vinho); }
+  .an h1  { font-size: 27px; letter-spacing: -0.01em; margin: 4px 0 2px; }
+  .an-sub { color: var(--texto-2); font-size: 13px; margin: 0; max-width: 62ch; }
+
+  .an-btn {
+    background: var(--mesa); border: 1px solid var(--fio); color: var(--texto);
+    cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 700; min-height: 32px; padding: 8px 14px;
+  }
+  .an-btn:hover { border-color: var(--vinho); color: var(--vinho); }
+  .an-btn.an-forte { background: var(--vinho); border-color: var(--vinho); color: var(--bege); }
+  .an-btn.an-forte:hover { background: var(--vinho-claro); }
+
+  /* ---------- controles ---------- */
+
+  .an-controles {
+    align-items: center; background: var(--mesa); border: 1px solid var(--fio-fraco);
+    display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 18px; padding: 12px 16px;
+  }
+  .an-campo { align-items: center; display: flex; gap: 8px; }
+  .an-campo label { color: var(--vinho); font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+  .an select  {
+    appearance: none; background: var(--mesa);
+    background-image: linear-gradient(45deg, transparent 50%, var(--vinho) 50%), linear-gradient(135deg, var(--vinho) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-repeat: no-repeat; background-size: 5px 5px, 5px 5px;
+    border: 1px solid var(--fio); border-radius: 0; color: var(--texto); font: inherit; font-size: 13px; height: 32px; padding: 0 32px 0 10px;
+  }
+  .an-alterna { display: flex; }
+  .an-alterna button {
+    background: var(--mesa); border: 1px solid var(--fio); color: var(--texto); cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 700; min-height: 32px; padding: 7px 14px;
+  }
+  .an-alterna button + button { border-left: none; }
+  .an-alterna button[aria-pressed="true"] { background: var(--vinho); border-color: var(--vinho); color: var(--bege); }
+  .an-espaco { flex: 1; }
+  .an-corte { color: var(--texto-3); font-size: 11.5px; }
+
+  /* ---------- destaque de resultado ---------- */
+
+  .an-resultado {
+    background: var(--mesa); border: 1px solid var(--fio-fraco); border-top: 3px solid var(--vinho);
+    display: flex; flex-wrap: wrap; gap: 10px 40px; margin-top: 16px; padding: 16px 18px;
+  }
+  .an-resultado .an-peca { display: flex; flex-direction: column; }
+  .an-resultado .an-rot { color: var(--vinho); font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+  .an-resultado .an-n { font-size: 34px; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; line-height: 1.12; }
+  .an-resultado .an-peca.an-secundaria .an-n { font-size: 22px; }
+  .an-resultado .an-n u { color: var(--cinza); font-size: .42em; margin: 0 .16em; text-decoration: none; }
+  .an-resultado .an-obs { color: var(--texto-2); font-size: 12px; }
+
+  /* ---------- cards ---------- */
+
+  .an-cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); margin-top: 16px; }
+
+  .an-card {
+    background: var(--mesa); border: 1px solid var(--fio-fraco); box-shadow: var(--sombra);
+    display: flex; flex-direction: column; padding: 16px 16px 0;
+  }
+  .an-card-topo { align-items: center; color: var(--vinho); display: flex; gap: 7px; }
+  .an-card-topo svg { height: 14px; width: 14px; }
+  .an-card-topo span { font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+  .an-card-n { font-size: 33px; font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin-top: 8px; }
+  .an-card-n u { color: var(--cinza); font-size: 0.42em; margin: 0 .16em; text-decoration: none; }
+  .an-card-n.an-vazio { color: var(--texto-3); font-size: 20px; letter-spacing: 0; }
+  .an-card-comp { color: var(--texto-2); font-size: 12px; min-height: 34px; }
+  .an-card-comp span { color: var(--texto-3); }
+
+  .an-barra { background: var(--trilha); box-shadow: inset 0 0 0 1px var(--cinza); height: 4px; margin-top: 12px; width: 100%; }
+  .an-barra i { background: var(--vinho); display: block; height: 100%; width: 0; }
+  .an-barra.an-transbordo i { background-image: repeating-linear-gradient(45deg, var(--bege) 0 3px, var(--vinho) 3px 7px); }
+  .an-barra.an-indisponivel { background-image: repeating-linear-gradient(45deg, var(--trilha) 0 3px, #FFFFFF 3px 6px); }
+
+  .an-card-pe { border-top: 1px solid var(--fio-fraco); margin: 12px -16px 0; padding: 6px 16px; }
+  .an-card-pe button {
+    background: none; border: none; color: var(--vinho); cursor: pointer;
+    font: inherit; font-size: 11.5px; font-weight: 700; min-height: 24px; padding: 4px 0;
+  }
+  .an-card-pe button:hover { text-decoration: underline; }
+
+  /* ---------- abas ---------- */
+
+  .an-abas { border-bottom: 1px solid var(--fio); display: flex; flex-wrap: wrap; gap: 2px; margin-top: 26px; }
+  .an-aba {
+    background: none; border: none; border-bottom: 2px solid transparent; color: var(--texto-2);
+    cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; padding: 9px 14px;
+  }
+  .an-aba[aria-pressed="true"] { border-bottom-color: var(--vinho); color: var(--vinho); }
+
+  /* ---------- seções ---------- */
+
+  .an main  { display: block; }
+  .an section  { margin-top: 24px; }
+  .an section[hidden]  { display: none; }
+  .an-bloco { background: var(--mesa); border: 1px solid var(--fio-fraco); padding: 18px 18px 20px; }
+  .an-bloco + .an-bloco { margin-top: 16px; }
+  .an-bloco h2 { font-size: 15px; margin: 0 0 3px; }
+  .an-bloco .an-ajuda { color: var(--texto-2); font-size: 12px; margin: 0 0 14px; max-width: 70ch; }
+  .an-dois { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); }
+
+  /* ---------- funil ---------- */
+
+  .an-etapa {
+    align-items: center; background: none; border: none; cursor: pointer; display: grid; font: inherit;
+    gap: 3px 12px; grid-template-columns: 190px 1fr 104px; padding: 8px 6px; text-align: left; width: 100%;
+  }
+  .an-etapa:hover, .an-etapa:focus-visible { background: rgba(103, 0, 0, 0.06); box-shadow: inset 3px 0 0 var(--vinho); }
+  .an-etapa-nome { font-size: 12.5px; font-weight: 700; }
+  .an-etapa-trilha { background: var(--trilha); box-shadow: inset 0 0 0 1px var(--cinza); height: 14px; overflow: hidden; }
+  .an-etapa-trilha i { background: var(--vinho); display: block; height: 100%; width: 0; }
+  .an-etapa-num { font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+  .an-etapa-num b { display: block; font-size: 14px; }
+  .an-etapa-num span { color: var(--texto-3); font-size: 11px; }
+
+  /* ---------- rosca ---------- */
+
+  .an-rosca-caixa { align-items: center; display: flex; flex-wrap: wrap; gap: 20px; }
+  .an-legenda { font-size: 12.5px; }
+  .an-legenda div { align-items: baseline; display: flex; gap: 8px; margin-bottom: 8px; }
+  .an-legenda div.an-total { border-top: 1px solid var(--fio); margin-top: 10px; padding-left: 18px; padding-top: 10px; }
+  .an-chave { display: inline-block; height: 10px; width: 10px; }
+  .an-chave.an-dentro { background: var(--vinho); }
+  .an-chave.an-fora { background: var(--base-grafico); }
+  .an-legenda b { font-variant-numeric: tabular-nums; }
+
+  .an-aviso {
+    background: var(--bege); border-left: 3px solid var(--vinho); color: var(--texto);
+    font-size: 12px; line-height: 1.6; margin-top: 14px; padding: 10px 12px;
+  }
+
+  /* ---------- barras mensais ---------- */
+
+  .an-meses { align-items: flex-end; border-bottom: 1px solid var(--fio); display: flex; gap: 12px; margin-top: 8px; }
+  .an-mes { display: flex; flex: 0 1 92px; flex-direction: column; max-width: 92px; }
+  .an-mes-btn { background: none; border: none; cursor: pointer; font: inherit; padding: 0; }
+  .an-mes-btn:hover .an-serie { background: var(--vinho-claro); }
+  .an-mes-valor { font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 700; text-align: center; }
+  .an-mes-barras { align-items: flex-end; display: flex; gap: 3px; height: 150px; }
+  .an-mes-barras i { display: block; flex: 1; min-height: 1px; }
+  .an-mes-barras .an-base { background: var(--base-grafico); }
+  .an-mes-barras .an-serie { background: var(--vinho); }
+  .an-mes-rot { color: var(--texto-2); font-size: 10.5px; font-weight: 700; margin-top: 6px; text-align: center; }
+  .an-escala { color: var(--texto-3); font-size: 11px; }
+
+  /* ---------- tabela ---------- */
+
+  .an-rolagem { overflow-x: auto; }
+  .an table  { border-collapse: collapse; font-size: 12.5px; min-width: 720px; width: 100%; }
+  .an caption  { text-align: left; }
+  .an th  {
+    border-bottom: 2px solid var(--vinho); color: var(--vinho); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.06em; padding: 0 14px 7px 0; text-align: left; text-transform: uppercase;
+  }
+  .an td  { border-bottom: 1px solid var(--fio-fraco); padding: 8px 14px 8px 0; }
+  .an th:not(:first-child), .an td:not(:first-child)  { text-align: right; }
+  .an td:not(:first-child)  { font-variant-numeric: tabular-nums; }
+  .an td:first-child  { font-weight: 700; }
+  tbody tr.an-clicavel:hover { background: rgba(103, 0, 0, 0.06); }
+  .an-sem { color: var(--texto-3); font-weight: 400; }
+  .an-cel-btn { background: none; border: none; color: inherit; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
+  .an-cel-btn:hover { color: var(--vinho); text-decoration: underline; }
+
+  /* ---------- painel de detalhe ---------- */
+
+  .an-capa { background: rgba(0, 0, 0, 0.32); inset: 0; position: fixed; z-index: 10; }
+  .an-capa[hidden], .an-detalhe[hidden] { display: none; }
+  .an-detalhe {
+    background: var(--mesa); border: 1px solid var(--fio); border-left: 3px solid var(--vinho);
+    bottom: 0; max-width: 100%; overflow-y: auto; padding: 22px 22px 40px;
+    position: fixed; right: 0; top: 0; width: 420px; z-index: 11;
+  }
+  .an-detalhe-topo { align-items: flex-start; display: flex; gap: 12px; justify-content: space-between; }
+  .an-detalhe h3 { font-size: 17px; margin: 0; }
+  .an-fechar { background: none; border: 1px solid var(--fio); cursor: pointer; display: grid; font: inherit; font-size: 15px; height: 32px; place-items: center; width: 32px; }
+  .an-fechar:hover { border-color: var(--vinho); color: var(--vinho); }
+  .an-detalhe-n { font-size: 30px; font-variant-numeric: tabular-nums; font-weight: 700; margin: 14px 0 2px; }
+  .an-detalhe-n u { color: var(--cinza); font-size: 0.42em; margin: 0 .16em; text-decoration: none; }
+  .an-detalhe dl { display: grid; grid-template-columns: 150px 1fr; margin: 16px 0 0; }
+  .an-detalhe dt { border-top: 1px solid var(--fio-fraco); color: var(--vinho); font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; padding: 10px 0; text-transform: uppercase; }
+  .an-detalhe dd { border-top: 1px solid var(--fio-fraco); font-variant-numeric: tabular-nums; font-weight: 700; margin: 0; padding: 10px 0; text-align: right; }
+  .an-detalhe .an-explica { border-top: 1px solid var(--fio-fraco); color: var(--texto-2); font-size: 12.5px; line-height: 1.6; margin-top: 0; padding-top: 16px; }
+  .an-mini { align-items: flex-end; display: flex; gap: 6px; height: 76px; margin-top: 10px; }
+  .an-mini div { background: var(--vinho); flex: 1; min-height: 2px; }
+  .an-mini-rot { color: var(--texto-3); display: flex; font-size: 9px; gap: 6px; margin-top: 4px; }
+  .an-mini-rot span { flex: 1; text-align: center; }
+
+  @media (max-width: 720px) {
+    .an-etapa { grid-template-columns: 1fr; }
+    .an-etapa-num { text-align: left; }
+    .an-detalhe { width: 100%; }
+    .an-detalhe dl { grid-template-columns: 1fr; }
+    .an-detalhe dd { text-align: left; }
+  }

@@ -38,6 +38,7 @@ const navigation: ReadonlyArray<NavigationItem> = [
   { href: "/scouting", label: "Buscador", icon: icons.scouting, permission: "opportunities.read" },
   { href: "/proposals", label: "Propostas", icon: icons.proposal, permission: "proposals.read" },
   { href: "/technical-archive", label: "Acervo técnico", icon: icons.archive, permission: "technical-archive.read" },
+  { href: "/analysis", label: "Análise", icon: icons.indicators, permission: "opportunities.read" },
   { href: "/indicators", label: "Inteligência e KPIs", icon: icons.indicators, permission: "indicators.read" },
   { href: "/calendar", label: "Calendário", icon: icons.calendar, permission: "calendar.read" },
 ];
