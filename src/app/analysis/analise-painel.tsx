@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { MapaTerritorio } from "@/app/analysis/mapa-territorio";
 import {
   percentual,
   proporcaoDeBarra,
@@ -11,6 +12,7 @@ import {
   type EtapaDoFunil,
   type MesDoFunil,
 } from "@/modules/analysis/domain/funil-comercial";
+import type { CelulaTerritorial } from "@/modules/analysis/domain/territorio";
 
 /**
  * Interação da tela de Análise: período, medida, abas e painel de detalhe.
@@ -28,6 +30,8 @@ type Props = Readonly<{
   meses: readonly MesDoFunil[];
   semValor: number;
   atualizadoEm: string;
+  /** Agregação por mês, UF e esfera — só a aba do mapa consome. */
+  territorio: readonly CelulaTerritorial[];
 }>;
 
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -65,7 +69,7 @@ function Barra({ a, b, rotulo }: { a: number | null; b: number | null; rotulo: s
   );
 }
 
-export function AnalisePainel({ meses, semValor, atualizadoEm }: Props) {
+export function AnalisePainel({ meses, semValor, atualizadoEm, territorio }: Props) {
   const [janela, setJanela] = useState(6);
   const [medida, setMedida] = useState<"qtd" | "val">("qtd");
   const [aba, setAba] = useState(0);
@@ -164,7 +168,7 @@ export function AnalisePainel({ meses, semValor, atualizadoEm }: Props) {
       </div>
 
       <div aria-label="Seções da análise" className="an-abas" role="group">
-        {["Visão geral", "Aderência e funil", "Desempenho", "Indicadores"].map((rotulo, indice) => (
+        {["Visão geral", "Aderência e funil", "Mapa do Brasil", "Desempenho", "Indicadores"].map((rotulo, indice) => (
           <button aria-pressed={aba === indice} className="an-aba" key={rotulo} onClick={() => setAba(indice)} type="button">{rotulo}</button>
         ))}
       </div>
@@ -195,7 +199,13 @@ export function AnalisePainel({ meses, semValor, atualizadoEm }: Props) {
         </div>
       </section>
 
-      <section aria-labelledby="an-h-meses" hidden={!(aba === 0 || aba === 2)}>
+      {/* O conjunto de meses do recorte ativo: o mapa filtra por ele sem
+          nova ida ao banco, e assim mapa e cards falam do mesmo período. */}
+      <section aria-labelledby="an-h-mapa" hidden={!(aba === 0 || aba === 2)}>
+        <MapaTerritorio celulas={territorio} medida={medida} meses={new Set(recorte.map((m) => m.mes))}/>
+      </section>
+
+      <section aria-labelledby="an-h-meses" hidden={!(aba === 0 || aba === 3)}>
         <div className="an-bloco">
           <h2 id="an-h-meses">Evolução mensal</h2>
           <p className="an-ajuda">
@@ -245,7 +255,7 @@ export function AnalisePainel({ meses, semValor, atualizadoEm }: Props) {
         </div>
       </section>
 
-      <section aria-labelledby="an-h-tabela" hidden={!(aba === 0 || aba === 3)}>
+      <section aria-labelledby="an-h-tabela" hidden={!(aba === 0 || aba === 4)}>
         <div className="an-bloco">
           <h2 id="an-h-tabela">Indicadores por etapa</h2>
           <p className="an-ajuda">O mesmo período dos cards e do gráfico. Clique no nome da etapa para abrir o detalhe.</p>

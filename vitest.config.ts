@@ -9,7 +9,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    // `.tsx` entrou com o primeiro teste de componente (o mapa da Análise):
+    // ele renderiza pelo servidor e confere o HTML resultante, que é como se
+    // pega largura de barra inválida e "NaN" chegando na tela.
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],

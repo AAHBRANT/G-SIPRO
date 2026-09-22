@@ -1,6 +1,7 @@
 import { authorize } from "@/core/authorization/policy";
 import { getCurrentAuthorizationContext } from "@/core/authorization/authorization-context";
 import { PrismaFunilRepository } from "@/modules/analysis/infrastructure/prisma-funil-repository";
+import { PrismaTerritorioRepository } from "@/modules/analysis/infrastructure/prisma-territorio-repository";
 import { AnalisePainel } from "@/app/analysis/analise-painel";
 import "./analise.css";
 
@@ -46,7 +47,12 @@ export default async function AnalisePage() {
 
   const agora = new Date();
   const { de, ate } = janelaDoPeriodo(agora);
-  const { meses, semValorPorMes } = await new PrismaFunilRepository().carregar(de, ate);
+  // As duas consultas são independentes e usam a mesma janela: em paralelo,
+  // a página não paga a soma dos dois tempos.
+  const [{ meses, semValorPorMes }, territorio] = await Promise.all([
+    new PrismaFunilRepository().carregar(de, ate),
+    new PrismaTerritorioRepository().carregar(de, ate),
+  ]);
 
   const semValor = Object.values(semValorPorMes).reduce((soma, quantos) => soma + quantos, 0);
   const atualizadoEm = agora.toLocaleString("pt-BR", {
@@ -73,7 +79,7 @@ export default async function AnalisePage() {
             Ainda não há licitações rastreadas no período. Assim que a varredura rodar, os números aparecem aqui.
           </p>
         )
-        : <AnalisePainel atualizadoEm={atualizadoEm} meses={meses} semValor={semValor}/>}
+        : <AnalisePainel atualizadoEm={atualizadoEm} meses={meses} semValor={semValor} territorio={territorio}/>}
     </main>
   );
 }
