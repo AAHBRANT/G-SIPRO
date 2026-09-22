@@ -20,9 +20,11 @@ import { useState } from "react";
 export function BaixarDocumentos({ id }: { id: string }) {
   const [baixando, setBaixando] = useState(false);
   const [erro, setErro] = useState<string>();
+  const [aviso, setAviso] = useState<string>();
 
   async function baixar() {
     setErro(undefined);
+    setAviso(undefined);
     setBaixando(true);
     try {
       const resposta = await fetch(`/api/scouting/scouted-tenders/${id}/documentos`);
@@ -40,6 +42,7 @@ export function BaixarDocumentos({ id }: { id: string }) {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      setAviso(resumoDoPacote(resposta.headers));
     } catch {
       // Pacote grande com rede instável cai aqui. Dizer "tente de novo" sem
       // dizer o que houve faz a pessoa repetir o download de 20 MB às cegas.
@@ -55,7 +58,26 @@ export function BaixarDocumentos({ id }: { id: string }) {
       {baixando ? "Montando o pacote…" : "Baixar edital e anexos"}
     </button>
     {erro && <p className="bx-erro" role="alert">{erro}</p>}
+    {aviso && <p className="bx-aviso-baixa">{aviso}</p>}
   </>;
+}
+
+/**
+ * Diz quantos documentos vieram — e, quando vem um só, que a culpa não é do
+ * G-SIPRO.
+ *
+ * "ta baixando só o edital e eu quero o edital mais todos os anexos"
+ * (22/09/2026): o download estava correto, o órgão é que tinha publicado um
+ * arquivo só no portal. Sem essa frase, receber um arquivo é indistinguível
+ * de ter perdido os outros.
+ */
+function resumoDoPacote(headers: Headers): string | undefined {
+  const publicados = Number(headers.get("x-documentos-publicados") ?? 0);
+  const incluidos = Number(headers.get("x-documentos-incluidos") ?? 0);
+  if (!publicados) return undefined;
+  if (publicados === 1) return "O órgão publicou 1 documento no PNCP — é tudo o que existe lá. Anexos citados no edital podem estar no site do próprio órgão.";
+  if (incluidos < publicados) return `${incluidos} de ${publicados} documentos baixados. O que faltou está listado no _NAO-INCLUIDOS.txt dentro do zip.`;
+  return `${publicados} documentos baixados — tudo o que o órgão publicou no PNCP.`;
 }
 
 /** O nome verdadeiro vem do cabeçalho; sem ele, um nome genérico serve. */

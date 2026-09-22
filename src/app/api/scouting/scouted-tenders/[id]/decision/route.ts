@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requirePermission } from "@/core/authorization/authorization-context";
@@ -11,6 +11,7 @@ import {
   TriageService,
   discardReasonSchema,
 } from "@/modules/scouting/application/triage-service";
+import { montarLicitacaoDaAprovacao } from "@/modules/scouting/application/licitacao-da-aprovacao-service";
 import { OpportunityFromScoutedTender, PrismaTriageRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 
 const commandSchema = z.discriminatedUnion("decision", [
@@ -34,6 +35,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       if (command.decision === "APPROVE") {
         const opportunityId = await service.approve(id, authorization.actorId, context.correlationId);
+        /**
+         * A ficha da LICITAÇÃO é montada depois de responder: ela depende de
+         * baixar do PNCP tudo que o órgão publicou (10 a 20 MB é comum) só
+         * para pesar e conferir cada arquivo, e segurar a tela por isso seria
+         * cobrar do usuário uma espera que ele não pediu — decisão do dono em
+         * 22/09/2026. Falhar lá NÃO desfaz a aprovação: a oportunidade já
+         * existe, e o serviço registra o motivo em vez de propagar erro para
+         * uma requisição encerrada.
+         */
+        after(() => montarLicitacaoDaAprovacao(id, opportunityId, authorization.actorId, context.correlationId));
         return NextResponse.json({ data: { decision: "APPROVE", opportunityId }, correlationId: context.correlationId });
       }
 

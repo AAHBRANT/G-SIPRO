@@ -77,6 +77,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             "Content-Disposition": `attachment; filename="${sanitizar(unico.filename)}"`,
             "Content-Length": String(unico.bytes.byteLength),
             "Cache-Control": "no-store",
+            // A tela precisa poder dizer QUANTOS documentos o órgão publicou.
+            // Sem isso, receber um arquivo só parece defeito do G-SIPRO quando
+            // é o portal que não tem mais nada — foi a dúvida real de
+            // 22/09/2026 ("ta baixando só o edital").
+            "x-documentos-publicados": "1",
+            "x-documentos-incluidos": "1",
             "x-correlation-id": context.correlationId,
           },
         });
@@ -127,6 +133,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           "Content-Disposition": `attachment; filename="${nome}.zip"`,
           "Content-Length": String(zip.byteLength),
           "Cache-Control": "no-store",
+          "x-documentos-publicados": String(arquivos.length),
+          "x-documentos-incluidos": String(pacote.entradas.length),
           "x-correlation-id": context.correlationId,
         },
       });
