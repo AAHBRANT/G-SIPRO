@@ -789,6 +789,13 @@
 
 .bx-link:hover { text-decoration: underline; }
 
+/* O download é um botão porque precisa de fetch com a sessão, mas lê como os
+   links ao lado — ver baixar-documentos.tsx. */
+button.bx-link { background: none; border: none; cursor: pointer; font-family: inherit; padding: 0; }
+button.bx-link:disabled { cursor: progress; opacity: 0.6; text-decoration: none; }
+
+.bx-erro { color: var(--vinho); font-size: 11.5px; font-weight: 700; margin: 0 11px 10px; }
+
 /* ---------- vazio ---------- */
 
 .bx-vazio { padding: 52px 16px; text-align: center; }

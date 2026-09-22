@@ -11,6 +11,7 @@ import { computeArchiveAdherence } from "@/modules/scouting/domain/archive-adher
 import { combineAdherence } from "@/modules/scouting/domain/combined-adherence";
 import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { buildPrerequisites, summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
+import { rotulosDeEsfera as sphereLabels } from "@/modules/scouting/domain/esfera";
 import { toArchiveRequirement } from "@/modules/scouting/domain/edital-requirement";
 import { editalReadingFromRow } from "@/modules/scouting/infrastructure/prisma-edital-reading";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
@@ -23,6 +24,7 @@ import { ShareTenderAction } from "./share-tender-action";
 import { Flag, SignalActions } from "./signal-actions";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
 import { TriageActions } from "./triage-actions";
+import { BaixarDocumentos } from "@/app/opportunities/scouted/baixar-documentos";
 import "./scouted.css";
 
 const PAGE_SIZE = 60;
@@ -34,7 +36,7 @@ const QUEUE_CAP = 900;
 /** Abaixo disto a licitação contraria o perfil em mais de um critério. */
 const OFF_PROFILE = 50;
 
-const sphereLabels: Record<string, string> = { F: "Federal", E: "Estadual", M: "Municipal", D: "Distrital" };
+
 const workTypeLabels: Record<ScoutWorkType, string> = {
   BUILDING: "Edificação",
   SPECIAL_STRUCTURE: "Obra de arte especial",
@@ -665,21 +667,9 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
                         3. A origem: saída manual quando o pacote não fecha
                            (órgão fora do ar, anexo gigante). */}
                     <div className="bx-links">
-                      {/* ⚠️ `target="_blank"`, e NUNCA o atributo `download`.
-                          Mesmo padrão do anexo de chamado em support-admin.tsx,
-                          e a razão é o Teams: o app roda em iframe de outro
-                          site, e `download` faz o navegador buscar o arquivo
-                          FORA de uma navegação de topo — essa busca não leva o
-                          cookie de sessão, o proxy.ts recusa com 401 em JSON, e
-                          o navegador salva a mensagem de erro como
-                          "documentos.json". Foi exatamente o que aconteceu em
-                          21/09/2026. Em aba nova é navegação de verdade, e os
-                          cookies SameSite=None que o auth.ts configura para o
-                          Teams viajam junto. */}
-                      <a className="bx-link forte" href={`/api/scouting/scouted-tenders/${tender.id}/documentos`} rel="noreferrer" target="_blank">
-                        <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
-                        Baixar edital e anexos
-                      </a>
+                      {/* Botão, e não link: a sessão do Teams não acompanha
+                          navegação de topo. Ver baixar-documentos.tsx. */}
+                      <BaixarDocumentos id={tender.id}/>
                       {tender.edital && <a className="bx-link" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
                         Arquivo lido pela IA
                         <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
