@@ -26,6 +26,10 @@ import {
   type ArquivoConferido,
 } from "@/modules/scouting/domain/licitacao-da-aprovacao";
 import { parsePncpIdentifier } from "@/modules/scouting/domain/pncp-identifier";
+import { requisitosDoEdital } from "@/modules/scouting/domain/requisitos-do-edital";
+import { PrismaEditalReadingRepository } from "@/modules/scouting/infrastructure/prisma-edital-reading";
+import { RequirementService } from "@/modules/requirements/application/requirement-service";
+import { PrismaRequirementRepository } from "@/modules/requirements/infrastructure/prisma-requirement-repository";
 import { PncpFilesClient, type TenderFile } from "@/modules/scouting/infrastructure/pncp-files-client";
 import { TenderService } from "@/modules/tenders/application/tender-service";
 import { PrismaTenderRepository } from "@/modules/tenders/infrastructure/prisma-tender-repository";
@@ -58,6 +62,47 @@ async function conferirArquivos(
     }
   }
   return conferidos;
+}
+
+/**
+ * Transporta a leitura do edital para os requisitos da ficha.
+ *
+ * Sem leitura ainda, não há o que transportar — e isso é comum: a licitação
+ * pode ser aprovada antes de o represado alcançá-la. Os requisitos nascem em
+ * rascunho, para conferência humana; ver `requisitos-do-edital`.
+ *
+ * Um requisito que não entra não derruba os outros nem a ficha: a exigência
+ * perdida vira linha de log, e a equipe ainda tem a licitação montada.
+ */
+async function registrarRequisitos(
+  tenderId: string,
+  scoutedTenderId: string,
+  actorId: string,
+  correlationId: string,
+): Promise<number> {
+  const logger = createLogger(getEnvironment());
+  const leitura = await new PrismaEditalReadingRepository().find(scoutedTenderId);
+  if (!leitura) return 0;
+
+  const versao = await getDatabase().tenderVersion.findFirst({
+    where: { tenderId },
+    orderBy: { version: "desc" },
+    select: { id: true },
+  });
+  if (!versao) return 0;
+
+  const servico = new RequirementService(new PrismaRequirementRepository());
+  let gravados = 0;
+  for (const requisito of requisitosDoEdital(leitura.requirement, versao.id, actorId)) {
+    try {
+      await servico.create(requisito, actorId, correlationId);
+      gravados += 1;
+    } catch (erro) {
+      logger.warn({ tenderId, correlationId, texto: requisito.text.slice(0, 120), erro: erro instanceof Error ? erro.message : String(erro) },
+        "Requisito do edital não pôde ser registrado na ficha.");
+    }
+  }
+  return gravados;
 }
 
 export async function montarLicitacaoDaAprovacao(
@@ -117,6 +162,7 @@ export async function montarLicitacaoDaAprovacao(
     );
 
     const criada = await new TenderService(new PrismaTenderRepository()).create(rascunho, actorId, correlationId);
+    const requisitos = await registrarRequisitos(criada.id, scoutedTenderId, actorId, correlationId);
     logger.info({
       ...base,
       tenderId: criada.id,
@@ -124,6 +170,7 @@ export async function montarLicitacaoDaAprovacao(
       publicados: publicados.length,
       vinculados: conferidos.length,
       ignorados: ignorados.length,
+      requisitos,
     }, "Ficha da licitação criada a partir da aprovação.");
   } catch (erro) {
     // Já existe ficha para esta licitação (aprovação repetida, corrida entre

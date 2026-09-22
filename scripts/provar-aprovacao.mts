@@ -81,6 +81,31 @@ async function main() {
     },
   });
 
+  // Leitura de edital sintética: é dela que saem os requisitos da ficha.
+  // Sem isso, a prova mostraria a licitação sem exigência nenhuma e pareceria
+  // que o transporte não funciona.
+  await db.scoutedTenderEditalReading.upsert({
+    where: { tenderId: licitacao.id },
+    create: {
+      id: randomUUID(),
+      tenderId: licitacao.id,
+      readMethod: "PATTERN_MATCH",
+      sourceUri: "https://pncp.gov.br/prova/edital.pdf",
+      sourceFilename: "edital-de-prova.pdf",
+      sourceFileHash: "b".repeat(64),
+      sourceFetchedAt: new Date(),
+      services: [
+        { description: "Pavimentacao asfaltica em CBUQ", quantity: 65_010, unit: "m2" },
+        { description: "Drenagem urbana" },
+      ],
+      consortiumAllowed: false,
+      requiresCat: true,
+      requiresSiteVisit: true,
+      limitations: ["garantia de proposta nao localizada"],
+    },
+    update: {},
+  });
+
   console.log("aprovando pelo servico real...");
   const oportunidadeId = await new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender())
     .approve(licitacao.id, ator.id, randomUUID());
@@ -142,6 +167,16 @@ async function main() {
       console.log(`  digital:  ${v.fileHash.slice(0, 20)}...`);
       console.log(`  ANEXOS VINCULADOS: ${v.attachments.length}`);
       for (const a of v.attachments) console.log(`     - ${a.fileName.slice(0, 55)}`);
+
+      const requisitos = await db.tenderRequirement.findMany({
+        where: { tenderVersionId: v.id },
+        select: { type: true, criticality: true, status: true, text: true },
+        orderBy: { createdAt: "asc" },
+      });
+      console.log(`\n  EXIGENCIAS DO EDITAL NA FICHA: ${requisitos.length}`);
+      for (const r of requisitos) {
+        console.log(`     [${r.criticality.padEnd(8)}] [${r.status}] ${r.type.padEnd(24)} ${r.text.slice(0, 60)}`);
+      }
     }
   }
 
