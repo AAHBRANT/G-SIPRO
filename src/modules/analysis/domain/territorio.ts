@@ -60,6 +60,8 @@ export type CelulaTerritorial = Readonly<{
   mes: string;
   uf: string | null;
   esfera: string;
+  /** Município da unidade do órgão, como o portal o escreve. */
+  cidade: string | null;
   quantidade: Readonly<Record<EtapaDoFunil, number>>;
   valor: Readonly<Record<EtapaDoFunil, number | null>>;
   /** Licitações da célula sem valor estimado informado. */
@@ -114,6 +116,8 @@ export type Filtro = Readonly<{
   meses?: ReadonlySet<string> | null;
   esfera?: Esfera | null;
   regiao?: Regiao | null;
+  /** Chave `nome normalizado|UF` de um município. */
+  municipio?: string | null;
 }>;
 
 /**
@@ -124,7 +128,7 @@ export type Filtro = Readonly<{
  * filtro por região.
  */
 export function filtrar(celulas: readonly CelulaTerritorial[], filtro: Filtro = {}): readonly CelulaTerritorial[] {
-  const { meses, esfera, regiao } = filtro;
+  const { meses, esfera, regiao, municipio } = filtro;
   return celulas.filter((celula) => {
     if (meses && meses.size > 0 && !meses.has(celula.mes)) return false;
     if (esfera && esferaConhecida(celula.esfera) !== esfera) return false;
@@ -132,6 +136,7 @@ export function filtrar(celulas: readonly CelulaTerritorial[], filtro: Filtro = 
       const uf = ufPorSigla(celula.uf);
       if (!uf || uf.regiao !== regiao) return false;
     }
+    if (municipio && chaveDaCelula(celula) !== municipio) return false;
     return true;
   });
 }
@@ -322,4 +327,192 @@ export function regioesComDados(celulas: readonly CelulaTerritorial[]): readonly
     if (uf) presentes.add(uf.regiao);
   }
   return REGIOES.filter((regiao) => presentes.has(regiao));
+}
+
+/* ============================================================
+   Municípios, projeção e o resto da seção territorial
+   ============================================================ */
+
+/**
+ * Como a seção territorial nomeia as etapas.
+ *
+ * ⚠️ "Universo" aqui é TUDO QUE O BUSCADOR ACHOU — decisão do dono em
+ * 22/09/2026 —, não o mercado de licitações do país. Se o filtro de perfil do
+ * buscador estiver apertado demais, o universo encolhe junto e ninguém
+ * percebe pelo número. A tela precisa dizer isso por extenso; o rótulo
+ * sozinho convida ao erro contrário.
+ */
+export const rotuloTerritorial: Record<EtapaDoFunil, string> = {
+  aderentes: "Universo · tudo que o buscador achou",
+  aprovadas: "Aprovadas para estudo",
+  orcamento: "Estudo concluído",
+  propostas: "Participamos · proposta enviada",
+};
+
+/** Versão curta, para caber em cabeçalho de tabela e card. */
+export const rotuloCurtoTerritorial: Record<EtapaDoFunil, string> = {
+  aderentes: "Universo",
+  aprovadas: "Aprovadas para estudo",
+  orcamento: "Estudo concluído",
+  propostas: "Participamos",
+};
+
+/** Município com licitação no período, já resolvido pelo servidor. */
+export type MunicipioNoMapa = Readonly<{
+  /** `nome normalizado|UF` — a mesma chave que o filtro usa. */
+  chave: string;
+  nome: string;
+  uf: string;
+  ibge: number;
+  latitude: number;
+  longitude: number;
+}>;
+
+/** Uma licitação na lista do recorte. */
+export type LicitacaoDoRecorte = Readonly<{
+  id: string;
+  /** numeroControlePNCP — o identificador estável da contratação. */
+  identificador: string;
+  objeto: string;
+  uf: string | null;
+  cidade: string | null;
+  esfera: string;
+  autoridade: string;
+  /** ISO. É quando o buscador captou, não quando o portal publicou. */
+  captadaEm: string;
+  fechaEm: string | null;
+  valor: number | null;
+  aprovada: boolean;
+  estudoConcluido: boolean;
+  propostaEnviada: boolean;
+}>;
+
+/**
+ * Chave de município de uma célula. Mesma normalização de
+ * `municipios-brasil.ts` — repetida aqui porque aquele módulo não pode
+ * atravessar para o navegador, e esta função precisa rodar nos dois lados.
+ */
+export function chaveDaCelula(celula: CelulaTerritorial): string | null {
+  if (!celula.cidade || !celula.uf) return null;
+  const nome = celula.cidade
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return nome ? `${nome}|${celula.uf.trim().toUpperCase()}` : null;
+}
+
+/**
+ * Projeção equiretangular calibrada para a malha do IBGE que este projeto
+ * embute: `x = (longitude + 74) × 16,4` e `y = (6 − latitude) × 16,4`, no
+ * sistema de `VIEWBOX_DO_BRASIL`.
+ *
+ * ⚠️ Os números não são arbitrários e não devem ser "arredondados": eles vêm
+ * da mesma projeção com que a malha foi gerada. O teste prova a calibração do
+ * jeito que importa — as 27 capitais caem dentro do contorno da própria UF.
+ * Mudar a malha sem refazer a projeção põe todo ponto no lugar errado, e o
+ * erro é pequeno o bastante para passar despercebido num relance.
+ */
+export const PROJECAO = { origemLongitude: -74, origemLatitude: 6, escala: 16.4 } as const;
+
+export function projetar(latitude: number, longitude: number): Readonly<{ x: number; y: number }> {
+  return {
+    x: (longitude - PROJECAO.origemLongitude) * PROJECAO.escala,
+    y: (PROJECAO.origemLatitude - latitude) * PROJECAO.escala,
+  };
+}
+
+/** Total por município (pela chave), só de células com município conhecido. */
+export function porMunicipio(
+  celulas: readonly CelulaTerritorial[],
+  etapa: EtapaDoFunil,
+): ReadonlyMap<string, TotalTerritorial> {
+  const mapa = new Map<string, TotalTerritorial>();
+  for (const celula of celulas) {
+    const chave = chaveDaCelula(celula);
+    if (!chave) continue;
+    mapa.set(chave, somar(mapa.get(chave) ?? VAZIO, daCelula(celula, etapa)));
+  }
+  return mapa;
+}
+
+/** Nome legível de cada município presente, pela chave. */
+export function nomesDeMunicipios(celulas: readonly CelulaTerritorial[]): ReadonlyMap<string, { nome: string; uf: string }> {
+  const mapa = new Map<string, { nome: string; uf: string }>();
+  for (const celula of celulas) {
+    const chave = chaveDaCelula(celula);
+    if (!chave || mapa.has(chave) || !celula.cidade || !celula.uf) continue;
+    mapa.set(chave, { nome: celula.cidade.trim(), uf: celula.uf.trim().toUpperCase() });
+  }
+  return mapa;
+}
+
+/** Licitações cujo município o portal não informou — ficam sem ponto. */
+export function semMunicipio(celulas: readonly CelulaTerritorial[], etapa: EtapaDoFunil): TotalTerritorial {
+  return total(celulas.filter((celula) => chaveDaCelula(celula) === null), etapa);
+}
+
+export type ResumoRegional = Readonly<{
+  regiao: Regiao;
+  total: TotalTerritorial;
+  medida: number | null;
+  /** Participação no total nacional da mesma etapa, período e esfera. */
+  participacao: number | null;
+}>;
+
+/**
+ * As cinco regiões, SEMPRE todas — inclusive as sem licitação nenhuma.
+ * Esconder a região vazia tiraria justamente a informação que interessa a
+ * quem procura onde a empresa não está.
+ */
+export function resumosRegionais(
+  celulas: readonly CelulaTerritorial[],
+  etapa: EtapaDoFunil,
+  medida: Medida,
+): readonly ResumoRegional[] {
+  const mapa = porRegiao(celulas, etapa);
+  const nacional = medidaDe(total(celulas, etapa), medida);
+  return REGIOES.map((regiao) => {
+    const item = mapa.get(regiao) ?? SEM_OCORRENCIA;
+    const valor = medidaDe(item, medida);
+    return { regiao, total: item, medida: valor, participacao: participacao(valor, nacional) };
+  });
+}
+
+/**
+ * A etapa mais avançada que a licitação alcançou.
+ *
+ * ⚠️ É a última etapa ALCANÇADA, não a única a que ela pertence: quem enviou
+ * proposta também conta como aprovada para estudo em todas as somas. Confundir
+ * as duas coisas faz a soma das "últimas etapas" parecer o funil, e não é.
+ */
+export function ultimaEtapa(registro: LicitacaoDoRecorte): EtapaDoFunil {
+  if (registro.propostaEnviada) return "propostas";
+  if (registro.estudoConcluido) return "orcamento";
+  if (registro.aprovada) return "aprovadas";
+  return "aderentes";
+}
+
+/** Aplica os filtros territoriais à lista de licitações. */
+export function filtrarRegistros(
+  registros: readonly LicitacaoDoRecorte[],
+  filtro: Readonly<{ esfera?: Esfera | null; regiao?: Regiao | null; uf?: string | null; municipio?: string | null }>,
+): readonly LicitacaoDoRecorte[] {
+  return registros.filter((registro) => {
+    if (filtro.esfera && esferaConhecida(registro.esfera) !== filtro.esfera) return false;
+    const uf = ufPorSigla(registro.uf);
+    if (filtro.regiao && (!uf || uf.regiao !== filtro.regiao)) return false;
+    if (filtro.uf && uf?.sigla !== filtro.uf) return false;
+    if (filtro.municipio) {
+      const chave = chaveDaCelula({
+        mes: "", uf: registro.uf, esfera: registro.esfera, cidade: registro.cidade,
+        quantidade: { aderentes: 0, aprovadas: 0, orcamento: 0, propostas: 0 },
+        valor: { aderentes: null, aprovadas: null, orcamento: null, propostas: null },
+        semValor: 0,
+      });
+      if (chave !== filtro.municipio) return false;
+    }
+    return true;
+  });
 }

@@ -24,6 +24,7 @@ import {
 
 const celula = (parcial: Partial<CelulaTerritorial> & Pick<CelulaTerritorial, "uf" | "esfera">): CelulaTerritorial => ({
   mes: "2026-09-01",
+  cidade: null,
   quantidade: { aderentes: 0, aprovadas: 0, orcamento: 0, propostas: 0 },
   valor: { aderentes: null, aprovadas: null, orcamento: null, propostas: null },
   semValor: 0,

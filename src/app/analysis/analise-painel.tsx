@@ -12,7 +12,7 @@ import {
   type EtapaDoFunil,
   type MesDoFunil,
 } from "@/modules/analysis/domain/funil-comercial";
-import type { CelulaTerritorial } from "@/modules/analysis/domain/territorio";
+import type { DadosTerritoriais } from "@/modules/analysis/infrastructure/prisma-territorio-repository";
 
 /**
  * Interação da tela de Análise: período, medida, abas e painel de detalhe.
@@ -30,8 +30,8 @@ type Props = Readonly<{
   meses: readonly MesDoFunil[];
   semValor: number;
   atualizadoEm: string;
-  /** Agregação por mês, UF e esfera — só a aba do mapa consome. */
-  territorio: readonly CelulaTerritorial[];
+  /** Agregação territorial e lista do recorte — só a aba do mapa consome. */
+  territorio: DadosTerritoriais;
 }>;
 
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -202,7 +202,14 @@ export function AnalisePainel({ meses, semValor, atualizadoEm, territorio }: Pro
       {/* O conjunto de meses do recorte ativo: o mapa filtra por ele sem
           nova ida ao banco, e assim mapa e cards falam do mesmo período. */}
       <section aria-labelledby="an-h-mapa" hidden={!(aba === 0 || aba === 2)}>
-        <MapaTerritorio celulas={territorio} medida={medida} meses={new Set(recorte.map((m) => m.mes))}/>
+        <MapaTerritorio
+          celulas={territorio.celulas}
+          medida={medida}
+          meses={new Set(recorte.map((m) => m.mes))}
+          municipios={territorio.municipios}
+          registros={territorio.registros}
+          registrosCortados={territorio.registrosCortados}
+        />
       </section>
 
       <section aria-labelledby="an-h-meses" hidden={!(aba === 0 || aba === 3)}>

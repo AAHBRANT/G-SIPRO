@@ -348,3 +348,76 @@
 
   .an-terr tbody tr.sel { background: var(--bege); }
   .an-terr td small { color: var(--texto-3); display: block; font-size: 10.5px; }
+
+  /* ---------- território: resumos, esferas, pontos e lista ---------- */
+
+  .an-terr-resumos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); margin: 4px 0 18px; }
+  .an-terr-resumo { border: 1px solid var(--fio); display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; }
+  .an-terr-resumo.destaque { border-left: 3px solid var(--vinho); }
+  .an-terr-resumo .an-rot { color: var(--vinho); font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+  .an-terr-resumo .an-n { font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.15; }
+  .an-terr-resumo .an-obs { color: var(--texto-2); font-size: 11.5px; }
+
+  .an-esfera-topo { align-items: center; display: flex; gap: 8px; }
+  .an-esfera-topo i { color: var(--cinza); font-size: 10px; font-style: normal; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .an-esfera-topo b { color: var(--vinho); font-size: 12px; margin-left: auto; }
+
+  .an-terr-destaque {
+    border-left: 3px solid var(--vinho); background: var(--bege); color: var(--texto);
+    font-size: 12.5px; line-height: 1.6; margin: 18px 0; padding: 10px 12px;
+  }
+
+  .an-mapa-titulo { color: var(--vinho); font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .an-mapa-titulo span { color: var(--texto-3); display: block; font-weight: 400; }
+
+  /* Fora do recorte continua visível, só recuado: sumir com o resto do país
+     tira a referência de onde o recorte fica. */
+  .an-uf.fora { opacity: .35; }
+
+  .an-ponto { cursor: pointer; }
+  .an-ponto-alvo { fill: transparent; }
+  .an-ponto-bola { fill: var(--mesa); stroke: var(--vinho); stroke-width: 2; }
+  .an-ponto.sel .an-ponto-bola { fill: var(--vinho); stroke: var(--mesa); stroke-width: 2.5; }
+  .an-ponto:hover .an-ponto-bola { fill: var(--vinho-claro); stroke: var(--mesa); }
+  .an-ponto-nome {
+    fill: var(--vinho); font-size: 13px; font-weight: 700; paint-order: stroke;
+    stroke: var(--mesa); stroke-width: 3.5px;
+  }
+
+  .an-mapa-escala { align-items: center; color: var(--texto-3); display: flex; flex-wrap: wrap; font-size: 11px; gap: 6px; margin-top: 8px; }
+  .an-mapa-escala i { display: block; height: 10px; width: 26px; }
+  .an-mapa-escala i.n1 { background: rgba(103, 0, 0, 0.16); }
+  .an-mapa-escala i.n2 { background: rgba(103, 0, 0, 0.32); }
+  .an-mapa-escala i.n3 { background: rgba(103, 0, 0, 0.50); }
+  .an-mapa-escala i.n4 { background: rgba(103, 0, 0, 0.72); }
+  .an-mapa-escala i.n5 { background: var(--vinho); }
+  .an-mapa-escala b { color: var(--texto-2); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+
+  .an-terr-escopo { font-size: 13px; font-weight: 700; }
+  .an-terr-etapas dd { align-items: baseline; display: flex; gap: 6px; }
+  .an-terr-etapas dd small { color: var(--texto-3); font-size: 10.5px; font-weight: 400; }
+  .an-terr-link { color: var(--vinho); display: inline-block; font-size: 12px; font-weight: 700; margin-top: 12px; }
+
+  .an-regionais { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); margin: 20px 0 4px; }
+  .an-regional {
+    background: var(--mesa); border: 1px solid var(--fio); cursor: pointer; display: flex;
+    flex-direction: column; gap: 1px; padding: 10px 12px; text-align: left;
+  }
+  .an-regional:hover { border-color: var(--vinho); }
+  .an-regional.sel { border-color: var(--vinho); border-left-width: 3px; }
+  .an-regional .an-rot { color: var(--vinho); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .an-regional .an-n { font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.2; }
+  .an-regional .an-obs { color: var(--texto-2); font-size: 10.5px; }
+
+  /* A regra geral da tabela alinha tudo à direita a partir da 2ª coluna, e
+     ganharia desta por especificidade — daí o seletor mais longo. Texto
+     alinhado à direita fica ilegível em coluna de objeto e de município. */
+  .an .an-terr td.an-td-texto { text-align: left; }
+
+  .an-paginas { align-items: center; color: var(--texto-2); display: flex; font-size: 12px; gap: 12px; margin-top: 12px; }
+  .an-paginas button {
+    background: var(--mesa); border: 1px solid var(--fio); color: var(--vinho); cursor: pointer;
+    font-size: 12px; font-weight: 700; padding: 6px 12px;
+  }
+  .an-paginas button:hover:not(:disabled) { background: var(--bege); }
+  .an-paginas button:disabled { color: var(--cinza); cursor: default; opacity: .5; }
