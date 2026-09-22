@@ -49,6 +49,7 @@ import {
 import { editalRelevance, isEdital } from "@/modules/scouting/domain/edital-relevance";
 import { completarAcervo, extrairQuantitativosDaDescricao, faltaAcervo } from "@/modules/scouting/domain/acervo-exigido";
 import { editalRequirementFromText } from "@/modules/scouting/domain/edital-text-requirement";
+import { parcelasEmListaCorrida } from "@/modules/scouting/domain/parcelas-em-lista";
 import { parsePncpIdentifier } from "@/modules/scouting/domain/pncp-identifier";
 import { normalizeText } from "@/modules/scouting/domain/qualification";
 import { listArchive } from "@/modules/scouting/infrastructure/archive-files";
@@ -447,8 +448,14 @@ export class EditalReadingService {
       requirement = extrairQuantitativosDaDescricao(requirement);
 
       // Só então, e só se ainda faltar, os outros anexos já baixados.
+      // ⚠️ O PRINCIPAL ENTRA NA VARREDURA, e entra primeiro. Excluí-lo parece
+      // certo — ele já foi lido — mas há licitação que publica UM arquivo só,
+      // e nesse caso não sobra anexo nenhum para varrer. Medido em São Joaquim
+      // de Bicas/MG (01612516000150-1-000304/2026): edital único, com a lista
+      // de parcelas e os quantitativos dentro dele, e a tela mostrando
+      // "estimado a partir do objeto".
       if (faltaAcervo(requirement)) {
-        requirement = await this.completarAcervoComAnexos(requirement, ordenados, [principal, complemento]);
+        requirement = await this.completarAcervoComAnexos(requirement, ordenados, []);
       }
 
       const reading = await this.readings.save(
@@ -623,8 +630,15 @@ export class EditalReadingService {
       try {
         const texto = await this.pdfText.extract(await candidato.read());
         const doAnexo = editalRequirementFromText(texto);
-        if (doAnexo.services.length === 0) continue;
-        requirement = completarAcervo(requirement, doAnexo);
+        // Segundo formato de edital: a exigência vem em lista corrida, não em
+        // tabela — ver `parcelas-em-lista`. O leitor de tabela devolve vazio
+        // nesse caso, e a licitação cai em "estimado a partir do objeto".
+        const emLista = parcelasEmListaCorrida(texto);
+        const combinado = emLista.length > 0
+          ? completarAcervo(doAnexo, { ...doAnexo, services: emLista })
+          : doAnexo;
+        if (combinado.services.length === 0) continue;
+        requirement = completarAcervo(requirement, combinado);
         if (!faltaAcervo(requirement)) break;
       } catch {
         // Anexo ilegível (escaneado, compactação exótica, PNCP fora do ar) é
