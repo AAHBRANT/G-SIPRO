@@ -47,6 +47,7 @@ import {
   type EditalRequirement,
 } from "@/modules/scouting/domain/edital-requirement";
 import { editalRelevance, isEdital } from "@/modules/scouting/domain/edital-relevance";
+import { completarAcervo, extrairQuantitativosDaDescricao, faltaAcervo } from "@/modules/scouting/domain/acervo-exigido";
 import { editalRequirementFromText } from "@/modules/scouting/domain/edital-text-requirement";
 import { parsePncpIdentifier } from "@/modules/scouting/domain/pncp-identifier";
 import { normalizeText } from "@/modules/scouting/domain/qualification";
@@ -171,6 +172,14 @@ const pdfPeloNome = (filename: string): boolean => /\.pdf$/i.test(filename.trim(
  * PDF é o quarto da lista (dois .docx e um .dwg na frente é combinação
  * banal), coisa que o laço antigo, sem teto, nunca fazia.
  */
+/**
+ * Quantos anexos JÁ BAIXADOS podem ser lidos atrás do quantitativo que faltou.
+ * Teto baixo de propósito: extrair texto de PDF grande custa tempo da
+ * varredura, e a exigência de acervo, quando existe, está nos primeiros
+ * documentos da régua de relevância.
+ */
+const MAX_ANEXOS_PARA_ACERVO = 4;
+
 const MAX_DOWNLOADS_COM_ACHADO = 3;
 /** Teto absoluto, para o órgão que publica 40 anexos e nenhum PDF. */
 const MAX_DOWNLOADS = 8;
@@ -420,6 +429,28 @@ export class EditalReadingService {
         executionIdGravado = undefined;
       }
 
+      // ⚠️ COMPLEMENTO DE ACERVO — acréscimo de 22/09/2026, a pedido do dono:
+      // "ele só está lendo o edital e não acha os valores para comparar com
+      // nosso acervo, aí dá tudo 'sem valor no edital'".
+      //
+      // Só roda quando a leitura NÃO trouxe quantitativo nenhum. Com a leitura
+      // boa, nada aqui executa e o comportamento antigo fica intacto — a
+      // regra é não desarrumar o que já funciona.
+      //
+      // Usa apenas o que já foi baixado, sem pedir nada novo ao PNCP, e lê por
+      // casamento de padrão, sem IA: é complemento gratuito, não segunda
+      // rodada paga.
+      // Primeiro o que é de graça e instantâneo: o quantitativo mínimo que
+      // está escrito NA PRÓPRIA frase da parcela. Medido em editais reais, é
+      // onde ele costuma estar — "vazão mínima 7,5 m³/s", "no mínimo 30.000
+      // m²" — enquanto o campo próprio volta vazio da leitura.
+      requirement = extrairQuantitativosDaDescricao(requirement);
+
+      // Só então, e só se ainda faltar, os outros anexos já baixados.
+      if (faltaAcervo(requirement)) {
+        requirement = await this.completarAcervoComAnexos(requirement, ordenados, [principal, complemento]);
+      }
+
       const reading = await this.readings.save(
         {
           tenderId,
@@ -559,6 +590,52 @@ export class EditalReadingService {
    * extração funcionava normalmente. `-1` sinaliza que nem a extração em si
    * rodou; texto vazio de verdade também é possível e volta como `0`.
    */
+  /**
+   * Procura o quantitativo das parcelas nos OUTROS anexos já baixados.
+   *
+   * A tabela de parcelas de maior relevância costuma viver num documento e o
+   * quantitativo mínimo em outro — o edital diz "conforme anexo" e o anexo é
+   * que traz o número. Lendo um arquivo só, a exigência sai sem quantidade e a
+   * tela mostra "sem quantitativo no edital" para a licitação inteira.
+   *
+   * ⚠️ Não é a planilha orçamentária. O alvo é a exigência de acervo — as
+   * poucas parcelas que pedem atestado. Trazer o orçamento inteiro foi tentado
+   * e recusado: afogaria as três parcelas que decidem habilitação em dezenas
+   * de itens que ninguém exige comprovar.
+   *
+   * Para no primeiro anexo que resolve. Falha de leitura de um anexo não
+   * derruba nada: a exigência já lida continua valendo.
+   */
+  private async completarAcervoComAnexos(
+    base: EditalRequirement,
+    candidatos: readonly Readable[],
+    jaLidos: readonly (Readable | undefined)[],
+  ): Promise<EditalRequirement> {
+    const lidos = new Set(jaLidos.filter((d): d is Readable => d !== undefined));
+    let requirement = base;
+    let tentativas = 0;
+
+    for (const candidato of candidatos) {
+      if (lidos.has(candidato)) continue;
+      if (tentativas >= MAX_ANEXOS_PARA_ACERVO) break;
+      tentativas += 1;
+
+      try {
+        const texto = await this.pdfText.extract(await candidato.read());
+        const doAnexo = editalRequirementFromText(texto);
+        if (doAnexo.services.length === 0) continue;
+        requirement = completarAcervo(requirement, doAnexo);
+        if (!faltaAcervo(requirement)) break;
+      } catch {
+        // Anexo ilegível (escaneado, compactação exótica, PNCP fora do ar) é
+        // rotina. Seguir para o próximo é melhor do que perder a leitura toda.
+        continue;
+      }
+    }
+
+    return requirement;
+  }
+
   private async tentarSemIA(
     principal: Readable,
     bytes: Buffer,
