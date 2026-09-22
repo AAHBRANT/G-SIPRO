@@ -90,6 +90,12 @@ jobs:
         run: |
           set -uo pipefail
           teto=30
+          # ⚠️ Uma chamada que falha não mata mais a rodada. Achado em produção
+          # (22/09/2026): a chamada 1 estourou o tempo e o `break` descartou as
+          # 29 restantes, deixando o represado intocado. Falha isolada acontece
+          # (PDF grande, PNCP lento); serviço fora do ar dá falha em sequência.
+          # Duas seguidas é o limite: uma é ruído, duas é problema.
+          seguidas=0
           for i in $(seq 1 "$teto"); do
             echo "chamada ${i}/${teto}"
             if ! resposta=$(curl --fail --silent --show-error \
@@ -97,9 +103,15 @@ jobs:
               --request POST \
               --header "Authorization: Bearer ${SCOUT_DISPATCH_TOKEN}" \
               "${GSIPRO_URL}/api/scouting/process-backlog"); then
-              echo "::warning::chamada ${i} do represado falhou — a próxima varredura tenta de novo"
-              break
+              seguidas=$((seguidas + 1))
+              echo "::warning::chamada ${i} do represado falhou (${seguidas} seguida(s))"
+              if [ "${seguidas}" -ge 2 ]; then
+                echo "::warning::duas falhas seguidas — a próxima varredura tenta de novo"
+                break
+              fi
+              continue
             fi
+            seguidas=0
             echo "${resposta}"
             total=$(echo "${resposta}" | jq -r '.data.editais.total // 0')
             # `candidatas` é a releitura dos editais cujo acervo saiu sem

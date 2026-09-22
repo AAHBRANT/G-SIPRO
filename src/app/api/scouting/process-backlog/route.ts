@@ -247,6 +247,22 @@ const CORTE_DA_CORRECAO_DE_ACERVO = new Date("2026-09-22T16:45:00.000Z");
 const LOTE_RELEITURA = 40;
 
 /**
+ * Margem antes do `deadline` em que a releitura para de PEGAR item novo.
+ *
+ * ⚠️ Achado em produção (22/09/2026, primeira rodada com releitura): a
+ * chamada voltou `curl: (28) timed out after 200002 ms` e o laço do workflow
+ * abortou a rodada inteira na primeira tentativa. O `deadline` é checado
+ * ENTRE itens, nunca dentro de um: uma leitura iniciada a 149 s dos 150 s de
+ * orçamento roda até acabar, e baixar um PDF de edital passa fácil dos 50 s
+ * que sobravam para o `--max-time 200` do workflow.
+ *
+ * A margem é o pior caso de uma leitura, não uma média: é melhor deixar duas
+ * releituras para a chamada seguinte — e há até 30 por rodada — do que
+ * estourar o relógio e perder a rodada toda.
+ */
+const MARGEM_DA_RELEITURA_MS = 45_000;
+
+/**
  * Refaz a leitura de editais que já foram lidos mas cujo acervo exigido saiu
  * SEM QUANTITATIVO NENHUM — o estado que a tela mostra como "sem valor no
  * edital", e que impede a comparação com os atestados da empresa.
@@ -326,7 +342,8 @@ async function relerAcervoSemQuantitativo(
   let tentadas = 0;
   const porStatus: Record<string, number> = {};
   for (const candidata of candidatas) {
-    if (Date.now() >= deadline) break;
+    // Ver `MARGEM_DA_RELEITURA_MS`: não começar o que não dá tempo de terminar.
+    if (Date.now() >= deadline - MARGEM_DA_RELEITURA_MS) break;
     tentadas += 1;
     try {
       // `force` = true: é exatamente o caso que o parâmetro existe para
