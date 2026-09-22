@@ -102,8 +102,14 @@ jobs:
             fi
             echo "${resposta}"
             total=$(echo "${resposta}" | jq -r '.data.editais.total // 0')
-            if [ "${total}" -eq 0 ]; then
-              echo "represado de leitura zerado"
+            # `candidatas` é a releitura dos editais cujo acervo saiu sem
+            # quantitativo (defeito do leitor, corrigido em 22/09/2026). Sem
+            # somar aqui, o loop pararia na primeira chamada assim que o
+            # represado de NOVAS zerasse — e a releitura andaria 40 por
+            # semana, no ritmo do agendador, em vez de terminar na rodada.
+            releituras=$(echo "${resposta}" | jq -r '.data.releituras.candidatas // 0')
+            if [ "${total}" -eq 0 ] && [ "${releituras}" -eq 0 ]; then
+              echo "represado de leitura zerado e nenhuma releitura pendente"
               break
             fi
           done
