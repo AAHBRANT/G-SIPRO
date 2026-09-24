@@ -19,7 +19,10 @@
  * aparecem no período. A tabela dos 5.570 municípios nunca atravessa para o
  * navegador.
  */
+import { Prisma } from "@/generated/prisma/client";
+
 import { getDatabase } from "@/core/database/prisma";
+import { copiasDoPeriodo, paraConsulta } from "@/modules/analysis/infrastructure/copias-de-licitacao";
 import { acharMunicipio, chaveDoMunicipio } from "@/modules/analysis/infrastructure/municipios-brasil";
 import type { CelulaTerritorial, LicitacaoDoRecorte, MunicipioNoMapa } from "@/modules/analysis/domain/territorio";
 
@@ -87,6 +90,7 @@ export class PrismaTerritorioRepository {
   /** `de` inclusivo, `ate` exclusivo, ambos no primeiro dia do mês em UTC. */
   async carregar(de: Date, ate: Date): Promise<DadosTerritoriais> {
     const banco = getDatabase();
+    const copias = paraConsulta(await copiasDoPeriodo(de, ate));
 
     const [linhas, registros] = await Promise.all([
       banco.$queryRaw<LinhaDoBanco[]>`
@@ -109,6 +113,10 @@ export class PrismaTerritorioRepository {
             ) AS tem_proposta
           FROM scouted_tenders st
           WHERE st."createdAt" >= ${de} AND st."createdAt" < ${ate}
+            -- ⚠️ A mesma obra publicada duas vezes não pode somar duas
+            -- vezes. Ver copias-de-licitacao.ts: a cópia continua no banco,
+            -- inteira, e sai só das contagens.
+            AND st."externalId" NOT IN (${Prisma.join(copias)})
         )
         SELECT
           mes,
@@ -155,6 +163,8 @@ export class PrismaTerritorioRepository {
           ) AS tem_proposta
         FROM scouted_tenders st
         WHERE st."createdAt" >= ${de} AND st."createdAt" < ${ate}
+          -- Ver acima: a cópia não entra na lista nem nas somas.
+          AND st."externalId" NOT IN (${Prisma.join(copias)})
         ORDER BY st."estimatedValue" DESC NULLS LAST, st."createdAt" DESC
         LIMIT ${TETO_DE_REGISTROS + 1}
       `,

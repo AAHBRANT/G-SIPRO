@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   findDuplicates,
   resolveDuplicates,
+  resolverCopias,
+  type CopiaInput,
   type DuplicateInput,
   type DuplicateResolutionInput,
 } from "@/modules/scouting/domain/duplicates";
@@ -146,5 +148,100 @@ describe("quem sobrevive quando é a mesma obra", () => {
 
   it("lista vazia não quebra", () => {
     expect(resolveDuplicates([]).size).toBe(0);
+  });
+});
+
+describe("duplicatas que já foram decididas", () => {
+  const base = (id: string, parcial: Partial<CopiaInput> = {}): CopiaInput => ({
+    id,
+    authorityName: "PREFEITURA MUNICIPAL DE ALMIRANTE TAMANDARE",
+    authorityDocument: "76105659000174",
+    subject: "Contratacao integrada de empresa de engenharia especializada para desenvolvimento de projetos e execucao das obras do corredor",
+    createdAt: new Date("2026-08-11T00:00:00.000Z"),
+    temOportunidade: false,
+    descartada: false,
+    ...parcial,
+  });
+
+  /**
+   * O caso real: Almirante Tamandaré/PR, sequenciais 193 e 197, mesma obra,
+   * R$ 110,5 mi contados duas vezes porque as duas já estavam aprovadas.
+   */
+  it("acha a cópia entre duas publicações já aprovadas", () => {
+    const copias = resolverCopias([base("a"), base("b")]);
+    expect(copias.size).toBe(1);
+  });
+
+  /**
+   * ⚠️ Critério diferente do da fila: marcar como cópia aquela em que a
+   * equipe montou ficha esconderia o trabalho feito.
+   */
+  it("quem já virou oportunidade é quem fica valendo, mesmo sendo a mais antiga", () => {
+    const antiga = base("antiga", { temOportunidade: true, createdAt: new Date("2026-08-01T00:00:00.000Z") });
+    const nova = base("nova", { createdAt: new Date("2026-08-20T00:00:00.000Z") });
+    const copias = resolverCopias([antiga, nova]);
+    expect(copias.get("nova")).toBe("antiga");
+    expect(copias.has("antiga")).toBe(false);
+  });
+
+  it("empatadas em oportunidade, a mais recente vence — como na fila", () => {
+    const antiga = base("antiga", { createdAt: new Date("2026-08-01T00:00:00.000Z") });
+    const nova = base("nova", { createdAt: new Date("2026-08-20T00:00:00.000Z") });
+    expect(resolverCopias([antiga, nova]).get("antiga")).toBe("nova");
+  });
+
+  it("as duas com oportunidade: desempata pela data, e nenhuma some", () => {
+    const a = base("a", { temOportunidade: true, createdAt: new Date("2026-08-01T00:00:00.000Z") });
+    const b = base("b", { temOportunidade: true, createdAt: new Date("2026-08-20T00:00:00.000Z") });
+    const copias = resolverCopias([a, b]);
+    expect(copias.get("a")).toBe("b");
+    expect(copias.size).toBe(1);
+  });
+
+  it("obras diferentes do mesmo órgão não viram cópia uma da outra", () => {
+    const uma = base("uma");
+    const outra = base("outra", { subject: "Aquisicao de merenda escolar para a rede municipal de ensino durante o exercicio" });
+    expect(resolverCopias([uma, outra]).size).toBe(0);
+  });
+
+  it("nunca marca os dois lados do mesmo par", () => {
+    const copias = resolverCopias([base("a"), base("b"), base("c")]);
+    expect(copias.size).toBe(2);
+    const vencedores = new Set(copias.values());
+    for (const vencedor of vencedores) expect(copias.has(vencedor)).toBe(false);
+  });
+});
+
+describe("cópias e descarte", () => {
+  const base = (id: string, parcial: Partial<CopiaInput> = {}): CopiaInput => ({
+    id,
+    authorityName: "PREFEITURA MUNICIPAL DE ALMIRANTE TAMANDARE",
+    authorityDocument: "76105659000174",
+    subject: "Contratacao integrada de empresa de engenharia especializada para desenvolvimento de projetos e execucao das obras do corredor",
+    createdAt: new Date("2026-08-11T00:00:00.000Z"),
+    temOportunidade: false,
+    descartada: false,
+    ...parcial,
+  });
+
+  /**
+   * A duplicata que a faxina já descartou continuava somando em "aderentes",
+   * porque o funil conta toda licitação captada, de qualquer status.
+   */
+  it("a descartada é a cópia, mesmo sendo a mais recente", () => {
+    const viva = base("viva", { createdAt: new Date("2026-08-01T00:00:00.000Z") });
+    const fora = base("fora", { descartada: true, createdAt: new Date("2026-08-20T00:00:00.000Z") });
+    expect(resolverCopias([viva, fora]).get("fora")).toBe("viva");
+  });
+
+  it("não ser descartada pesa mais que ter oportunidade", () => {
+    const viva = base("viva");
+    const fora = base("fora", { descartada: true, temOportunidade: true });
+    expect(resolverCopias([viva, fora]).get("fora")).toBe("viva");
+  });
+
+  it("duas descartadas ainda assim deixam uma valendo", () => {
+    const copias = resolverCopias([base("a", { descartada: true }), base("b", { descartada: true })]);
+    expect(copias.size).toBe(1);
   });
 });

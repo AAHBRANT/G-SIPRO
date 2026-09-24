@@ -17,7 +17,10 @@
  * reencontra — por isso a tela apresenta esse número como leitura do robô, com
  * ressalva, e não como universo de licitações distintas.
  */
+import { Prisma } from "@/generated/prisma/client";
+
 import { getDatabase } from "@/core/database/prisma";
+import { copiasDoPeriodo, paraConsulta } from "@/modules/analysis/infrastructure/copias-de-licitacao";
 import type { MesDoFunil } from "@/modules/analysis/domain/funil-comercial";
 
 type LinhaDoBanco = Readonly<{
@@ -61,6 +64,7 @@ export class PrismaFunilRepository {
    */
   async carregar(de: Date, ate: Date): Promise<FunilDoPeriodo> {
     const banco = getDatabase();
+    const copias = paraConsulta(await copiasDoPeriodo(de, ate));
 
     const [linhas, varreduras] = await Promise.all([
       banco.$queryRaw<LinhaDoBanco[]>`
@@ -80,6 +84,10 @@ export class PrismaFunilRepository {
             ) AS tem_proposta
           FROM scouted_tenders st
           WHERE st."createdAt" >= ${de} AND st."createdAt" < ${ate}
+            -- ⚠️ A mesma obra publicada duas vezes não pode somar duas
+            -- vezes. Ver copias-de-licitacao.ts: a cópia continua no banco,
+            -- inteira, e sai só das contagens.
+            AND st."externalId" NOT IN (${Prisma.join(copias)})
         )
         SELECT
           mes,

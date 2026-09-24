@@ -200,3 +200,66 @@ export function resolveDuplicates(items: readonly DuplicateResolutionInput[]): R
 
   return resultado;
 }
+
+export type CopiaInput = DuplicateResolutionInput & Readonly<{
+  /**
+   * Verdadeiro quando esta publicação já virou oportunidade — ou seja, já tem
+   * trabalho pendurado nela.
+   */
+  temOportunidade: boolean;
+  /** Verdadeiro quando já foi descartada, por duplicata ou por qualquer motivo. */
+  descartada: boolean;
+}>;
+
+/**
+ * Decide, entre publicações da MESMA obra, qual conta nos números e quais são
+ * cópia. Não apaga nem esconde nada: só diz quem não pode somar de novo.
+ *
+ * ⚠️ Existe porque `resolveDuplicates` só alcança a fila. Uma vez que alguém
+ * aprovou as duas publicações — ou que a faxina descartou uma delas —, as
+ * duas continuam no banco e as duas continuam somando: a mesma obra entra
+ * duas vezes no total e no valor (achado em produção, 23/09/2026: Almirante
+ * Tamandaré/PR, R$ 110,5 mi contados duas vezes, sequenciais 193 e 197).
+ *
+ * ⚠️ O CRITÉRIO AQUI É OUTRO, e de propósito. Na fila, vence a publicação
+ * mais recente, porque republicação costuma ser retificação e é a versão nova
+ * que a equipe precisa ver. Para contar, a ordem é:
+ *
+ * 1. quem NÃO foi descartada vence quem foi — a descartada já saiu do jogo;
+ * 2. quem JÁ TEM OPORTUNIDADE vence — tratar como cópia justamente aquela em
+ *    que a equipe montou ficha, baixou edital e levantou requisitos
+ *    esconderia o trabalho feito para destacar uma linha em que ninguém
+ *    tocou;
+ * 3. empatadas nas duas, a mais recente, como na fila.
+ *
+ * Devolve, para cada cópia, o id da publicação que fica valendo.
+ */
+export function resolverCopias(items: readonly CopiaInput[]): ReadonlyMap<string, string> {
+  const grupos = findDuplicates(items);
+  const porId = new Map(items.map((item) => [item.id, item]));
+  const referencia = (item: CopiaInput) => item.publishedAt ?? item.createdAt;
+
+  const resultado = new Map<string, string>();
+  const processados = new Set<string>();
+
+  for (const [id, outros] of grupos) {
+    if (processados.has(id)) continue;
+    const membros = [id, ...outros];
+    for (const membro of membros) processados.add(membro);
+
+    const vencedor = membros.reduce((melhor, candidato) => {
+      const a = porId.get(melhor);
+      const b = porId.get(candidato);
+      if (!a || !b) return melhor;
+      if (a.descartada !== b.descartada) return a.descartada ? candidato : melhor;
+      if (a.temOportunidade !== b.temOportunidade) return b.temOportunidade ? candidato : melhor;
+      return referencia(b) > referencia(a) ? candidato : melhor;
+    });
+
+    for (const membro of membros) {
+      if (membro !== vencedor) resultado.set(membro, vencedor);
+    }
+  }
+
+  return resultado;
+}
