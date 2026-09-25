@@ -50,8 +50,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         where: { name: { equals: name, mode: "insensitive" }, active: true },
         select: { id: true, name: true, sphere: true, locality: true },
       });
+      // `identifiers.revisarCadastro` segue o mesmo marcador que o cadastro
+      // automático do "aprovar" já usa (ver OpportunityFromScoutedTender):
+      // quem é criado fora da curadoria da equipe nasce sinalizado para
+      // conferência, venha do PNCP ou de alguém digitando aqui.
       const authority = existing ?? await database.contractingAuthority.create({
-        data: { name, createdBy: authorization.actorId, updatedBy: authorization.actorId },
+        data: {
+          name,
+          identifiers: { origem: "MANUAL", revisarCadastro: true },
+          createdBy: authorization.actorId,
+          updatedBy: authorization.actorId,
+        },
         select: { id: true, name: true, sphere: true, locality: true },
       });
       return NextResponse.json({ data: authority, correlationId: context.correlationId }, { status: existing ? 200 : 201 });

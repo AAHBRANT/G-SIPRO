@@ -48,8 +48,15 @@ export async function POST(request: Request): Promise<NextResponse> {
         where: { name: { equals: name, mode: "insensitive" }, active: true },
         select: { id: true, name: true },
       });
+      // Mesmo marcador usado em contracting-authorities: nasce sinalizado
+      // para a curadoria conferir depois, por ter sido criado fora dela.
       const customer = existing ?? await database.customer.create({
-        data: { name, createdBy: authorization.actorId, updatedBy: authorization.actorId },
+        data: {
+          name,
+          identifiers: { origem: "MANUAL", revisarCadastro: true },
+          createdBy: authorization.actorId,
+          updatedBy: authorization.actorId,
+        },
         select: { id: true, name: true },
       });
       return NextResponse.json({ data: customer, correlationId: context.correlationId }, { status: existing ? 200 : 201 });
