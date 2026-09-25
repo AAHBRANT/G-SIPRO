@@ -63,7 +63,7 @@ export function OpportunityEditor({
     setMessage("");
     const payload = {
       ...Object.fromEntries(
-        ["origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"]
+        ["origin", "subject", "customerId", "contractingAuthorityId", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"]
           .map((field) => [field, form.get(field)?.toString().trim()])
           .filter(([, value]) => value),
       ),

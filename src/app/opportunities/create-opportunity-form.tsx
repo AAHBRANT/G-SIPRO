@@ -42,7 +42,7 @@ export function CreateOpportunityForm({ users = [] }: { users?: readonly { id: s
     setSubmitting(true);
     setMessage("");
     const form = new FormData(formElement);
-    const fields = ["code", "origin", "subject", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"];
+    const fields = ["code", "origin", "subject", "customerId", "contractingAuthorityId", "estimatedValue", "currency", "valueSource", "publishedAt", "deliveryAt", "datesSource", "datesTimeZone", "ownerId"];
     try {
       const response = await fetch("/api/opportunities", {
         method: "POST",

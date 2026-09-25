@@ -1,3 +1,5 @@
+import { ContractingPartyField, type Party } from "./contracting-party-field";
+
 export type OpportunityFormValues = Readonly<{
   origin?: string;
   subject?: string;
@@ -9,8 +11,21 @@ export type OpportunityFormValues = Readonly<{
   datesSource?: string;
   datesTimeZone?: string;
   ownerId?: string;
+  contractingAuthorityId?: string;
   contractingAuthorityName?: string;
+  customerId?: string;
+  customerName?: string;
 }>;
+
+function currentParty(values: OpportunityFormValues): Party | undefined {
+  if (values.contractingAuthorityId && values.contractingAuthorityName) {
+    return { id: values.contractingAuthorityId, kind: "AUTHORITY", name: values.contractingAuthorityName };
+  }
+  if (values.customerId && values.customerName) {
+    return { id: values.customerId, kind: "CUSTOMER", name: values.customerName };
+  }
+  return undefined;
+}
 
 export function OpportunityFormFields({
   values = {},
@@ -53,12 +68,7 @@ export function OpportunityFormFields({
           <input className="rounded-xl border border-border px-3 py-2 font-normal" defaultValue={values.valueSource} disabled={disabled} maxLength={300} name="valueSource" />
         </label>
       </div>
-      {values.contractingAuthorityName && (
-        <div className="rounded-xl bg-slate-50 px-3 py-2">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Cliente/órgão identificado</p>
-          <p className="mt-1 text-sm font-semibold text-slate-800">{values.contractingAuthorityName}</p>
-        </div>
-      )}
+      <ContractingPartyField disabled={disabled} initialParty={currentParty(values)} />
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-1 text-sm font-semibold">
           Publicação

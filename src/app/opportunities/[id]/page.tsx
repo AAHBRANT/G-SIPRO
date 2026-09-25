@@ -133,7 +133,11 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     ...(record.estimatedValue !== null && { estimatedValue: record.estimatedValue.toString() }),
     ...(record.currency && { currency: record.currency }),
     ...(record.valueSource && { valueSource: record.valueSource }),
-    ...(record.contractingAuthority && { contractingAuthorityName: record.contractingAuthority.name }),
+    ...(record.contractingAuthority && {
+      contractingAuthorityId: record.contractingAuthority.id,
+      contractingAuthorityName: record.contractingAuthority.name,
+    }),
+    ...(record.customer && { customerId: record.customer.id, customerName: record.customer.name }),
     ...(localDateTime(record.publishedAt) && { publishedAt: localDateTime(record.publishedAt) }),
     ...(localDateTime(record.deliveryAt) && { deliveryAt: localDateTime(record.deliveryAt) }),
     ...(record.datesSource && { datesSource: record.datesSource }),
