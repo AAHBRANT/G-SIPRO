@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requirePermission } from "@/core/authorization/authorization-context";
+import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
-import { ConflictError } from "@/core/errors/application-error";
+import { ConflictError, ResourceNotFoundError } from "@/core/errors/application-error";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
 import { inferPublicAuthorityFromValueSource } from "@/modules/opportunities/domain/public-authority-inference";
+import { buildOpportunityEditorData } from "@/modules/opportunities/presentation/opportunity-editor-data";
 import {
   detectDuplicateCandidates,
   duplicateDecisionSchema,
@@ -15,6 +17,39 @@ import {
 } from "@/modules/opportunities/domain/duplicate-detection";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
 import { mapOpportunityApiError } from "@/modules/opportunities/presentation/opportunity-api";
+
+/**
+ * Pacote completo de UMA oportunidade, no mesmo formato que
+ * `OpportunityEditor` consome — sob pedido, para a janelinha que o mapa da
+ * Análise abre quando a licitação já foi aprovada. É a mesma conversão que
+ * `opportunities/[id]/page.tsx` já fazia; ver `opportunity-editor-data.ts`.
+ */
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
+  const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });
+  return runWithRequestContext(context, async () => {
+    try {
+      const authorization = await requirePermission("opportunities.read");
+      const id = z.uuid().parse((await params).id);
+      const [record, users] = await Promise.all([
+        getDatabase().opportunity.findUnique({ where: { id }, include: { customer: true, contractingAuthority: true } }),
+        getDatabase().user.findMany({ where: { status: "ACTIVE" }, select: { id: true, displayName: true }, orderBy: { displayName: "asc" } }),
+      ]);
+      if (!record) return toApiError(new ResourceNotFoundError("Oportunidade não encontrada."));
+
+      return NextResponse.json({
+        data: {
+          opportunity: buildOpportunityEditorData(record),
+          users: users.map((user) => ({ id: user.id, name: user.displayName })),
+          canUpdate: authorize(authorization, { permission: "opportunities.update" }).allowed,
+          canTransition: authorize(authorization, { permission: "opportunities.transition" }).allowed,
+        },
+        correlationId: context.correlationId,
+      });
+    } catch (error) {
+      return toApiError(error);
+    }
+  });
+}
 
 export async function PATCH(request: Request, route: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const context = createRequestContext({ correlationId: request.headers.get("x-correlation-id") ?? undefined });

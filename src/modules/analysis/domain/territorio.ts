@@ -386,6 +386,8 @@ export type LicitacaoDoRecorte = Readonly<{
   fechaEm: string | null;
   valor: number | null;
   aprovada: boolean;
+  /** Preenchido só quando `aprovada`: é a licitação, não a oportunidade, que o mapa lista. */
+  opportunityId: string | null;
   estudoConcluido: boolean;
   propostaEnviada: boolean;
 }>;

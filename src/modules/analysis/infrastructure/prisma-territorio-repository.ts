@@ -54,6 +54,7 @@ type LinhaDeRegistro = Readonly<{
   fechaEm: Date | null;
   valor: unknown;
   aprovada: boolean;
+  opportunityId: string | null;
   tem_orcamento: boolean;
   tem_proposta: boolean;
 }>;
@@ -152,6 +153,7 @@ export class PrismaTerritorioRepository {
           st."proposalClosesAt" AS "fechaEm",
           st."estimatedValue" AS valor,
           (st.status = 'APPROVED') AS aprovada,
+          st."opportunityId" AS "opportunityId",
           EXISTS (
             SELECT 1 FROM opportunity_analyses oa
             WHERE oa."opportunityId" = st."opportunityId" AND oa.status = 'SUCCEEDED'
@@ -207,6 +209,7 @@ export class PrismaTerritorioRepository {
         fechaEm: linha.fechaEm ? linha.fechaEm.toISOString() : null,
         valor: dinheiro(linha.valor),
         aprovada: linha.aprovada,
+        opportunityId: linha.opportunityId,
         estudoConcluido: linha.aprovada && linha.tem_orcamento,
         propostaEnviada: linha.aprovada && linha.tem_proposta,
       })),

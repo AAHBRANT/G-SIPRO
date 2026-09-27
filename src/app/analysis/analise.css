@@ -447,3 +447,26 @@
      ficariam ilegíveis. */
   .an-mapa svg.em-estado .an-uf { fill: rgba(120, 120, 120, 0.12); stroke: var(--vinho); stroke-width: 1.6; }
   .an-mapa svg.em-estado .an-uf:hover { fill: rgba(120, 120, 120, 0.2); }
+
+  /* ---------- janelinha de uma licitação (aberta pela lista do recorte) ---------- */
+
+  .an-modal-fundo {
+    align-items: flex-start; background: rgba(0, 0, 0, 0.45); bottom: 0; display: flex;
+    justify-content: center; left: 0; overflow-y: auto; padding: 32px 16px; position: fixed;
+    right: 0; top: 0; z-index: 60;
+  }
+  .an-modal-caixa {
+    background: var(--mesa); border-top: 3px solid var(--vinho); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+    margin: auto 0; max-width: 980px; position: relative; width: 100%;
+  }
+  .an-modal-fechar {
+    background: var(--mesa); border: 1px solid var(--fio); border-radius: 999px; color: var(--texto-2);
+    cursor: pointer; display: grid; font-size: 16px; height: 32px; line-height: 1; place-items: center;
+    position: absolute; right: 12px; top: 12px; width: 32px; z-index: 1;
+  }
+  .an-modal-fechar:hover { border-color: var(--vinho); color: var(--vinho); }
+
+  /* Linha da lista "Licitações deste recorte": abre a janelinha ao clicar. */
+  .an-linha-clicavel { cursor: pointer; }
+  .an-linha-clicavel:hover { background: var(--bege); }
+  .an-linha-clicavel:focus-visible { outline: 2px solid var(--vinho); outline-offset: -2px; }

@@ -71,6 +71,7 @@ const registro = (parcial: Partial<LicitacaoDoRecorte> = {}): LicitacaoDoRecorte
   fechaEm: null,
   valor: 4_200_000,
   aprovada: true,
+  opportunityId: null,
   estudoConcluido: false,
   propostaEnviada: false,
   ...parcial,

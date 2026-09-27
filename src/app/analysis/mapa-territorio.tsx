@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { TenderDetailModal } from "./tender-detail-modal";
 import { etapasDoFunil, type EtapaDoFunil } from "@/modules/analysis/domain/funil-comercial";
 import { REGIOES, UNIDADES_FEDERATIVAS, ufPorSigla, type Regiao } from "@/modules/analysis/domain/malha-uf";
 import {
@@ -109,6 +110,8 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
   const [municipio, setMunicipio] = useState<string | null>(null);
   const [esfera, setEsfera] = useState<Esfera | null>(null);
   const [pagina, setPagina] = useState(0);
+  /** Licitação aberta na janelinha — nulo quando nenhuma está selecionada. */
+  const [selecionado, setSelecionado] = useState<{ tenderId: string; opportunityId: string | null } | null>(null);
   const [zoom, setZoom] = useState(1);
   /** Centro do recorte, em unidades do SVG. Nulo = centro da caixa base. */
   const [centro, setCentro] = useState<{ x: number; y: number } | null>(null);
@@ -811,7 +814,19 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
                 </thead>
                 <tbody>
                   {daPagina.map((registro) => (
-                    <tr key={registro.id}>
+                    <tr
+                      className="an-linha-clicavel"
+                      key={registro.id}
+                      onClick={() => setSelecionado({ tenderId: registro.id, opportunityId: registro.opportunityId })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelecionado({ tenderId: registro.id, opportunityId: registro.opportunityId });
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
                       <th scope="row">{registro.identificador}</th>
                       <td className="an-td-texto">{registro.objeto.slice(0, 90)}{registro.objeto.length > 90 ? "…" : ""}</td>
                       <td className="an-td-texto">{registro.cidade ?? "—"}{registro.uf ? ` · ${registro.uf}` : ""}</td>
@@ -838,6 +853,13 @@ export function MapaTerritorio({ celulas, municipios, registros, registrosCortad
               )}
           </>
         )}
+    {selecionado && (
+      <TenderDetailModal
+        onClose={() => setSelecionado(null)}
+        opportunityId={selecionado.opportunityId}
+        tenderId={selecionado.tenderId}
+      />
+    )}
     </div>
   );
 }

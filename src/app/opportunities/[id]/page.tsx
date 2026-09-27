@@ -7,6 +7,7 @@ import { ContextDocumentUploader } from "@/components/documents/context-document
 import { getCurrentAuthorizationContext } from "@/core/authorization/authorization-context";
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
+import { buildOpportunityEditorData } from "@/modules/opportunities/presentation/opportunity-editor-data";
 
 import {
   IntelligencePanel,
@@ -47,12 +48,6 @@ const routeAlternativesSchema = z.array(z.object({
     nanos: z.number(),
   })).catch([]),
 }).passthrough());
-
-function localDateTime(value: Date | null): string | undefined {
-  if (!value) return undefined;
-  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
 
 export default async function OpportunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const authorization = await getCurrentAuthorizationContext();
@@ -124,26 +119,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   ]);
   if (!record) notFound();
 
-  const opportunity: OpportunityEditorData = {
-    id: record.id,
-    code: record.code,
-    origin: record.origin,
-    status: record.status,
-    ...(record.subject && { subject: record.subject }),
-    ...(record.estimatedValue !== null && { estimatedValue: record.estimatedValue.toString() }),
-    ...(record.currency && { currency: record.currency }),
-    ...(record.valueSource && { valueSource: record.valueSource }),
-    ...(record.contractingAuthority && {
-      contractingAuthorityId: record.contractingAuthority.id,
-      contractingAuthorityName: record.contractingAuthority.name,
-    }),
-    ...(record.customer && { customerId: record.customer.id, customerName: record.customer.name }),
-    ...(localDateTime(record.publishedAt) && { publishedAt: localDateTime(record.publishedAt) }),
-    ...(localDateTime(record.deliveryAt) && { deliveryAt: localDateTime(record.deliveryAt) }),
-    ...(record.datesSource && { datesSource: record.datesSource }),
-    ...(record.datesTimeZone && { datesTimeZone: record.datesTimeZone }),
-    ...(record.ownerId && { ownerId: record.ownerId }),
-  };
+  const opportunity: OpportunityEditorData = buildOpportunityEditorData(record);
   const analysis: IntelligenceAnalysisView | null = latestAnalysis ? {
     id: latestAnalysis.id,
     version: latestAnalysis.version,

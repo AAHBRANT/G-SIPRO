@@ -3,11 +3,17 @@
 import { useRouter } from "next/navigation";
 import { type MouseEvent, useState, useTransition } from "react";
 
+export type Decisao = Readonly<{ decision: "APPROVE"; opportunityId?: string } | { decision: "DISCARD" }>;
+
 /**
  * Decisão humana sobre uma licitação rastreada. Aprovar cria a oportunidade e
  * leva direto a ela; descartar exige motivo, que fica registrado no histórico.
+ *
+ * `onDecided`, quando informado, substitui esse destino padrão — é o que a
+ * janelinha do mapa da Análise usa para fechar e atualizar no lugar, em vez
+ * de arrancar a pessoa da tela de Análise para a de Oportunidades.
  */
-export function TriageActions({ id }: { id: string }) {
+export function TriageActions({ id, onDecided }: { id: string; onDecided?: (decisao: Decisao) => void }) {
   const router = useRouter();
   const [discarding, setDiscarding] = useState(false);
   const [reason, setReason] = useState("");
@@ -55,7 +61,7 @@ export function TriageActions({ id }: { id: string }) {
         <button
           className="bx-bt sim"
           disabled={pending || reason.trim().length < 3}
-          onClick={() => decide({ decision: "DISCARD", reason: reason.trim() }, () => router.refresh())}
+          onClick={() => decide({ decision: "DISCARD", reason: reason.trim() }, () => (onDecided ? onDecided({ decision: "DISCARD" }) : router.refresh()))}
           type="button"
         >Confirmar</button>
         <button className="bx-bt nao" onClick={() => { setDiscarding(false); setReason(""); }} type="button">Cancelar</button>
@@ -70,6 +76,7 @@ export function TriageActions({ id }: { id: string }) {
         className="bx-bt sim"
         disabled={pending}
         onClick={() => decide({ decision: "APPROVE" }, (payload) => {
+          if (onDecided) { onDecided({ decision: "APPROVE", ...(payload.opportunityId ? { opportunityId: payload.opportunityId } : {}) }); return; }
           if (payload.opportunityId) router.push(`/opportunities/${payload.opportunityId}`);
           else router.refresh();
         })}
