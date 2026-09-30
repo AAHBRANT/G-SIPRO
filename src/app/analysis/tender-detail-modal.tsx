@@ -91,7 +91,7 @@ export function TenderDetailModal({
         {pending && (
           <div className="bx" style={{ background: "none", minHeight: 0, padding: 0 }}>
             <div className="bx-linha">
-              <div className="bx-cab">
+              <div className="an-modal-cab">
                 <TenderSummaryHeader
                   canDecide={pending.canDecide}
                   duplicateCount={pending.duplicateCount}

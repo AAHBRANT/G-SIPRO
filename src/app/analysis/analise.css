@@ -470,3 +470,18 @@
   .an-linha-clicavel { cursor: pointer; }
   .an-linha-clicavel:hover { background: var(--bege); }
   .an-linha-clicavel:focus-visible { outline: 2px solid var(--vinho); outline-offset: -2px; }
+
+  /* Cabeçalho da licitação DENTRO da janelinha — não reaproveita o grid de 5
+     colunas do .bx-cab da lista (achado 29/09/2026): aquele grid é calibrado
+     para a seta de abrir/fechar como primeira coluna, e a janelinha não tem
+     seta nenhuma — sobrando uma coluna, tudo deslizava uma casa e o objeto
+     caía inteiro dentro de uma faixa de 16px. Aqui é flex com quebra: mais
+     largura sobrando na janela do que numa linha de lista, então não precisa
+     do mesmo aperto. */
+  .an-modal-cab {
+    align-items: flex-start; display: flex; flex-wrap: wrap; gap: 16px 24px;
+    padding: 22px 52px 18px 22px;
+  }
+  .an-modal-cab .min-w-0 { flex: 1 1 320px; min-width: 240px; }
+  .an-modal-cab .bx-num { flex: 0 0 auto; text-align: left; }
+  .an-modal-cab .bx-medidor-caixa { flex: 0 0 168px; }
