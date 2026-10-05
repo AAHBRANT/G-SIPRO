@@ -44,9 +44,22 @@ export type OpportunitySeed = Readonly<{
 
 export interface TriageRepository {
   findById(id: string): Promise<ScoutedTenderRecord | null>;
-  markApproved(id: string, opportunityId: string, actorId: string, decidedAt: Date): Promise<void>;
-  /** `actorId` ausente quando o descarte é automático (duplicata resolvida pela varredura). */
-  markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<void>;
+  /**
+   * Passa a licitação de PENDING para APPROVED numa única escrita condicional.
+   * Devolve `false` quando ela já não estava pendente — outra aprovação,
+   * descarte ou expiração chegou antes. É esta trava, e não a leitura anterior,
+   * que impede a mesma licitação de gerar duas oportunidades.
+   */
+  claimForApproval(id: string, actorId: string, decidedAt: Date): Promise<boolean>;
+  /** Vincula a oportunidade criada à licitação já travada como aprovada. */
+  linkOpportunity(id: string, opportunityId: string): Promise<void>;
+  /** Desfaz a trava quando a oportunidade não chegou a ser criada. */
+  releaseApproval(id: string): Promise<void>;
+  /**
+   * `actorId` ausente quando o descarte é automático (duplicata resolvida pela
+   * varredura). Devolve `false` quando a licitação já não estava pendente.
+   */
+  markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<boolean>;
   countPending(): Promise<number>;
 }
 
@@ -89,29 +102,43 @@ export class TriageService {
 
   async approve(id: string, actorId: string, correlationId: string, decidedAt: Date = new Date()): Promise<string> {
     const record = await this.requirePending(id);
-    const opportunityId = await this.opportunities.createFromScoutedTender(
-      {
-        subject: record.subject,
-        authorityName: record.authorityName,
-        authorityDocument: record.authorityDocument,
-        sphere: record.sphere,
-        city: record.city,
-        state: record.state,
-        estimatedValue: record.estimatedValue,
-        publishedAt: record.proposalOpensAt,
-        deliveryAt: record.proposalClosesAt,
-        ownerId: actorId,
-      },
-      actorId,
-      correlationId,
-    );
-    await this.repository.markApproved(id, opportunityId, actorId, decidedAt);
+    // Trava ANTES de criar a oportunidade. Até 05/10/2026 a licitação só era
+    // marcada aprovada no fim, e continuava na fila oferecendo Aprovar e
+    // Descartar de novo — cada nova aprovação criava mais uma oportunidade.
+    if (!(await this.repository.claimForApproval(id, actorId, decidedAt))) {
+      throw new ScoutedTenderAlreadyDecidedError("APPROVED");
+    }
+    let opportunityId: string;
+    try {
+      opportunityId = await this.opportunities.createFromScoutedTender(
+        {
+          subject: record.subject,
+          authorityName: record.authorityName,
+          authorityDocument: record.authorityDocument,
+          sphere: record.sphere,
+          city: record.city,
+          state: record.state,
+          estimatedValue: record.estimatedValue,
+          publishedAt: record.proposalOpensAt,
+          deliveryAt: record.proposalClosesAt,
+          ownerId: actorId,
+        },
+        actorId,
+        correlationId,
+      );
+    } catch (error) {
+      // A oportunidade não nasceu: a licitação volta para a fila.
+      await this.repository.releaseApproval(id);
+      throw error;
+    }
+    await this.repository.linkOpportunity(id, opportunityId);
     return opportunityId;
   }
 
   async discard(id: string, actorId: string | undefined, reason: unknown, decidedAt: Date = new Date()): Promise<void> {
     await this.requirePending(id);
-    await this.repository.markDiscarded(id, actorId, discardReasonSchema.parse(reason), decidedAt);
+    const discarded = await this.repository.markDiscarded(id, actorId, discardReasonSchema.parse(reason), decidedAt);
+    if (!discarded) throw new ScoutedTenderAlreadyDecidedError("DISCARDED");
   }
 
   /** Quantidade que alimenta o aviso na barra lateral e o card da tela. */
