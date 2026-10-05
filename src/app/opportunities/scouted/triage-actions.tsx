@@ -18,6 +18,13 @@ export function TriageActions({ id, onDecided }: { id: string; onDecided?: (deci
   const [discarding, setDiscarding] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string>();
+  /**
+   * Decisão já registrada: os botões saem na hora, sem esperar a fila
+   * recarregar. Antes disto a linha continuava oferecendo Aprovar/Descartar
+   * enquanto a página não era refeita — e voltar para a fila podia mostrar a
+   * versão guardada pelo navegador, com a licitação ainda "pendente".
+   */
+  const [decided, setDecided] = useState<string>();
   const [pending, startTransition] = useTransition();
 
   /**
@@ -37,13 +44,27 @@ export function TriageActions({ id, onDecided }: { id: string; onDecided?: (deci
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (response.status === 409) {
+        // Já decidida por outro clique ou outra pessoa: some da fila também.
+        setDecided("Esta licitação já foi triada.");
+        router.refresh();
+        return;
+      }
       if (!response.ok) {
-        setError(response.status === 409 ? "Esta licitação já foi triada." : "Não foi possível registrar a decisão.");
+        const failure = await response.json().catch(() => undefined);
+        setError(failure?.error?.message ?? "Não foi possível registrar a decisão.");
         return;
       }
       const payload = await response.json().catch(() => ({ data: {} }));
+      setDecided(body.decision === "APPROVE" ? "Aprovada — virou oportunidade." : "Descartada.");
+      // Invalida a fila guardada no navegador antes de sair dela.
+      router.refresh();
       onDone(payload.data ?? {});
     });
+  }
+
+  if (decided) {
+    return <div className="bx-acao" onClick={stopToggle}><span className="bx-local block text-center">{decided}</span></div>;
   }
 
   if (discarding) {

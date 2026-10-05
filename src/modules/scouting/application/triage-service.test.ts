@@ -29,12 +29,28 @@ function buildRecord(overrides: Partial<ScoutedTenderRecord> = {}): ScoutedTende
   };
 }
 
+/**
+ * O dublê imita o banco: a trava só passa enquanto a licitação está pendente,
+ * e a leitura (`findById`) devolve sempre a foto inicial — como acontece
+ * quando dois cliques leem antes de qualquer um gravar.
+ */
 function buildDependencies(record: ScoutedTenderRecord | null) {
   const seeds: OpportunitySeed[] = [];
+  let status = record?.status;
   const repository: TriageRepository = {
     findById: vi.fn(async () => record),
-    markApproved: vi.fn(async () => {}),
-    markDiscarded: vi.fn(async () => {}),
+    claimForApproval: vi.fn(async () => {
+      if (status !== "PENDING") return false;
+      status = "APPROVED";
+      return true;
+    }),
+    linkOpportunity: vi.fn(async () => {}),
+    releaseApproval: vi.fn(async () => { status = "PENDING"; }),
+    markDiscarded: vi.fn(async () => {
+      if (status !== "PENDING") return false;
+      status = "DISCARDED";
+      return true;
+    }),
     countPending: vi.fn(async () => 7),
   };
   const opportunities: OpportunityCreationPort = {
@@ -56,7 +72,51 @@ describe("TriageService.approve", () => {
       estimatedValue: 8_450_000,
       deliveryAt: new Date("2026-08-12T13:00:00.000Z"),
     });
-    expect(repository.markApproved).toHaveBeenCalledWith("scouted-1", "opportunity-1", "user-1", decidedAt);
+    expect(repository.claimForApproval).toHaveBeenCalledWith("scouted-1", "user-1", decidedAt);
+    expect(repository.linkOpportunity).toHaveBeenCalledWith("scouted-1", "opportunity-1");
+  });
+
+  it("trava a licitação como aprovada antes de criar a oportunidade", async () => {
+    const { repository, opportunities } = buildDependencies(buildRecord());
+    await new TriageService(repository, opportunities).approve("scouted-1", "user-1", "corr-1", decidedAt);
+    const claimOrder = vi.mocked(repository.claimForApproval).mock.invocationCallOrder[0]!;
+    const createOrder = vi.mocked(opportunities.createFromScoutedTender).mock.invocationCallOrder[0]!;
+    expect(claimOrder).toBeLessThan(createOrder);
+  });
+
+  /**
+   * Bug de 05/10/2026: aprovada, a licitação continuava na fila e dava para
+   * aprovar ou descartar de novo, sem fim. A segunda tentativa tem de ser
+   * recusada e não pode criar outra oportunidade.
+   */
+  it("segunda aprovação da mesma licitação é recusada e não duplica a oportunidade", async () => {
+    const { repository, opportunities } = buildDependencies(buildRecord());
+    const service = new TriageService(repository, opportunities);
+
+    await service.approve("scouted-1", "user-1", "corr-1", decidedAt);
+    await expect(service.approve("scouted-1", "user-2", "corr-2", decidedAt)).rejects.toBeInstanceOf(ScoutedTenderAlreadyDecidedError);
+
+    expect(opportunities.createFromScoutedTender).toHaveBeenCalledTimes(1);
+  });
+
+  it("descartar depois de aprovar é recusado", async () => {
+    const { repository, opportunities } = buildDependencies(buildRecord());
+    const service = new TriageService(repository, opportunities);
+
+    await service.approve("scouted-1", "user-1", "corr-1", decidedAt);
+    await expect(service.discard("scouted-1", "user-1", "Mudei de ideia", decidedAt)).rejects.toBeInstanceOf(ScoutedTenderAlreadyDecidedError);
+  });
+
+  it("devolve a licitação à fila quando a oportunidade não chega a ser criada", async () => {
+    const { repository, opportunities } = buildDependencies(buildRecord());
+    vi.mocked(opportunities.createFromScoutedTender).mockRejectedValueOnce(new Error("banco fora"));
+    const service = new TriageService(repository, opportunities);
+
+    await expect(service.approve("scouted-1", "user-1", "corr-1", decidedAt)).rejects.toThrow("banco fora");
+    expect(repository.releaseApproval).toHaveBeenCalledWith("scouted-1");
+    expect(repository.linkOpportunity).not.toHaveBeenCalled();
+    // Liberada, pode ser aprovada de novo.
+    await expect(service.approve("scouted-1", "user-1", "corr-2", decidedAt)).resolves.toBe("opportunity-1");
   });
 
   it("define como responsável quem aprovou, e não o sistema", async () => {

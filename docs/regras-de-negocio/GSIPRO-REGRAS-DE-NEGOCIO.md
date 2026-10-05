@@ -75,7 +75,8 @@ Padrões transversais observados em praticamente todos os módulos:
 - **Sinalização**: marca colorida por licitação (HIGH/MEDIUM/LOW fixos, ou CUSTOM com rótulo/cor livres); só aplicável a registro `PENDING`; sinalizar de novo substitui a marca anterior.
 - **Triagem/decisão humana**: só se aplica a `PENDING`.
   - Aprovar cria uma oportunidade com origem `BUSCADOR`, status `QUALIFICATION`, aprovador como responsável.
-  - Descartar exige motivo (mín. 3 caracteres); descarte automático (duplicata resolvida) pode não ter ator.
+  - A licitação é travada como `APPROVED` (escrita condicional a `PENDING`) **antes** de criar a oportunidade: uma segunda aprovação ou um descarte posterior é recusado (409) e nunca gera oportunidade duplicada. Se a criação da oportunidade falhar, a trava é desfeita e a licitação volta a `PENDING`.
+  - Descartar exige motivo (mín. 3 caracteres); descarte automático (duplicata resolvida) pode não ter ator. Também é condicional a `PENDING` — descarte de licitação já decidida é recusado.
 - **Duplicidade entre licitações**: agrupamento por órgão + (número de processo OU objeto normalizado); CNPJs diferentes sob nome igual nunca são agrupados (evita colidir dois municípios homônimos); nunca oculta a duplicata, só sinaliza — decisão de ignorar é de quem lê.
 - **Aderência ao perfil**: nota 0–100 (tipo de obra 40%, valor/porte 30%, prazo 20%, esfera 10%); critério sem dado sai do numerador e do denominador (nunca vira zero nem nota cheia).
 - **Aderência de acervo técnico**: mede se há prova de execução prévia; parcela do edital não reconhecida pelo catálogo nunca conta como coberta nem como faltante; quantitativo mínimo usa o maior atestado isolado, nunca a soma.

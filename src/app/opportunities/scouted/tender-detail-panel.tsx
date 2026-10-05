@@ -199,7 +199,9 @@ export function TenderSummaryHeader({
           score={tender.score}
           undetermined={tender.resumo.total === 0}
         />
-        {canDecide ? <TriageActions id={tender.id} onDecided={onDecided}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
+        {tender.status !== "PENDING"
+          ? <span className="bx-local block text-center">Esta licitação já foi triada.</span>
+          : canDecide ? <TriageActions id={tender.id} onDecided={onDecided}/> : <span className="bx-local block text-center">Sem alçada para decidir</span>}
         <div className="bx-mini-acoes">
           <SignalActions id={tender.id} signal={signal ? { level: signal.level, label: signal.label, color: signal.color, ...(signal.note ? { note: signal.note } : {}) } : undefined}/>
           <ShareTenderAction id={tender.id} recipients={shareRecipients} subject={tender.subject}/>

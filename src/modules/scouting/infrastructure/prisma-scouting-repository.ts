@@ -154,21 +154,37 @@ export class PrismaTriageRepository implements TriageRepository {
     };
   }
 
-  async markApproved(id: string, opportunityId: string, actorId: string, decidedAt: Date): Promise<void> {
-    await getDatabase().scoutedTender.update({
-      where: { id },
-      data: { status: "APPROVED", opportunityId, decidedById: actorId, decidedAt },
+  async claimForApproval(id: string, actorId: string, decidedAt: Date): Promise<boolean> {
+    // `updateMany` com `status: "PENDING"` no filtro: a condição e a escrita
+    // acontecem num único UPDATE, então dois cliques (ou duas pessoas) ao
+    // mesmo tempo não passam os dois.
+    const result = await getDatabase().scoutedTender.updateMany({
+      where: { id, status: "PENDING" },
+      data: { status: "APPROVED", decidedById: actorId, decidedAt },
+    });
+    return result.count === 1;
+  }
+
+  async linkOpportunity(id: string, opportunityId: string): Promise<void> {
+    await getDatabase().scoutedTender.update({ where: { id }, data: { opportunityId } });
+  }
+
+  async releaseApproval(id: string): Promise<void> {
+    await getDatabase().scoutedTender.updateMany({
+      where: { id, status: "APPROVED", opportunityId: null },
+      data: { status: "PENDING", decidedById: null, decidedAt: null },
     });
   }
 
-  async markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<void> {
-    await getDatabase().scoutedTender.update({
-      where: { id },
+  async markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<boolean> {
+    const result = await getDatabase().scoutedTender.updateMany({
+      where: { id, status: "PENDING" },
       // Ausente quando o descarte é automático (duplicata resolvida pela
       // própria varredura, sem sessão de usuário) — `decidedById` já é
       // opcional no banco por causa disto.
       data: { status: "DISCARDED", decidedById: actorId ?? null, decisionReason: reason, decidedAt },
     });
+    return result.count === 1;
   }
 
   async countPending(): Promise<number> {
