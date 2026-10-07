@@ -56,7 +56,11 @@ export function TriageActions({ id, onDecided }: { id: string; onDecided?: (deci
         return;
       }
       const payload = await response.json().catch(() => ({ data: {} }));
-      setDecided(body.decision === "APPROVE" ? "Aprovada — virou oportunidade." : "Descartada.");
+      setDecided(body.decision !== "APPROVE"
+        ? "Descartada."
+        : payload.data?.reaproveitada
+          ? "Esta obra já tinha sido aprovada — abrindo a oportunidade existente."
+          : "Aprovada — virou oportunidade.");
       // Invalida a fila guardada no navegador antes de sair dela.
       router.refresh();
       onDone(payload.data ?? {});

@@ -34,7 +34,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const service = new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender());
 
       if (command.decision === "APPROVE") {
-        const opportunityId = await service.approve(id, authorization.actorId, context.correlationId);
+        const { opportunityId, reaproveitada } = await service.approve(id, authorization.actorId, context.correlationId);
+        // Mesma obra já aprovada por outra publicação: a oportunidade e a ficha
+        // dela já existem. Montar outra ficha aqui seria a duplicata de novo.
+        if (reaproveitada) {
+          return NextResponse.json({ data: { decision: "APPROVE", opportunityId, reaproveitada }, correlationId: context.correlationId });
+        }
         /**
          * A ficha da LICITAÇÃO é montada depois de responder: ela depende de
          * baixar do PNCP tudo que o órgão publicou (10 a 20 MB é comum) só

@@ -61,7 +61,7 @@ async function main() {
   step("6. Aprovar a primeira da fila");
   const triage = new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender());
   const target = queue[0]!;
-  const opportunityId = await triage.approve(target.id, actorId, randomUUID());
+  const { opportunityId } = await triage.approve(target.id, actorId, randomUUID());
   const created = await database.opportunity.findUniqueOrThrow({ where: { id: opportunityId }, include: { owner: true, contractingAuthority: true } });
   console.log("código:", created.code);
   console.log("origem:", created.origin, created.origin === "BUSCADOR" ? "✔" : "✘");

@@ -107,7 +107,7 @@ async function main() {
   });
 
   console.log("aprovando pelo servico real...");
-  const oportunidadeId = await new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender())
+  const { opportunityId: oportunidadeId } = await new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender())
     .approve(licitacao.id, ator.id, randomUUID());
 
   console.log("montando a ficha da licitacao (o que a rota faz em segundo plano)...");

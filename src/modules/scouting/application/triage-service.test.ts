@@ -8,6 +8,7 @@ import {
   type OpportunitySeed,
   type ScoutedTenderRecord,
   type TriageRepository,
+  type TwinTenders,
 } from "@/modules/scouting/application/triage-service";
 
 const decidedAt = new Date("2026-07-29T13:00:00.000Z");
@@ -34,7 +35,7 @@ function buildRecord(overrides: Partial<ScoutedTenderRecord> = {}): ScoutedTende
  * e a leitura (`findById`) devolve sempre a foto inicial — como acontece
  * quando dois cliques leem antes de qualquer um gravar.
  */
-function buildDependencies(record: ScoutedTenderRecord | null) {
+function buildDependencies(record: ScoutedTenderRecord | null, twins: TwinTenders = { pending: [], approved: [] }) {
   const seeds: OpportunitySeed[] = [];
   let status = record?.status;
   const repository: TriageRepository = {
@@ -46,11 +47,13 @@ function buildDependencies(record: ScoutedTenderRecord | null) {
     }),
     linkOpportunity: vi.fn(async () => {}),
     releaseApproval: vi.fn(async () => { status = "PENDING"; }),
-    markDiscarded: vi.fn(async () => {
+    markDiscarded: vi.fn(async (id: string) => {
+      if (id !== record?.id) return true;
       if (status !== "PENDING") return false;
       status = "DISCARDED";
       return true;
     }),
+    findTwins: vi.fn(async () => twins),
     countPending: vi.fn(async () => 7),
   };
   const opportunities: OpportunityCreationPort = {
@@ -63,9 +66,10 @@ describe("TriageService.approve", () => {
   it("cria a oportunidade com os dados da licitação e vincula à fila", async () => {
     const { repository, opportunities, seeds } = buildDependencies(buildRecord());
 
-    const opportunityId = await new TriageService(repository, opportunities).approve("scouted-1", "user-1", "corr-1", decidedAt);
+    const { opportunityId, reaproveitada } = await new TriageService(repository, opportunities).approve("scouted-1", "user-1", "corr-1", decidedAt);
 
     expect(opportunityId).toBe("opportunity-1");
+    expect(reaproveitada).toBe(false);
     expect(seeds[0]).toMatchObject({
       subject: "Construção de escola de educação infantil",
       authorityName: "Prefeitura de Gravataí",
@@ -116,7 +120,7 @@ describe("TriageService.approve", () => {
     expect(repository.releaseApproval).toHaveBeenCalledWith("scouted-1");
     expect(repository.linkOpportunity).not.toHaveBeenCalled();
     // Liberada, pode ser aprovada de novo.
-    await expect(service.approve("scouted-1", "user-1", "corr-2", decidedAt)).resolves.toBe("opportunity-1");
+    await expect(service.approve("scouted-1", "user-1", "corr-2", decidedAt)).resolves.toMatchObject({ opportunityId: "opportunity-1" });
   });
 
   it("define como responsável quem aprovou, e não o sistema", async () => {
@@ -206,5 +210,36 @@ describe("o que a aprovação leva para a oportunidade", () => {
     const { repository, opportunities, seeds } = buildDependencies(buildRecord());
     await new TriageService(repository, opportunities).approve("scouted-1", "ator-1", "corr-1", decidedAt);
     expect(seeds[0]?.publishedAt).toBeUndefined();
+  });
+});
+
+/**
+ * Relato de 07/10/2026: "ainda tá" — a mesma obra publicada duas vezes no
+ * PNCP. Aprovada uma publicação, a outra continuava na fila sem aviso e
+ * aprová-la criava a segunda oportunidade da mesma obra.
+ */
+describe("a mesma obra publicada mais de uma vez", () => {
+  it("não cria oportunidade nova quando outra publicação da obra já foi aprovada", async () => {
+    const { repository, opportunities } = buildDependencies(buildRecord(), {
+      pending: [],
+      approved: [{ id: "scouted-0", opportunityId: "opportunity-0" }],
+    });
+
+    const resultado = await new TriageService(repository, opportunities).approve("scouted-1", "user-1", "corr-1", decidedAt);
+
+    expect(resultado).toEqual({ opportunityId: "opportunity-0", reaproveitada: true });
+    expect(opportunities.createFromScoutedTender).not.toHaveBeenCalled();
+    expect(repository.claimForApproval).not.toHaveBeenCalled();
+    expect(repository.markDiscarded).toHaveBeenCalledWith("scouted-1", "user-1", expect.stringContaining("scouted-0"), decidedAt);
+  });
+
+  it("ao aprovar, tira da fila as outras publicações pendentes da mesma obra", async () => {
+    const { repository, opportunities } = buildDependencies(buildRecord(), { pending: ["scouted-2", "scouted-3"], approved: [] });
+
+    await new TriageService(repository, opportunities).approve("scouted-1", "user-1", "corr-1", decidedAt);
+
+    expect(opportunities.createFromScoutedTender).toHaveBeenCalledTimes(1);
+    expect(repository.markDiscarded).toHaveBeenCalledWith("scouted-2", undefined, expect.stringContaining("scouted-1"), decidedAt);
+    expect(repository.markDiscarded).toHaveBeenCalledWith("scouted-3", undefined, expect.stringContaining("scouted-1"), decidedAt);
   });
 });

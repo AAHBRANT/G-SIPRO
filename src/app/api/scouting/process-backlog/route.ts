@@ -6,7 +6,7 @@ import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { EditalReadingService } from "@/modules/scouting/application/edital-reading-service";
 import { TriageService } from "@/modules/scouting/application/triage-service";
-import { resolveDuplicates } from "@/modules/scouting/domain/duplicates";
+import { descartesDaFila } from "@/modules/scouting/domain/duplicates";
 import { PdfjsTextExtraction } from "@/modules/scouting/infrastructure/pdf-text";
 import { PncpFilesClient } from "@/modules/scouting/infrastructure/pncp-files-client";
 import {
@@ -67,9 +67,11 @@ const BUDGET_MS = 150_000;
  * publicação mais recente na fila — decisão do usuário: duplicata não é
  * mais só sinalizada, é excluída de verdade.
  *
- * Só olha quem ainda está PENDING: uma duplicata que alguém já decidiu
+ * Só DESCARTA quem ainda está PENDING: uma duplicata que alguém já decidiu
  * (aprovou ou descartou por conta própria) nunca é tocada por aqui —
- * `TriageService.discard()` já recusa quem não está mais pendente.
+ * `TriageService.discard()` já recusa quem não está mais pendente. Mas as
+ * aprovadas ENTRAM na comparação: pendente cuja irmã já virou oportunidade
+ * sai da fila (ver `descartesDaFila`).
  * `actorId` ausente: é a própria varredura, não uma pessoa: `decidedById`
  * fica nulo e o motivo registrado explica que foi automático.
  *
@@ -78,17 +80,18 @@ const BUDGET_MS = 150_000;
  * mais rápido que uma única leitura de edital.
  */
 async function descartarDuplicatas(): Promise<{ descartadas: number }> {
-  const pendentes = await getDatabase().scoutedTender.findMany({
-    where: { status: "PENDING" },
+  const candidatas = await getDatabase().scoutedTender.findMany({
+    where: { OR: [{ status: "PENDING" }, { status: "APPROVED", opportunityId: { not: null } }] },
     select: {
-      id: true, authorityDocument: true, authorityName: true, processNumber: true,
+      id: true, status: true, authorityDocument: true, authorityName: true, processNumber: true,
       subject: true, proposalOpensAt: true, createdAt: true,
     },
   });
-  if (pendentes.length < 2) return { descartadas: 0 };
+  if (candidatas.length < 2) return { descartadas: 0 };
 
-  const perdedores = resolveDuplicates(pendentes.map((tender) => ({
+  const perdedores = descartesDaFila(candidatas.map((tender) => ({
     id: tender.id,
+    aprovada: tender.status === "APPROVED",
     ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
     authorityName: tender.authorityName,
     ...(tender.processNumber ? { processNumber: tender.processNumber } : {}),
@@ -100,9 +103,11 @@ async function descartarDuplicatas(): Promise<{ descartadas: number }> {
 
   const service = new TriageService(new PrismaTriageRepository(), new OpportunityFromScoutedTender());
   let descartadas = 0;
-  for (const [perdedorId, sobreviventeId] of perdedores) {
+  for (const [perdedorId, { sobrevivente, jaAprovada }] of perdedores) {
     try {
-      await service.discard(perdedorId, undefined, `Duplicata automática: mesma obra que a licitação ${sobreviventeId}, publicada mais recentemente.`);
+      await service.discard(perdedorId, undefined, jaAprovada
+        ? `Duplicata automática: mesma obra que a licitação ${sobrevivente}, já aprovada.`
+        : `Duplicata automática: mesma obra que a licitação ${sobrevivente}, publicada mais recentemente.`);
       descartadas += 1;
     } catch {
       // Corrida rara: alguém decidiu esta licitação entre a consulta acima e
