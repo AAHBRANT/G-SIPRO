@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
+import { getEnvironment } from "@/core/config/env";
 import { getDatabase } from "@/core/database/prisma";
+import { createLogger } from "@/core/observability/logger";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
 import type { QualifiedTender, ScoutRepository, ScoutRunSummary, ScoutRunTrigger } from "@/modules/scouting/application/scout-service";
@@ -9,8 +11,10 @@ import type {
   OpportunitySeed,
   ScoutedTenderRecord,
   TriageRepository,
+  TwinTenders,
 } from "@/modules/scouting/application/triage-service";
 import type { ArchiveEvidence } from "@/modules/scouting/domain/archive-adherence";
+import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { rotuloDaEsfera } from "@/modules/scouting/domain/esfera";
 import { fieldsFromExtractionOutput, servicesFromExtraction } from "@/modules/technical-archive/domain/extracted-services";
 import type { SignalRecord, SignalRepository } from "@/modules/scouting/application/signal-service";
@@ -22,6 +26,11 @@ const FILTER_SINGLETON_ID = "00000000-0000-4000-8000-000000000001";
 const VALUE_SOURCE = "PNCP — valor estimado publicado";
 const DATES_SOURCE = "PNCP — encerramento do prazo de propostas";
 const DATES_TIME_ZONE = "America/Sao_Paulo";
+
+/** Nome do órgão no tamanho da coluna (`contracting_authorities.name`, 200). */
+function nomeDoOrgao(nome: string): string {
+  return nome.trim().replace(/\s+/g, " ").slice(0, 200);
+}
 
 function toNumber(value: { toString(): string } | null | undefined): number | undefined {
   if (value === null || value === undefined) return undefined;
@@ -187,6 +196,31 @@ export class PrismaTriageRepository implements TriageRepository {
     return result.count === 1;
   }
 
+  async findTwins(id: string): Promise<TwinTenders> {
+    // Só entra na conta quem ainda importa: o que está na fila e o que já
+    // virou oportunidade. Descartada e expirada já saíram do jogo.
+    const candidatas = await getDatabase().scoutedTender.findMany({
+      where: { OR: [{ status: "PENDING" }, { status: "APPROVED", opportunityId: { not: null } }, { id }] },
+      select: { id: true, status: true, opportunityId: true, authorityDocument: true, authorityName: true, processNumber: true, subject: true, decidedAt: true },
+    });
+    const irmas = new Set(findDuplicates(candidatas.map((tender) => ({
+      id: tender.id,
+      ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
+      authorityName: tender.authorityName,
+      ...(tender.processNumber ? { processNumber: tender.processNumber } : {}),
+      subject: tender.subject,
+    }))).get(id) ?? []);
+    const doGrupo = candidatas.filter((tender) => irmas.has(tender.id));
+    return {
+      pending: doGrupo.filter((tender) => tender.status === "PENDING").map((tender) => tender.id),
+      // A aprovada mais antiga primeiro: é nela que o trabalho começou.
+      approved: doGrupo
+        .filter((tender) => tender.status === "APPROVED" && tender.opportunityId)
+        .sort((a, b) => (a.decidedAt?.getTime() ?? 0) - (b.decidedAt?.getTime() ?? 0))
+        .map((tender) => ({ id: tender.id, opportunityId: tender.opportunityId! })),
+    };
+  }
+
   async countPending(): Promise<number> {
     return getDatabase().scoutedTender.count({ where: { status: "PENDING" } });
   }
@@ -216,10 +250,15 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
     // município. O registro nasce marcado em `identifiers.revisarCadastro` para
     // a equipe conferir — a curadoria continua existindo, só deixou de ser
     // pré-requisito para a oportunidade existir.
-    const authority = await getDatabase().contractingAuthority.findFirst({
-      where: { active: true, name: { equals: seed.authorityName, mode: "insensitive" } },
-      select: { id: true },
-    }) ?? await this.cadastrarOrgao(seed, actorId);
+    //
+    // A busca começa pelo CNPJ: só pelo nome, "PREFEITURA MUNICIPAL DE X" e
+    // "MUNICIPIO DE X" (o mesmo CNPJ) viravam dois órgãos, um por aprovação.
+    const authority = await this.orgaoPeloCnpj(seed.authorityDocument)
+      ?? await getDatabase().contractingAuthority.findFirst({
+        where: { active: true, name: { equals: nomeDoOrgao(seed.authorityName), mode: "insensitive" } },
+        select: { id: true },
+      })
+      ?? await this.cadastrarOrgao(seed, actorId);
 
     const created = await this.service.create(
       {
@@ -242,8 +281,30 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
     );
 
     // "Em análise" é o estado em que a equipe recebe a oportunidade.
-    await this.service.transition(created.id, "QUALIFICATION", actorId, {}, correlationId);
+    //
+    // A oportunidade JÁ está gravada a esta altura. Deixar a falha subir fazia
+    // a triagem devolver a licitação à fila, e a próxima aprovação criava uma
+    // segunda oportunidade, ficando a primeira órfã em rascunho. Falhar aqui
+    // só deixa esta em rascunho — visível e movível pela tela dela.
+    try {
+      await this.service.transition(created.id, "QUALIFICATION", actorId, {}, correlationId);
+    } catch (error) {
+      createLogger(getEnvironment()).warn(
+        { opportunityId: created.id, correlationId, erro: error instanceof Error ? error.message : String(error) },
+        "Oportunidade criada pela aprovação ficou em rascunho: não foi possível passá-la para Em análise.",
+      );
+    }
     return created.id;
+  }
+
+  private async orgaoPeloCnpj(documento: string | undefined): Promise<{ id: string } | null> {
+    const cnpj = documento?.replace(/\D/g, "");
+    if (!cnpj || cnpj.length !== 14) return null;
+    return getDatabase().contractingAuthority.findFirst({
+      where: { active: true, identifiers: { path: ["cnpj"], equals: cnpj } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
   /**
@@ -254,15 +315,19 @@ export class OpportunityFromScoutedTender implements OpportunityCreationPort {
    * buscador ficaria indistinguível do que foi curado à mão.
    */
   private async cadastrarOrgao(seed: OpportunitySeed, actorId: string): Promise<{ id: string }> {
-    const localidade = [seed.city, seed.state].filter(Boolean).join(" / ");
+    // Cortes nos limites das colunas: o PNCP aceita razão social de até 400
+    // caracteres e a tabela de órgãos guarda 200 — sem o corte, a aprovação
+    // dessa licitação falhava sempre.
+    const localidade = [seed.city, seed.state].filter(Boolean).join(" / ").slice(0, 160);
+    const cnpj = seed.authorityDocument?.replace(/\D/g, "");
     return getDatabase().contractingAuthority.create({
       data: {
         id: randomUUID(),
-        name: seed.authorityName,
+        name: nomeDoOrgao(seed.authorityName),
         ...(rotuloDaEsfera(seed.sphere) ? { sphere: rotuloDaEsfera(seed.sphere) } : {}),
         ...(localidade ? { locality: localidade } : {}),
         identifiers: {
-          ...(seed.authorityDocument ? { cnpj: seed.authorityDocument } : {}),
+          ...(cnpj ? { cnpj } : {}),
           origem: "BUSCADOR",
           revisarCadastro: true,
         },

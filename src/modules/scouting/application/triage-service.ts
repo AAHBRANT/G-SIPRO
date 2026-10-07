@@ -60,8 +60,28 @@ export interface TriageRepository {
    * varredura). Devolve `false` quando a licitação já não estava pendente.
    */
   markDiscarded(id: string, actorId: string | undefined, reason: string, decidedAt: Date): Promise<boolean>;
+  /**
+   * Outras publicações da MESMA obra (regra de `findDuplicates`): as que ainda
+   * estão na fila e as que já viraram oportunidade.
+   */
+  findTwins(id: string): Promise<TwinTenders>;
   countPending(): Promise<number>;
 }
+
+export type TwinTenders = Readonly<{
+  pending: readonly string[];
+  approved: readonly Readonly<{ id: string; opportunityId: string }>[];
+}>;
+
+export type ApprovalOutcome = Readonly<{
+  opportunityId: string;
+  /**
+   * Verdadeiro quando a mesma obra já tinha sido aprovada por outra
+   * publicação: nenhuma oportunidade nova foi criada, esta publicação foi
+   * descartada como duplicata e `opportunityId` é a que já existia.
+   */
+  reaproveitada: boolean;
+}>;
 
 export interface OpportunityCreationPort {
   /** Cria a oportunidade com origem BUSCADOR e status "Em análise" (QUALIFICATION). */
@@ -100,8 +120,24 @@ export class TriageService {
     return record;
   }
 
-  async approve(id: string, actorId: string, correlationId: string, decidedAt: Date = new Date()): Promise<string> {
+  async approve(id: string, actorId: string, correlationId: string, decidedAt: Date = new Date()): Promise<ApprovalOutcome> {
     const record = await this.requirePending(id);
+    const twins = await this.repository.findTwins(id);
+
+    // A mesma obra já virou oportunidade por outra publicação (o órgão
+    // republicou depois de uma retificação, por exemplo). Aprovar de novo
+    // criaria a segunda oportunidade e a segunda ficha da mesma obra — o
+    // sintoma relatado em 07/10/2026. Em vez disso, esta publicação sai da
+    // fila como duplicata e a pessoa vai para a oportunidade que já existe.
+    const existente = twins.approved[0];
+    if (existente) {
+      const reason = `Duplicata: mesma obra já aprovada pela licitação ${existente.id}.`;
+      if (!(await this.repository.markDiscarded(id, actorId, reason, decidedAt))) {
+        throw new ScoutedTenderAlreadyDecidedError("DISCARDED");
+      }
+      return { opportunityId: existente.opportunityId, reaproveitada: true };
+    }
+
     // Trava ANTES de criar a oportunidade. Até 05/10/2026 a licitação só era
     // marcada aprovada no fim, e continuava na fila oferecendo Aprovar e
     // Descartar de novo — cada nova aprovação criava mais uma oportunidade.
@@ -132,7 +168,15 @@ export class TriageService {
       throw error;
     }
     await this.repository.linkOpportunity(id, opportunityId);
-    return opportunityId;
+
+    // As outras publicações da mesma obra que ainda estão na fila saem junto:
+    // deixá-las lá é o que fazia "a mesma licitação" continuar aparecendo,
+    // agora sem o aviso de duplicata (o par aprovado não entra mais na conta
+    // da fila). `false` aqui é corrida com outra decisão — a dela vale.
+    for (const twin of twins.pending) {
+      await this.repository.markDiscarded(twin, undefined, `Duplicata automática: mesma obra que a licitação ${id}, aprovada.`, decidedAt);
+    }
+    return { opportunityId, reaproveitada: false };
   }
 
   async discard(id: string, actorId: string | undefined, reason: unknown, decidedAt: Date = new Date()): Promise<void> {

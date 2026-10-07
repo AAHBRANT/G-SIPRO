@@ -263,3 +263,45 @@ export function resolverCopias(items: readonly CopiaInput[]): ReadonlyMap<string
 
   return resultado;
 }
+
+export type FilaInput = DuplicateResolutionInput & Readonly<{
+  /** Já aprovada e com oportunidade: o trabalho da obra está nela. */
+  aprovada: boolean;
+}>;
+
+export type DescarteDaFila = Readonly<{ sobrevivente: string; jaAprovada: boolean }>;
+
+/**
+ * Quem sai da fila por ser a mesma obra de outra licitação — só PENDENTES
+ * são devolvidas; aprovada nunca é descartada por aqui.
+ *
+ * ⚠️ Até 07/10/2026 a faxina só comparava pendentes entre si. Aprovada uma
+ * publicação, a irmã ficava sozinha no grupo: perdia o aviso de duplicata,
+ * nunca era descartada e quem a aprovava criava a SEGUNDA oportunidade e a
+ * segunda ficha da mesma obra. Agora, havendo aprovada no grupo, toda
+ * pendente do grupo sai apontando para ela. Sem aprovada, vale a regra de
+ * sempre (`resolveDuplicates`): fica a publicação mais recente.
+ */
+export function descartesDaFila(items: readonly FilaInput[]): ReadonlyMap<string, DescarteDaFila> {
+  const grupos = findDuplicates(items);
+  const porId = new Map(items.map((item) => [item.id, item]));
+  const resultado = new Map<string, DescarteDaFila>();
+  const resolvidos = new Set<string>();
+
+  for (const [id, outros] of grupos) {
+    if (resolvidos.has(id)) continue;
+    const membros = [id, ...outros];
+    const aprovada = membros.find((membro) => porId.get(membro)?.aprovada);
+    if (!aprovada) continue;
+    for (const membro of membros) {
+      resolvidos.add(membro);
+      if (!porId.get(membro)?.aprovada) resultado.set(membro, { sobrevivente: aprovada, jaAprovada: true });
+    }
+  }
+
+  const soPendentes = items.filter((item) => !item.aprovada && !resolvidos.has(item.id));
+  for (const [perdedor, sobrevivente] of resolveDuplicates(soPendentes)) {
+    resultado.set(perdedor, { sobrevivente, jaAprovada: false });
+  }
+  return resultado;
+}
