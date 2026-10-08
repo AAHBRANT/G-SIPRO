@@ -31,7 +31,7 @@ export function ConfirmarLimpeza({ licitacoes, oportunidades }: { licitacoes: nu
       {resultado.falhas.length > 0 && <ul className="mt-2 list-disc pl-5 text-amber-900">{resultado.falhas.map((falha) => <li key={falha}>{falha}</li>)}</ul>}
     </div>}
     {!confirmando
-      ? <button className="rounded-xl bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={pending || (licitacoes === 0 && oportunidades === 0)} onClick={() => setConfirmando(true)} type="button">Aplicar limpeza</button>
+      ? <button className="rounded-xl bg-brand px-5 py-2.5 font-bold text-white disabled:opacity-60" disabled={pending || (licitacoes === 0 && oportunidades === 0)} onClick={() => setConfirmando(true)} type="button">Rodar a limpeza agora</button>
       : <div className="grid gap-3">
         <p className="text-sm text-slate-700">Confirma descartar <strong>{licitacoes}</strong> licitação(ões) da fila e encerrar <strong>{oportunidades}</strong> oportunidade(s) como duplicadas? Os itens &quot;Decidir à mão&quot; não são alterados.</p>
         <div className="flex gap-2">

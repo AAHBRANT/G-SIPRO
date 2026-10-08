@@ -1,4 +1,6 @@
+import { getEnvironment } from "@/core/config/env";
 import { getDatabase } from "@/core/database/prisma";
+import { createLogger } from "@/core/observability/logger";
 import { OpportunityService } from "@/modules/opportunities/application/opportunity-service";
 import { PrismaOpportunityRepository } from "@/modules/opportunities/infrastructure/prisma-opportunity-repository";
 import { TriageService } from "@/modules/scouting/application/triage-service";
@@ -122,4 +124,40 @@ export async function aplicarLimpeza(actorId: string, correlationId: string): Pr
   }
 
   return { licitacoesDescartadas, oportunidadesEncerradas, falhas };
+}
+
+/**
+ * A limpeza sem ninguém apertar botão — pedido do dono em 08/10/2026. Roda
+ * depois de cada aprovação (`actorId` = quem aprovou) e na faxina semanal do
+ * Buscador (sem pessoa: assina o proprietário do sistema, porque o histórico
+ * da oportunidade exige um usuário real).
+ *
+ * Nunca lança: é trabalho de bastidor, chamado depois que a resposta já foi
+ * enviada ou no meio de outra rotina. Falha vira log, e a próxima rodada
+ * tenta de novo — o plano é sempre recalculado do zero.
+ *
+ * As duplicatas com proposta ou que já avançaram continuam fora: encerrar
+ * uma delas sozinho jogaria fora trabalho da equipe.
+ */
+export async function limparDuplicatasAutomaticamente(actorId: string | undefined, correlationId: string): Promise<ResultadoDaLimpeza | undefined> {
+  const logger = createLogger(getEnvironment());
+  try {
+    const ator = actorId ?? (await getDatabase().user.findFirst({
+      where: { isOwner: true, status: "ACTIVE" },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    }))?.id;
+    if (!ator) {
+      logger.warn({ correlationId }, "Limpeza automática de duplicatas sem usuário proprietário ativo para assinar: não rodou.");
+      return undefined;
+    }
+    const resultado = await aplicarLimpeza(ator, correlationId);
+    if (resultado.licitacoesDescartadas || resultado.oportunidadesEncerradas || resultado.falhas.length) {
+      logger.info({ correlationId, ...resultado }, "Limpeza automática de duplicatas aplicada.");
+    }
+    return resultado;
+  } catch (erro) {
+    logger.error({ correlationId, erro: erro instanceof Error ? erro.message : String(erro) }, "Limpeza automática de duplicatas falhou.");
+    return undefined;
+  }
 }

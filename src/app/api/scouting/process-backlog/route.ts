@@ -5,6 +5,7 @@ import { getDatabase } from "@/core/database/prisma";
 import { toApiError } from "@/core/errors/api-error";
 import { createRequestContext, runWithRequestContext } from "@/core/observability/request-context";
 import { EditalReadingService } from "@/modules/scouting/application/edital-reading-service";
+import { limparDuplicatasAutomaticamente } from "@/modules/scouting/application/limpeza-de-duplicatas-service";
 import { TriageService } from "@/modules/scouting/application/triage-service";
 import { descartesDaFila } from "@/modules/scouting/domain/duplicates";
 import { PdfjsTextExtraction } from "@/modules/scouting/infrastructure/pdf-text";
@@ -41,12 +42,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const deadline = Date.now() + BUDGET_MS;
       const duplicatas = await descartarDuplicatas();
+      // Rede de segurança semanal da limpeza que já roda a cada aprovação:
+      // oportunidade duplicada que tenha escapado é encerrada aqui, sem botão.
+      const limpeza = await limparDuplicatasAutomaticamente(undefined, context.correlationId);
       const editais = await readEditaisDaVarredura(context.correlationId, deadline);
       // Depois das novas, e com o MESMO relógio: licitação sem leitura
       // nenhuma vem antes de uma que já tem leitura, ainda que incompleta.
       const releituras = await relerAcervoSemQuantitativo(context.correlationId, deadline);
 
-      return NextResponse.json({ data: { duplicatas, editais, releituras }, correlationId: context.correlationId });
+      return NextResponse.json({ data: { duplicatas, limpeza, editais, releituras }, correlationId: context.correlationId });
     } catch (error) {
       return toApiError(error);
     }
