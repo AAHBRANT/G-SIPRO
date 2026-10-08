@@ -9,7 +9,13 @@ async function main(){
   if(!process.env.DATABASE_URL?.match(/@(?:localhost|127\.0\.0\.1):5433\/gsipro(?:\?|$)/))throw new Error("Smoke permitido somente no PostgreSQL local G-SIPRO em 5433.");
   const db=getDatabase(); const actor=await db.user.findFirstOrThrow({where:{status:"ACTIVE"}});
   const existingOpportunity=await db.opportunity.findUnique({where:{code:"OP-TESTE-I3-001"}});
-  const opportunity=existingOpportunity??await new OpportunityService(new PrismaOpportunityRepository()).create({code:"OP-TESTE-I3-001",origin:"PORTAL",subject:"Oportunidade sintética para proposta vinculada a edital e lote."},actor.id);
+  const created=existingOpportunity??await new OpportunityService(new PrismaOpportunityRepository()).create({origin:"PORTAL",subject:"Oportunidade sintética para proposta vinculada a edital e lote."},actor.id,undefined,undefined,"OP-TESTE-I3-001");
+  // Desde 25/07/2026 a proposta só nasce de oportunidade validada (ACTIVE) e
+  // delegada (com responsável). O cenário já entra nesse estado gravando
+  // direto: passar pela transição para ACTIVE dispararia a conversão
+  // automática em proposta — sem edital nem lote, que é justamente o que este
+  // smoke precisa vincular e conferir.
+  const opportunity=await db.opportunity.update({where:{id:created.id},data:{status:"ACTIVE",ownerId:actor.id}});
   let tender=await db.tender.findUnique({where:{code:"ED-TESTE-I3-001"},include:{versions:{orderBy:{version:"desc"}},lots:true}});
   if(!tender){tender=await db.$transaction(async tx=>{const created=await tx.tender.create({data:{id:randomUUID(),code:"ED-TESTE-I3-001",number:"001/I3",modality:"Sintética",subject:"Edital sintético do BL-301",origin:"Fonte sintética controlada BL-301",opportunityId:opportunity!.id,createdBy:actor.id,updatedBy:actor.id}});await tx.tenderLot.create({data:{id:randomUUID(),tenderId:created.id,code:"LOTE-I3-01",subject:"Lote sintético do BL-301",createdBy:actor.id,updatedBy:actor.id}});await tx.tenderVersion.create({data:{id:randomUUID(),tenderId:created.id,version:1,fileName:"edital-sintetico-bl301.pdf",fileHash:"3".repeat(64),source:"Fonte sintética controlada BL-301",receivedAt:new Date(),status:"VALIDATED",createdBy:actor.id}});return tx.tender.findUniqueOrThrow({where:{id:created.id},include:{versions:true,lots:true}})});}
   const version=tender.versions[0],lot=tender.lots[0]; if(!version||!lot)throw new Error("Cenário sintético incompleto.");
