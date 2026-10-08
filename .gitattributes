@@ -1,0 +1,3 @@
+# Scripts de shell precisam de LF: com CRLF (core.autocrlf=true no Windows) o
+# bash quebra com "command not found" no fim de cada linha.
+*.sh text eol=lf
