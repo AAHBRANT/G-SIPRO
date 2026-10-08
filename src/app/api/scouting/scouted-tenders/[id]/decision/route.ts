@@ -12,6 +12,7 @@ import {
   discardReasonSchema,
 } from "@/modules/scouting/application/triage-service";
 import { montarLicitacaoDaAprovacao } from "@/modules/scouting/application/licitacao-da-aprovacao-service";
+import { limparDuplicatasAutomaticamente } from "@/modules/scouting/application/limpeza-de-duplicatas-service";
 import { OpportunityFromScoutedTender, PrismaTriageRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 
 const commandSchema = z.discriminatedUnion("decision", [
@@ -35,6 +36,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       if (command.decision === "APPROVE") {
         const { opportunityId, reaproveitada } = await service.approve(id, authorization.actorId, context.correlationId);
+        // Depois de responder: varre o banco atrás de duplicata que tenha
+        // escapado (duas pessoas aprovando publicações gêmeas no mesmo
+        // instante, por exemplo) e resolve sozinha — sem botão.
+        after(() => limparDuplicatasAutomaticamente(authorization.actorId, context.correlationId));
         // Mesma obra já aprovada por outra publicação: a oportunidade e a ficha
         // dela já existem. Montar outra ficha aqui seria a duplicata de novo.
         if (reaproveitada) {

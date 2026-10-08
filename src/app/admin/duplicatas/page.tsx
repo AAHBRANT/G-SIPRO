@@ -39,7 +39,7 @@ export default async function DuplicatasPage() {
   const nada = plano.licitacoes.size === 0 && plano.grupos.length === 0;
 
   return <main className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-    <PageHeader eyebrow="Sistema" icon="dashboard" subtitle="Licitações e oportunidades da mesma obra que a aprovação do Buscador deixou duplicadas. Nada é alterado até você confirmar." title="Limpeza de duplicatas"/>
+    <PageHeader eyebrow="Sistema" icon="dashboard" subtitle="A limpeza roda sozinha depois de cada aprovação e na varredura semanal do Buscador. Esta tela só mostra o que estiver pendente agora — o botão abaixo é opcional." title="Limpeza de duplicatas"/>
 
     <section className="mt-6 grid gap-3 sm:grid-cols-3">
       <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Licitações a descartar da fila</p><p className="mt-1 text-3xl font-black text-slate-950">{plano.licitacoes.size}</p></div>
