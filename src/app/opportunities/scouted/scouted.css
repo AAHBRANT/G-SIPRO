@@ -1473,3 +1473,8 @@ button.bx-link:disabled { cursor: progress; opacity: 0.6; text-decoration: none;
 
 .bx-rodape-ficha { align-items: center; border-top: 1px solid var(--fio); display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; margin-top: 18px; padding-top: 14px; }
 .bx-rodape-ficha .bx-links { align-items: center; border-top: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 0; padding: 0; }
+
+/* Lista de documentos lidos na aba Edital (leitura com anexos, 22/10/2026). */
+.bx-docs-lidos { margin-top: 16px; }
+.bx-docs-lidos ul.bx-checklist { list-style: none; margin: 0; padding: 0; }
+.bx-docs-lidos .bx-link { overflow-wrap: anywhere; }

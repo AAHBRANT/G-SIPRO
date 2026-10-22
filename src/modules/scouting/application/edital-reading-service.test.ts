@@ -124,6 +124,7 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
         find: vi.fn(async () => ({
           tenderId: "t-1", executionId: "exec-0", readMethod: "AI" as const,
           source: { uri: "https://x", filename: "e.pdf", fileHash: "a".repeat(64), fetchedAt: new Date() },
+          documentos: [],
           requirement: { services: [], limitations: [] },
         })),
       },
@@ -147,6 +148,7 @@ describe("o que impede a leitura devolve motivo, e não exceção", () => {
         find: vi.fn(async () => ({
           tenderId: "t-1", executionId: "exec-0", readMethod: "AI" as const,
           source: { uri: "https://x", filename: "e.pdf", fileHash: "a".repeat(64), fetchedAt: new Date() },
+          documentos: [],
           requirement: { services: [], limitations: [] },
         })),
       },
@@ -795,5 +797,105 @@ describe("juntar a leitura do anexo com a do edital", () => {
 
     expect(somou.limitations).toContain('Complementado com a leitura de "EDITAL.pdf".');
     expect(nada.limitations).toEqual([]);
+  });
+});
+
+/**
+ * Leitura com anexos (pedido do dono, 22/10/2026): "às vezes no edital não se
+ * tem quase nada". A varredura lê o edital E o termo de referência, o
+ * memorial e os anexos relevantes — inclusive em Word — e junta tudo.
+ */
+describe("leitura sem IA com anexos", () => {
+  const PARCELAS_NO_TR = `e.2) Os atestados ou certidões solicitados deverão comprovar a execução
+de serviços de características semelhantes e de complexidade tecnológica
+equivalente ou superior as parcelas de maior relevância técnica ou valor
+significativo, que são:
+•   Execução de Pavimentação com Bloco Intertravado de no mínimo 656,95m²;
+•   Execução de Sub-Base para Pavimentação de no mínimo 135,33 m³;
+•   Execução de Microdrenagem de no mínimo 103 m.
+e.3) Será admitida, para fins de comprovação de quantitativo mínimo, a
+apresentação e o somatório de diferentes atestados executados de forma
+concomitante.`;
+  const EDITAL_QUASE_VAZIO = `2.3. Empresas reunidas sob a forma de consórcio ou quaisquer outras
+modalidades de associação; 2.3.1. Justificativa da vedação de empresa em
+consórcio. Conforme Acordão do Tribunal de Contas da União 2831/2012, onde
+atribui à Administração a prerrogativa de admitir a participação de
+consórcios, desde que faça justificativa. As exigências técnicas constam do Termo de Referência.
+9.1. A prestação de garantia de proposta, nos termos do art. 58 da Lei nº
+14.133/2021, é exigida de todos os licitantes, no valor correspondente a 1%
+(um por cento) do valor estimado da contratação.`;
+  const MEMORIAL = `27.1. Para mais informações referente a visita técnica entre em contato
+através do telefone (66) 3486-4400. 27.2. O Licitante poderá declinar do
+direito de realizar a vistoria técnica.`;
+  const CRONOGRAMA = "Cronograma físico-financeiro. Parcelas de maior relevância: Pavimentação 99.999 m²";
+
+  const textos: Record<string, string> = { tr: PARCELAS_NO_TR, edital: EDITAL_QUASE_VAZIO, memorial: MEMORIAL, cronograma: CRONOGRAMA };
+  const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  function cenario() {
+    return montar({
+      files: {
+        list: vi.fn(async () => [
+          arquivo({ title: "Edital", url: "https://pncp.gov.br/arquivos/1", sequence: 1 }),
+          arquivo({ title: "Termo de Referência", documentType: "Termo de Referência", url: "https://pncp.gov.br/arquivos/2", sequence: 2 }),
+          arquivo({ title: "Cronograma físico-financeiro", documentType: "Outros", url: "https://pncp.gov.br/arquivos/3", sequence: 3 }),
+          arquivo({ title: "Memorial Descritivo", documentType: "Outros", url: "https://pncp.gov.br/arquivos/4", sequence: 4 }),
+        ]),
+        download: vi.fn(async (file: TenderFile) => {
+          if (file.sequence === 2) return baixado({ filename: "TR.docx", mimeType: DOCX, bytes: Buffer.from("tr") });
+          if (file.sequence === 3) return baixado({ filename: "cronograma.pdf", bytes: Buffer.from("cronograma") });
+          if (file.sequence === 4) return baixado({ filename: "memorial.pdf", bytes: Buffer.from("memorial") });
+          return baixado({ filename: "edital.pdf", bytes: Buffer.from("edital") });
+        }),
+      },
+      pdfText: { extract: vi.fn(async (bytes: Buffer) => textos[bytes.toString()] ?? "") },
+    });
+  }
+
+  it("junta o que cada documento traz: parcelas do TR, consórcio e garantia do edital, visita do memorial", async () => {
+    const { service } = cenario();
+    const outcome = await service.read("t-1", auth, undefined, false, true);
+
+    if (outcome.status !== "READ") throw new Error(outcome.status);
+    const r = outcome.reading.requirement;
+    expect(r.services).toHaveLength(3);
+    expect(r.services[0]).toMatchObject({ quantity: 656.95 });
+    expect(r.consortiumAllowed).toBe(false);
+    expect(r.requiresProposalBond).toBe(true);
+    expect(r.requiresSiteVisit).toBe(false);
+  });
+
+  it("lê o termo de referência em Word e registra todos os documentos lidos, na ordem da régua", async () => {
+    const { service, pdfText, readings } = cenario();
+    await service.read("t-1", auth, undefined, false, true);
+
+    expect(pdfText.extract).toHaveBeenCalledWith(Buffer.from("tr"), "docx");
+    const gravado = vi.mocked(readings.save).mock.calls[0]?.[0];
+    expect(gravado?.documentos?.map((d) => d.filename)).toEqual(["TR.docx", "edital.pdf", "memorial.pdf"]);
+  });
+
+  it("não lê cronograma, pranchas nem orçamento, mesmo dizendo 'parcelas de maior relevância'", async () => {
+    const { service, pdfText } = cenario();
+    const outcome = await service.read("t-1", auth, undefined, false, true);
+
+    expect(vi.mocked(pdfText.extract).mock.calls.some(([bytes]) => bytes.toString() === "cronograma")).toBe(false);
+    if (outcome.status !== "READ") throw new Error(outcome.status);
+    expect(outcome.reading.requirement.services.some((s) => s.quantity === 99999)).toBe(false);
+  });
+
+  it("com o prazo da varredura vencido, lê só o documento principal", async () => {
+    const { service, readings } = cenario();
+    const outcome = await service.read("t-1", auth, undefined, false, true, Date.now() - 1);
+
+    expect(outcome.status).toBe("READ");
+    expect(vi.mocked(readings.save).mock.calls[0]?.[0].documentos).toHaveLength(1);
+  });
+
+  it("a leitura com IA continua só com PDF e sem os anexos novos", async () => {
+    const { service, extraction } = cenario();
+    await service.read("t-1", auth);
+
+    const lidos = vi.mocked(extraction.runEphemeral).mock.calls.map(([pedido]) => pedido.source.filename);
+    expect(lidos.some((nome) => nome.endsWith(".docx"))).toBe(false);
   });
 });

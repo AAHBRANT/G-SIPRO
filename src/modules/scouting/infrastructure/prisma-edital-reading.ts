@@ -17,6 +17,7 @@ import { AiExtractionService } from "@/modules/ai-extraction/application/ai-extr
 import { OpenAiResponsesProvider } from "@/modules/ai-extraction/infrastructure/openai-responses-provider";
 import { PrismaAiExtractionRepository } from "@/modules/ai-extraction/infrastructure/prisma-ai-extraction-repository";
 import type {
+  DocumentoLido,
   EditalExtractionPort,
   EditalReadingRepository,
   EditalReadMethod,
@@ -88,6 +89,7 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
       executionId?: string;
       readMethod: EditalReadMethod;
       source: EditalSource;
+      documentos?: readonly DocumentoLido[];
       requirement: EditalRequirement;
     }>,
     actorId: string | undefined,
@@ -100,10 +102,13 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
       sourceFilename: input.source.filename,
       sourceFileHash: input.source.fileHash,
       sourceFetchedAt: input.source.fetchedAt,
+      sourceDocuments: (input.documentos ?? []) as unknown as object,
       services: input.requirement.services as unknown as object,
       consortiumAllowed: input.requirement.consortiumAllowed ?? null,
       requiresCat: input.requirement.requiresCat ?? null,
       requiresSiteVisit: input.requirement.requiresSiteVisit ?? null,
+      // Até 22/10/2026 não havia esta coluna: a garantia era lida e se perdia.
+      requiresProposalBond: input.requirement.requiresProposalBond ?? null,
       confidence: input.requirement.confidence ?? null,
       limitations: input.requirement.limitations as unknown as object,
       // `?? null` não bastava: a varredura automática manda `actorId: ""`
@@ -148,6 +153,7 @@ export class PrismaEditalReadingRepository implements EditalReadingRepository {
             executionId: input.executionId,
             sourceUri: input.source.uri,
             sourceFileHash: input.source.fileHash,
+            documentsCount: input.documentos?.length ?? 1,
             servicesCount: input.requirement.services.length,
             limitationsCount: input.requirement.limitations.length,
             assistive: true,
@@ -202,10 +208,13 @@ export type EditalReadingRow = Readonly<{
   sourceFilename: string;
   sourceFileHash: string;
   sourceFetchedAt: Date;
+  /** Opcional só para quem monta a linha à mão (testes); o banco sempre traz. */
+  sourceDocuments?: unknown;
   services: unknown;
   consortiumAllowed: boolean | null;
   requiresCat: boolean | null;
   requiresSiteVisit: boolean | null;
+  requiresProposalBond?: boolean | null;
   confidence: unknown;
   limitations: unknown;
   reviewedAt: Date | null;
@@ -223,15 +232,26 @@ export function editalReadingFromRow(row: EditalReadingRow): StoredEditalReading
       fileHash: row.sourceFileHash,
       fetchedAt: row.sourceFetchedAt,
     },
+    documentos: documentosDaLinha(row.sourceDocuments),
     requirement: {
       services: Array.isArray(row.services) ? (row.services as RequiredService[]) : [],
       ...(row.consortiumAllowed !== null ? { consortiumAllowed: row.consortiumAllowed } : {}),
       ...(row.requiresCat !== null ? { requiresCat: row.requiresCat } : {}),
       ...(row.requiresSiteVisit !== null ? { requiresSiteVisit: row.requiresSiteVisit } : {}),
+      ...(row.requiresProposalBond !== null && row.requiresProposalBond !== undefined ? { requiresProposalBond: row.requiresProposalBond } : {}),
       // Decimal do Prisma não é number: comparar sem converter daria falso.
       ...(row.confidence !== null && row.confidence !== undefined ? { confidence: Number(row.confidence) } : {}),
       limitations: Array.isArray(row.limitations) ? (row.limitations as string[]) : [],
     },
     ...(row.reviewedAt ? { reviewedAt: row.reviewedAt } : {}),
   };
+}
+
+/** Só o que tem nome e endereço em texto; o resto da lista é ignorado. */
+function documentosDaLinha(valor: unknown): DocumentoLido[] {
+  if (!Array.isArray(valor)) return [];
+  return valor.flatMap((item) => {
+    const doc = item as { filename?: unknown; uri?: unknown } | null;
+    return doc && typeof doc.filename === "string" && typeof doc.uri === "string" ? [{ filename: doc.filename, uri: doc.uri }] : [];
+  });
 }

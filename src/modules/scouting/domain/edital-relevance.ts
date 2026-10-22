@@ -33,7 +33,7 @@
 import { normalizeText } from "@/modules/scouting/domain/qualification";
 
 /** Peso de quem não casou com nenhum padrão: entra depois dos conhecidos. */
-const PESO_NEUTRO = 50;
+export const PESO_NEUTRO = 50;
 
 /** Peso do edital: separa "documento que traz a exigência" de "o resto". */
 export const PESO_EDITAL = 30;

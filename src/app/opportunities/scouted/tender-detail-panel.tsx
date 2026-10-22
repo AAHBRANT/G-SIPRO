@@ -428,11 +428,22 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
                   arquivo foi lido — e o hash é o que denuncia edital
                   retificado depois da leitura. */}
               <div className="bx-fatos">
-                <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
+                <Linha rotulo="Documento principal" valor={tender.edital.source.filename}/>
                 <Linha rotulo="Lido em" valor={dataCurta(tender.edital.source.fetchedAt) ?? "—"}/>
-                <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
-                <Linha rotulo="Confiança da leitura" valor={tender.edital.requirement.confidence === undefined ? "—" : `${Math.round(tender.edital.requirement.confidence * 100)}%`}/>
+                <Linha rotulo="Documentos lidos" valor={String(Math.max(1, tender.edital.documentos.length))}/>
+                <Linha rotulo="SHA-256 do principal" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
               </div>
+              {/* Desde 22/10/2026 a leitura percorre edital e anexos: é aqui
+                  que a pessoa vê de quais arquivos veio o que está na tela. */}
+              {tender.edital.documentos.length > 0 && <div className="bx-docs-lidos">
+                <p className="bx-aba-resumo">Lido de</p>
+                <ul className="bx-checklist">
+                  {tender.edital.documentos.map((documento) => <li className="bx-motivo atende" key={`${documento.uri}|${documento.filename}`}>
+                    {tick}
+                    <a className="bx-link" href={documento.uri} rel="noreferrer" target="_blank">{documento.filename}</a>
+                  </li>)}
+                </ul>
+              </div>}
             </>
             : <p className="bx-nota">
               Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.

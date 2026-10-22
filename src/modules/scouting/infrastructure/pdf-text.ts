@@ -16,33 +16,59 @@
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 
-import type { PdfTextPort } from "@/modules/scouting/application/edital-reading-service";
+import type { FormatoDeTexto, PdfTextPort } from "@/modules/scouting/application/edital-reading-service";
+
+/**
+ * Teto de páginas por PDF. Desde 22/10/2026 a leitura percorre também os
+ * anexos, e um caderno de projeto com centenas de pranchas consumiria o
+ * orçamento de tempo da varredura inteira. A exigência técnica de edital,
+ * termo de referência e memorial está nas primeiras dezenas de páginas.
+ */
+export const MAX_PAGINAS_POR_PDF = 150;
 
 export async function extractPdfText(bytes: Buffer): Promise<string> {
-  const documento = await getDocument({
+  const carregamento = getDocument({
     data: new Uint8Array(bytes),
     useSystemFonts: true,
     disableFontFace: true,
-  }).promise;
+  });
+  const documento = await carregamento.promise;
 
-  const paginas: string[] = [];
-  for (let numero = 1; numero <= documento.numPages; numero += 1) {
-    const pagina = await documento.getPage(numero);
-    try {
-      const conteudo = await pagina.getTextContent();
-      const texto = conteudo.items
-        .map((item) => ("str" in item ? (item as TextItem).str : ""))
-        .join(" ");
-      paginas.push(texto);
-    } finally {
-      pagina.cleanup();
+  try {
+    const paginas: string[] = [];
+    const ultima = Math.min(documento.numPages, MAX_PAGINAS_POR_PDF);
+    for (let numero = 1; numero <= ultima; numero += 1) {
+      const pagina = await documento.getPage(numero);
+      try {
+        const conteudo = await pagina.getTextContent();
+        const texto = conteudo.items
+          .map((item) => ("str" in item ? (item as TextItem).str : ""))
+          .join(" ");
+        paginas.push(texto);
+      } finally {
+        pagina.cleanup();
+      }
     }
+    return paginas.join("\n");
+  } finally {
+    // Sem isto o documento inteiro fica preso na memória até o fim da
+    // requisição — e com vários anexos por licitação, isso soma.
+    await carregamento.destroy();
   }
-  return paginas.join("\n");
+}
+
+/**
+ * Texto de um .docx (termo de referência em Word é comum). Só o texto corrido:
+ * tabela vira linhas de texto, que é o que o leitor por padrão já espera.
+ */
+export async function extractDocxText(bytes: Buffer): Promise<string> {
+  const mammoth = await import("mammoth");
+  const { value } = await mammoth.extractRawText({ buffer: bytes });
+  return value;
 }
 
 export class PdfjsTextExtraction implements PdfTextPort {
-  extract(bytes: Buffer): Promise<string> {
-    return extractPdfText(bytes);
+  extract(bytes: Buffer, formato: FormatoDeTexto = "pdf"): Promise<string> {
+    return formato === "docx" ? extractDocxText(bytes) : extractPdfText(bytes);
   }
 }
