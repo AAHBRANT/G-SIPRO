@@ -3077,11 +3077,17 @@ model ScoutedTenderEditalReading {
   /// SHA-256 dos bytes lidos: denuncia edital retificado depois da leitura.
   sourceFileHash    String                 @db.Char(64)
   sourceFetchedAt   DateTime               @db.Timestamptz(6)
+  /// Documentos que a leitura percorreu (edital e anexos), como lista de
+  /// `{ filename, uri }`. Vazia nas leituras anteriores a 22/10/2026, quando
+  /// só um documento era lido — é assim que a varredura acha quem reler.
+  sourceDocuments   Json                   @default("[]")
   /// Parcelas de maior relevância, como a leitura as devolveu.
   services          Json
   consortiumAllowed Boolean?
   requiresCat       Boolean?
   requiresSiteVisit Boolean?
+  /// Garantia de proposta. Até 22/10/2026 era lida e se perdia ao gravar.
+  requiresProposalBond Boolean?
   confidence        Decimal?               @db.Decimal(5, 4)
   /// O que a leitura declarou não ter conseguido determinar.
   limitations       Json

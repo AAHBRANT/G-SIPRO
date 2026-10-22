@@ -209,9 +209,12 @@ async function readEditaisDaVarredura(
   // dos dois é — sem isto, o próximo passo seria chute de novo.
   const amostrasDeTextoChars: number[] = [];
   for (const tender of pendentes) {
-    if (Date.now() >= deadline) break;
+    // Com anexos, uma leitura demora mais: não começar a que não cabe.
+    if (Date.now() >= deadline - MARGEM_DA_RELEITURA_MS) break;
     try {
-      const resultado = await service.read(tender.id, auth, correlationId, false, true);
+      // A leitura com anexos para de abrir documento novo com folga antes do
+      // fim do orçamento (ver MARGEM_DA_RELEITURA_MS).
+      const resultado = await service.read(tender.id, auth, correlationId, false, true, deadline - MARGEM_DA_RELEITURA_MS);
       porStatus[resultado.status] = (porStatus[resultado.status] ?? 0) + 1;
       if (resultado.status === "READ") lidas += 1;
       else if (resultado.status === "FAILED" && amostrasDeErro.size < MAX_AMOSTRAS_DE_ERRO) amostrasDeErro.add(resultado.reason);
@@ -312,19 +315,31 @@ async function relerAcervoSemQuantitativo(
   // chave ausente e a chave com null.
   let candidatas: { tenderId: string }[];
   try {
+    // ⚠️ Segundo critério, de 22/10/2026: leitura SEM IA feita antes da
+    // leitura com anexos (`sourceDocuments` vazio) é relida para ganhar o
+    // termo de referência, o projeto básico e o memorial. É seguro reler as
+    // que já tinham quantitativo: o documento principal continua o mesmo e
+    // manda na junção — os anexos só preenchem lacuna e acrescentam parcela.
+    // Leitura feita POR IA nunca entra por aqui: trocá-la por casamento de
+    // padrão poderia piorá-la.
     candidatas = await getDatabase().$queryRaw<{ tenderId: string }[]>`
       SELECT r."tenderId"
       FROM scouted_tender_edital_readings r
       JOIN scouted_tenders t ON t.id = r."tenderId"
       WHERE r."reviewedAt" IS NULL
-        AND r."updatedAt" < ${CORTE_DA_CORRECAO_DE_ACERVO}
         AND t.status IN ('PENDING', 'APPROVED')
-        AND NOT EXISTS (
-          SELECT 1
-          FROM jsonb_array_elements(
-            CASE WHEN jsonb_typeof(r.services) = 'array' THEN r.services ELSE '[]'::jsonb END
-          ) s
-          WHERE s->>'quantity' IS NOT NULL
+        AND (
+          (r."readMethod" = 'PATTERN_MATCH' AND r."sourceDocuments" = '[]'::jsonb)
+          OR (
+            r."updatedAt" < ${CORTE_DA_CORRECAO_DE_ACERVO}
+            AND NOT EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(r.services) = 'array' THEN r.services ELSE '[]'::jsonb END
+              ) s
+              WHERE s->>'quantity' IS NOT NULL
+            )
+          )
         )
       ORDER BY random()
       LIMIT ${LOTE_RELEITURA}
@@ -357,7 +372,7 @@ async function relerAcervoSemQuantitativo(
     try {
       // `force` = true: é exatamente o caso que o parâmetro existe para
       // atender — leitura antiga errada por bug já corrigido no parser.
-      const resultado = await service.read(candidata.tenderId, auth, correlationId, true, true);
+      const resultado = await service.read(candidata.tenderId, auth, correlationId, true, true, deadline - MARGEM_DA_RELEITURA_MS);
       porStatus[resultado.status] = (porStatus[resultado.status] ?? 0) + 1;
       if (resultado.status === "READ") relidas += 1;
     } catch (erro) {

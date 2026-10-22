@@ -46,7 +46,7 @@ import {
   editalFields,
   type EditalRequirement,
 } from "@/modules/scouting/domain/edital-requirement";
-import { editalRelevance, isEdital } from "@/modules/scouting/domain/edital-relevance";
+import { editalRelevance, isEdital, PESO_NEUTRO } from "@/modules/scouting/domain/edital-relevance";
 import { completarAcervo, extrairQuantitativosDaDescricao, faltaAcervo } from "@/modules/scouting/domain/acervo-exigido";
 import { editalRequirementFromText } from "@/modules/scouting/domain/edital-text-requirement";
 import { parcelasEmListaCorrida } from "@/modules/scouting/domain/parcelas-em-lista";
@@ -68,6 +68,9 @@ export type EditalSource = Readonly<{
   fetchedAt: Date;
 }>;
 
+/** Um documento que a leitura percorreu — o edital ou um anexo. */
+export type DocumentoLido = Readonly<{ filename: string; uri: string }>;
+
 /** Como a leitura chegou ao resultado gravado. */
 export type EditalReadMethod = "AI" | "PATTERN_MATCH";
 
@@ -77,6 +80,11 @@ export type StoredEditalReading = Readonly<{
   executionId?: string;
   readMethod: EditalReadMethod;
   source: EditalSource;
+  /**
+   * Todos os documentos percorridos (edital e anexos). Vazio nas leituras
+   * anteriores a 22/10/2026, que liam um documento só.
+   */
+  documentos: readonly DocumentoLido[];
   requirement: EditalRequirement;
   reviewedAt?: Date;
 }>;
@@ -134,6 +142,7 @@ export interface EditalReadingRepository {
       executionId?: string;
       readMethod: EditalReadMethod;
       source: EditalSource;
+      documentos?: readonly DocumentoLido[];
       requirement: EditalRequirement;
     }>,
     /** Ausente quando a leitura foi disparada pela varredura, sem usuário. */
@@ -148,8 +157,12 @@ export interface EditalReadingRepository {
  * `pdfjs-dist`, só sabe que existe algo que devolve texto a partir de bytes.
  */
 export interface PdfTextPort {
-  extract(bytes: Buffer): Promise<string>;
+  /** `formato` ausente é PDF — o único que existia até 22/10/2026. */
+  extract(bytes: Buffer, formato?: FormatoDeTexto): Promise<string>;
 }
+
+/** O que o leitor sem IA sabe transformar em texto. */
+export type FormatoDeTexto = "pdf" | "docx";
 
 /**
  * Só PDF. O provedor aprovado manda o arquivo como `input_file` em base64, e o
@@ -162,6 +175,61 @@ export interface PdfTextPort {
  */
 const isPdf = (file: DownloadedFile): boolean => file.mimeType === "application/pdf";
 const pdfPeloNome = (filename: string): boolean => /\.pdf$/i.test(filename.trim());
+
+/**
+ * Word (.docx) entra só na leitura sem IA, desde 22/10/2026 — muito termo de
+ * referência é publicado assim. O .doc antigo (binário) continua de fora: não
+ * há leitor confiável dele sem ferramenta externa.
+ */
+const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const isDocx = (file: DownloadedFile): boolean => file.mimeType === DOCX;
+const docxPeloNome = (filename: string): boolean => /\.docx$/i.test(filename.trim());
+
+/**
+ * LEITURA COM ANEXOS (pedido do dono, 22/10/2026): "às vezes no edital não se
+ * tem quase nada". A leitura sem IA deixa de parar no primeiro par edital +
+ * documento técnico e percorre também termo de referência, projeto básico,
+ * memorial e anexos gerais.
+ *
+ * Ficam de fora pranchas, planilha
+ * orçamentária, cronograma, curva ABC. É decisão anterior do dono não trazer
+ * o orçamento para a exigência: dezenas de itens com unidade afogariam as
+ * poucas parcelas que decidem habilitação.
+ */
+/**
+ * Anexo só entra quando o nome ou o tipo diz o que ele é: qualificação
+ * técnica, termo de referência, projeto básico/executivo, edital, memorial ou
+ * anexo (peso abaixo do neutro). Medido no PNCP real (22/10/2026): pacotes
+ * "Projeto Executivo" trazem dezenas de pranchas com nome genérico ("EST-01",
+ * "ARQ_PE_10") que não dizem "prancha" e passavam pelo filtro de peso 90 —
+ * 60 s de leitura de desenho, e o edital da mesma licitação nem foi baixado.
+ */
+const anexoRelevante = (documento: Readable): boolean => documento.weight < PESO_NEUTRO;
+/**
+ * Pacote que não vale baixar depois do principal: desenho CAD (não vira
+ * texto) e pacote (.rar/.zip/.7z) cujo NOME não diz que é documento — o
+ * "TRI_ARQ_PDF.part3.rar" marcado como "Projeto Executivo" é caderno de
+ * pranchas de até 40 MB. Medido no PNCP real: baixá-los dobrava o tempo da
+ * licitação (36 s → 73 s) sem trazer nada. "TRI_ARQ_MEMORIAL.rar" passa, porque
+ * o nome diz memorial.
+ */
+const pacoteDeDesenho = (file: TenderFile): boolean =>
+  /(^|[^a-z])dwg([^a-z]|$)/i.test(`${file.title} ${file.documentType}`)
+  || (/\.(rar|zip|7z)$/i.test(file.title.trim()) && editalRelevance(file.title) >= PESO_NEUTRO);
+/**
+ * Nome legível para a lista "Lido de". Há órgão que publica tudo como
+ * "57130.pdf": aí o título do PNCP é o único nome que diz algo.
+ */
+const nomeLegivel = (titulo: string, arquivo: string): string => {
+  if (!/^\d+\.[a-z0-9]+$/i.test(arquivo.trim())) return arquivo;
+  const extensao = arquivo.slice(arquivo.lastIndexOf("."));
+  return titulo.toLowerCase().endsWith(extensao.toLowerCase()) ? titulo : `${titulo}${extensao}`;
+};
+/** Quantos documentos relevantes ler por licitação, no máximo. */
+const MAX_DOCUMENTOS_LIDOS = 6;
+/** Quantos arquivos publicados baixar, no máximo, na leitura com anexos. */
+const MAX_DOWNLOADS_COM_ANEXOS = 12;
+const passou = (deadline: number | undefined): boolean => deadline !== undefined && Date.now() >= deadline;
 
 /**
  * Quantos arquivos publicados baixar depois de já ter algo legível em mãos.
@@ -202,6 +270,8 @@ type Readable = Readonly<{
   label: string;
   /** Como o órgão classificou o arquivo publicado. */
   documentType: string;
+  /** PDF ou Word. A IA só recebe PDF; o leitor sem IA aceita os dois. */
+  formato: FormatoDeTexto;
   read: () => Promise<Buffer>;
 }>;
 
@@ -301,6 +371,9 @@ export class EditalReadingService {
     // 800+ licitações por domingo a ~250 s cada de IA seria um lote de dias;
     // sem IA é leitura de texto, e roda no tempo da própria varredura.
     onlyPatternMatch = false,
+    // Momento-limite da varredura (Date.now()). A leitura com anexos para de
+    // abrir documento novo quando ele passa — o principal é sempre lido.
+    deadline?: number,
   ): Promise<EditalReadingOutcome> {
     const tender = await this.readings.tender(tenderId);
     if (!tender) return { status: "TENDER_NOT_FOUND" };
@@ -326,7 +399,7 @@ export class EditalReadingService {
       const candidates = await this.files.list(identifier.authorityDocument, identifier.year, identifier.sequence);
       if (candidates.length === 0) return { status: "NO_FILE" };
 
-      const { pool, oversized } = await this.gather(candidates);
+      const { pool, oversized } = await this.gather(candidates, onlyPatternMatch, deadline);
       if (pool.length === 0) {
         return oversized ? { status: "FILE_TOO_LARGE", title: oversized.title } : { status: "NO_FILE" };
       }
@@ -334,6 +407,7 @@ export class EditalReadingService {
       // Menor peso primeiro: justificativa de qualificação técnica, termo de
       // referência, projeto básico, edital, o resto.
       const ordenados = [...pool].sort((a, b) => a.weight - b.weight || a.order - b.order);
+      let documentosLidos: readonly Readable[] = [];
 
       // ⚠️ Descompactar é o primeiro momento em que o conteúdo do membro é
       // tocado de verdade: a listagem só leu cabeçalhos. Um PDF compactado em
@@ -420,12 +494,14 @@ export class EditalReadingService {
           executionIdGravado = undefined;
         }
       } else {
-        // onlyPatternMatch: sem IA desde o início, não só como reforço.
-        const semIA = await this.tentarSemIA(principal, bytes, complemento);
+        // onlyPatternMatch: sem IA desde o início, e desde 22/10/2026 lendo o
+        // edital E os anexos relevantes, não só o par principal + edital.
+        const semIA = await this.lerComAnexos(ordenados, principal, bytes, deadline);
         if (!semIA.requirement) {
           return { status: "NOTHING_EXTRACTED", textoChars: semIA.textoChars, ...(semIA.erroExtracao ? { erroExtracao: semIA.erroExtracao } : {}) };
         }
         requirement = semIA.requirement;
+        documentosLidos = semIA.lidos;
         readMethod = "PATTERN_MATCH";
         executionIdGravado = undefined;
       }
@@ -454,8 +530,9 @@ export class EditalReadingService {
       // de Bicas/MG (01612516000150-1-000304/2026): edital único, com a lista
       // de parcelas e os quantitativos dentro dele, e a tela mostrando
       // "estimado a partir do objeto".
-      if (faltaAcervo(requirement)) {
-        requirement = await this.completarAcervoComAnexos(requirement, ordenados, []);
+      // Na leitura com anexos os documentos já lidos não são abertos de novo.
+      if (faltaAcervo(requirement) && !passou(deadline)) {
+        requirement = await this.completarAcervoComAnexos(requirement, ordenados, documentosLidos);
       }
 
       const reading = await this.readings.save(
@@ -467,6 +544,8 @@ export class EditalReadingService {
           // estava dentro dele: é esse o link que o cartão oferece, e é o que a
           // pessoa precisa abrir para baixar o pacote sem navegar o portal.
           source: { uri: principal.uri, filename: principal.label, fileHash, fetchedAt: new Date() },
+          documentos: (documentosLidos.length > 0 ? documentosLidos : [principal])
+            .map((documento) => ({ filename: documento.label, uri: documento.uri })),
           requirement,
         },
         // A varredura chama sem sessão de usuário — não há quem apontar.
@@ -490,18 +569,35 @@ export class EditalReadingService {
    */
   private async gather(
     candidates: readonly TenderFile[],
+    // Leitura com anexos (sem IA): não para no primeiro par edital +
+    // documento técnico, aceita Word e respeita o prazo da varredura.
+    comAnexos = false,
+    deadline?: number,
   ): Promise<Readonly<{ pool: readonly Readable[]; oversized?: TenderFile }>> {
     const pool: Readable[] = [];
     let oversized: TenderFile | undefined;
     let baixados = 0;
+    const relevantes = () => pool.filter(anexoRelevante).length;
 
     for (const candidate of candidates) {
-      // Já temos o documento das parcelas E o edital: mais download não muda a
-      // leitura, só atrasa.
-      if (pool.some((d) => !d.ehEdital) && pool.some((d) => d.ehEdital)) break;
-      // O teto barato só vale quando já há algo legível; sem nada em mãos, vale
-      // o teto absoluto.
-      if (baixados >= (pool.length > 0 ? MAX_DOWNLOADS_COM_ACHADO : MAX_DOWNLOADS)) break;
+      if (comAnexos) {
+        // Prazo vencido só para quem já tem algo em mãos: sem nenhum documento,
+        // desistir aqui perderia a licitação inteira por meio segundo.
+        if (pool.length > 0 && passou(deadline)) break;
+        if (relevantes() >= MAX_DOCUMENTOS_LIDOS) break;
+        if (baixados >= MAX_DOWNLOADS_COM_ANEXOS) break;
+        // Com o principal em mãos, só vale baixar o que tem chance de ser
+        // documento: tipo genérico ("Outros Documentos", planilhas, minuta) e
+        // pacote de DWG ficam de fora — o tempo vai para o edital e os anexos.
+        if (pool.length > 0 && (editalRelevance(candidate.documentType, candidate.title) >= PESO_NEUTRO || pacoteDeDesenho(candidate))) continue;
+      } else {
+        // Já temos o documento das parcelas E o edital: mais download não muda a
+        // leitura, só atrasa.
+        if (pool.some((d) => !d.ehEdital) && pool.some((d) => d.ehEdital)) break;
+        // O teto barato só vale quando já há algo legível; sem nada em mãos, vale
+        // o teto absoluto.
+        if (baixados >= (pool.length > 0 ? MAX_DOWNLOADS_COM_ACHADO : MAX_DOWNLOADS)) break;
+      }
 
       let file: DownloadedFile | null;
       try {
@@ -518,14 +614,16 @@ export class EditalReadingService {
 
       const membros = await listArchive(file);
       if (membros.length === 0) {
-        if (isPdf(file)) {
+        const formato: FormatoDeTexto | undefined = isPdf(file) ? "pdf" : comAnexos && isDocx(file) ? "docx" : undefined;
+        if (formato) {
           pool.push({
             weight: editalRelevance(candidate.documentType, candidate.title, file.filename),
             ehEdital: isEdital(candidate.documentType, candidate.title, file.filename),
             order: pool.length,
             uri: candidate.url,
-            label: encurtar(file.filename),
+            label: encurtar(comAnexos ? nomeLegivel(candidate.title, file.filename) : file.filename),
             documentType: candidate.documentType,
+            formato,
             read: async () => file.bytes,
           });
         }
@@ -533,7 +631,8 @@ export class EditalReadingService {
       }
 
       for (const membro of membros) {
-        if (!pdfPeloNome(membro.filename)) continue;
+        const formato: FormatoDeTexto | undefined = pdfPeloNome(membro.filename) ? "pdf" : comAnexos && docxPeloNome(membro.filename) ? "docx" : undefined;
+        if (!formato) continue;
         pool.push({
           weight: editalRelevance(membro.filename),
           ehEdital: isEdital(membro.filename),
@@ -541,6 +640,7 @@ export class EditalReadingService {
           uri: candidate.url,
           label: encurtar(membro.path),
           documentType: candidate.documentType,
+          formato,
           read: () => membro.read(),
         });
       }
@@ -628,7 +728,7 @@ export class EditalReadingService {
       tentativas += 1;
 
       try {
-        const texto = await this.pdfText.extract(await candidato.read());
+        const texto = await this.pdfText.extract(await candidato.read(), candidato.formato);
         const doAnexo = editalRequirementFromText(texto);
         // Segundo formato de edital: a exigência vem em lista corrida, não em
         // tabela — ver `parcelas-em-lista`. O leitor de tabela devolve vazio
@@ -648,6 +748,71 @@ export class EditalReadingService {
     }
 
     return requirement;
+  }
+
+  /**
+   * Lê o principal e os anexos relevantes, na ordem da régua de relevância,
+   * e junta tudo numa exigência só.
+   *
+   * Cada documento é lido por inteiro pelo mesmo leitor de sempre (tabela de
+   * parcelas, lista corrida, consórcio, CAT, visita, garantia). A junção segue
+   * a regra que já existia para o complemento: o que veio antes manda, o
+   * documento seguinte só preenche lacuna e acrescenta parcela que ainda não
+   * estava na lista — nunca sobrescreve.
+   *
+   * O principal é sempre lido. Os demais param no teto de documentos ou
+   * quando o prazo da varredura passa. Documento ilegível (escaneado, Word
+   * corrompido) é pulado; só a falha do principal vira motivo na resposta.
+   */
+  private async lerComAnexos(
+    ordenados: readonly Readable[],
+    principal: Readable,
+    bytesDoPrincipal: Buffer,
+    deadline: number | undefined,
+  ): Promise<Readonly<{ requirement: EditalRequirement | undefined; textoChars: number; erroExtracao?: string; lidos: readonly Readable[] }>> {
+    const fila = [principal, ...ordenados.filter((d) => d !== principal && anexoRelevante(d))]
+      .slice(0, MAX_DOCUMENTOS_LIDOS);
+    const lidos: Readable[] = [];
+    let requirement: EditalRequirement | undefined;
+    let textoChars = 0;
+    let erroExtracao: string | undefined;
+
+    for (const documento of fila) {
+      if (documento !== principal && passou(deadline)) break;
+      let texto: string;
+      try {
+        texto = await this.pdfText.extract(documento === principal ? bytesDoPrincipal : await documento.read(), documento.formato);
+      } catch (erro) {
+        if (documento === principal) { textoChars = -1; erroExtracao = message(erro).slice(0, 300); }
+        continue;
+      }
+      if (texto.trim().length === 0) continue;
+      textoChars += texto.length;
+      lidos.push(documento);
+
+      let doDocumento: EditalRequirement;
+      try {
+        const lido = editalRequirementFromText(texto);
+        const emLista = parcelasEmListaCorrida(texto);
+        doDocumento = emLista.length > 0 ? completarAcervo(lido, { ...lido, services: emLista }) : lido;
+      } catch (erro) {
+        if (documento === principal) erroExtracao = message(erro).slice(0, 300);
+        continue;
+      }
+      requirement = requirement
+        ? completarAcervo(mergeReadings(requirement, doDocumento, documento.label), doDocumento)
+        : doDocumento;
+    }
+
+    const vazio = !requirement || (requirement.services.length === 0 && requirement.consortiumAllowed === undefined
+      && requirement.requiresCat === undefined && requirement.requiresSiteVisit === undefined
+      && requirement.requiresProposalBond === undefined);
+    return {
+      requirement: vazio ? undefined : requirement,
+      textoChars: lidos.length === 0 && textoChars === 0 && erroExtracao ? -1 : textoChars,
+      ...(erroExtracao ? { erroExtracao } : {}),
+      lidos,
+    };
   }
 
   private async tentarSemIA(
