@@ -6,13 +6,18 @@ import { getCurrentAuthorizationContext } from "@/core/authorization/authorizati
 import { authorize } from "@/core/authorization/policy";
 import { getDatabase } from "@/core/database/prisma";
 import type { Prisma } from "@/generated/prisma/client";
+import { ufPorSigla } from "@/modules/analysis/domain/malha-uf";
+import { projetar } from "@/modules/analysis/domain/territorio";
+import { acharMunicipio } from "@/modules/analysis/infrastructure/municipios-brasil";
 import { computeAdherence, type AdherenceInput } from "@/modules/scouting/domain/adherence";
+import type { PontoDaFila } from "@/modules/scouting/domain/fila-no-mapa";
 import { findDuplicates } from "@/modules/scouting/domain/duplicates";
 import { rotulosDeEsfera as sphereLabels } from "@/modules/scouting/domain/esfera";
 import { regionOf, regions, statesOfRegions } from "@/modules/scouting/domain/regions";
 import { defaultScoutFilter, scoutWorkTypes, type ScoutFilter, type ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
 import { PrismaArchiveEvidenceRepository, PrismaScoutRepository } from "@/modules/scouting/infrastructure/prisma-scouting-repository";
 import { scoreTender } from "@/modules/scouting/application/score-tender";
+import { FilaNoMapa } from "./fila-no-mapa";
 import { TenderDetailPanel, TenderSummaryHeader, workTypeLabels } from "./tender-detail-panel";
 import { filtersBootScript, ScoutedFilters, type FilterGroup } from "./scouted-filters";
 import { ThemeToggle, themeBootScript, THEME_ROOT_ID } from "./theme-toggle";
@@ -90,6 +95,8 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
   const includeUndisclosed = one(params.sig) !== "0";
   const adherenceFloor = Math.max(0, Math.min(100, Number(one(params.ader) ?? 0) || 0));
   const sort = one(params.sort) ?? "aderencia";
+  // Estado escolhido no mapa. Só aceita sigla que existe na malha do IBGE.
+  const ufSelecionada = ufPorSigla(one(params.uf))?.sigla;
 
   /**
    * Busca por texto e faixa de valor produzem, cada uma, um grupo OR. Escritas
@@ -187,9 +194,40 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
    *   tem pré-requisitos baixos por FALTA DE DADO. Um piso contra esse número
    *   esconderia justamente o represado que ainda precisa ser lido.
    */
-  const kept = adherenceFloor > 0
+  const keptNaFila = adherenceFloor > 0
     ? comRequisitos.filter((tender) => tender.archive.score >= adherenceFloor)
     : comRequisitos;
+  /**
+   * O estado escolhido no mapa corta SÓ a lista. O mapa continua recebendo a
+   * fila filtrada do país inteiro — senão, ao entrar no Paraná, os outros
+   * estados ficariam brancos e não daria para comparar nem trocar de estado.
+   */
+  const kept = ufSelecionada ? keptNaFila.filter((tender) => tender.state === ufSelecionada) : keptNaFila;
+
+  /**
+   * Um ponto por licitação, na sede do município do órgão — a mesma base de
+   * coordenadas da Análise. A tabela de municípios fica no servidor: o
+   * navegador recebe só a posição já projetada de quem está na fila.
+   */
+  const pontos: PontoDaFila[] = keptNaFila.map((tender) => {
+    const municipio = acharMunicipio(tender.city, tender.state);
+    const posicao = municipio ? projetar(municipio.latitude, municipio.longitude) : undefined;
+    return {
+      id: tender.id,
+      subject: tender.subject,
+      authorityName: tender.authorityName,
+      ...(tender.city ? { cidade: tender.city } : {}),
+      ...(tender.state ? { uf: tender.state } : {}),
+      ...(tender.estimatedValue !== undefined && tender.estimatedValue !== null ? { valor: Number(tender.estimatedValue) } : {}),
+      sigiloso: tender.valueUndisclosed,
+      ...(tender.days !== undefined ? { dias: tender.days } : {}),
+      ...(tender.proposalClosesAt ? { encerramento: tender.proposalClosesAt.toISOString() } : {}),
+      score: tender.score,
+      atendidos: tender.resumo.met,
+      totalDeRequisitos: tender.resumo.total,
+      ...(posicao ? { x: Math.round(posicao.x * 10) / 10, y: Math.round(posicao.y * 10) / 10 } : {}),
+    };
+  });
   const ordered = sort === "aderencia"
     ? [...kept].sort((a, b) => b.score - a.score
         // Empate em pré-requisitos: decide o acervo, e sem acervo julgado vai
@@ -203,7 +241,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
    * sobre a página: a irmã da linha visível costuma estar na página seguinte,
    * e um aviso que só aparece quando as duas caem juntas na tela não serve.
    */
-  const duplicadas = findDuplicates(kept.map((tender) => ({
+  const duplicadas = findDuplicates(keptNaFila.map((tender) => ({
     id: tender.id,
     ...(tender.authorityDocument ? { authorityDocument: tender.authorityDocument } : {}),
     authorityName: tender.authorityName,
@@ -259,21 +297,21 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       <ScoutedFilters groups={groups} sortOptions={sortOptions}/>
 
       <div>
-    <section className="bx-mesa">
-      <header className="bx-relacao">
-        <h2>
-          Relação de rastreadas
-          <span className="total">{kept.length === total ? total : `${kept.length} de ${total}`}</span>
-        </h2>
-        <p>
-          {kept.length > tenders.length && <>Mostrando as <strong>{tenders.length}</strong> primeiras · </>}
-          {semJulgamento > 0 && <><strong>{semJulgamento}</strong> fora do corte por acervo não julgado · </>}
-          {truncated && <>Fila maior que {QUEUE_CAP}; a contagem por exigência técnica considera as {QUEUE_CAP} primeiras · </>}
-          Ordenado por <strong>{sortOptions.find((option) => option.value === sort)?.label.toLowerCase()}</strong>
-        </p>
-      </header>
-
-      <div>
+    <FilaNoMapa
+      canDecide={canDecide}
+      pontos={pontos}
+      resumo={<p>
+        {kept.length > tenders.length && <>Mostrando as <strong>{tenders.length}</strong> primeiras · </>}
+        {semJulgamento > 0 && <><strong>{semJulgamento}</strong> fora do corte por acervo não julgado · </>}
+        {truncated && <>Fila maior que {QUEUE_CAP}; a contagem por exigência técnica considera as {QUEUE_CAP} primeiras · </>}
+        Ordenado por <strong>{sortOptions.find((option) => option.value === sort)?.label.toLowerCase()}</strong>
+      </p>}
+      titulo={<h2>
+        Relação de rastreadas
+        <span className="total">{kept.length === total ? total : `${kept.length} de ${total}`}</span>
+      </h2>}
+      uf={ufSelecionada}
+    >
         {tenders.map((tender) => {
           const signal = tender.signal;
           return <details
@@ -305,8 +343,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
           <p>{total === 0 ? "Nenhuma licitação aguardando triagem" : "Nada com esses filtros"}</p>
           <span>{total === 0 ? "A próxima varredura ocorre no domingo." : "Baixe a exigência técnica mínima ou desmarque alguma região."}</span>
         </div>}
-      </div>
-        </section>
+    </FilaNoMapa>
       </div>
     </div>
     </div>
