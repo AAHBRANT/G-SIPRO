@@ -17,6 +17,7 @@ import { BaixarDocumentos } from "@/app/opportunities/scouted/baixar-documentos"
 import { AdherenceGauge } from "./adherence-gauge";
 import { Flag, SignalActions } from "./signal-actions";
 import { ShareTenderAction } from "./share-tender-action";
+import { LocalNoMapa } from "./local-no-mapa";
 import { TriageActions, type Decisao } from "./triage-actions";
 // Este componente aparece fora de /opportunities/scouted também (janelinha do
 // mapa da Análise): o import garante que as classes bx-* cheguem junto,
@@ -181,7 +182,7 @@ export function TenderSummaryHeader({
 
       <div className="bx-num">
         <p className={value ? "bx-valor" : "bx-valor sigiloso"}>{value ?? "Sigiloso"}</p>
-        <p className="bx-local">{tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}</p>
+        <LocalNoMapa texto={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"} uf={tender.state ?? undefined}/>
       </div>
 
       <div className="bx-num bx-prazo">

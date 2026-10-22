@@ -1308,3 +1308,123 @@ button.bx-link:disabled { cursor: progress; opacity: 0.6; text-decoration: none;
 .bx-placar .falta b { color: var(--vinho); }
 .bx[data-tema="escuro"] .bx-placar .falta b { color: var(--bege); }
 .bx-placar .duvida b { color: var(--texto-2); }
+
+/* ---------- fila no mapa (22/10/2026) ----------
+   Seletor Lista / Mapa / Lista + mapa no cabeçalho preto da relação, e o
+   mesmo mapa do Brasil da Análise (malha do IBGE, mesma escala em vinho).
+   Ponto colorido pelo prazo, com o corte de 14 dias do cartão de prazo curto. */
+
+.bx {
+  --mapa-0: #ece6e5; --mapa-1: #e2cfcd; --mapa-2: #c9a3a0; --mapa-3: #a86d69; --mapa-4: #874140; --mapa-5: #670000;
+  --mapa-borda: #ffffff;
+  --prazo-curto: #b01d1d; --prazo-medio: #b86e00; --prazo-folgado: #2f7d4f;
+}
+.bx[data-tema="escuro"] {
+  --mapa-0: #2b2523; --mapa-1: #43302d; --mapa-2: #633935; --mapa-3: #8a433d; --mapa-4: #b24c44; --mapa-5: #dc5b50;
+  --mapa-borda: #0d0b0b;
+  --prazo-curto: #ff7b72; --prazo-medio: #f2b24b; --prazo-folgado: #6fd39b;
+}
+
+.bx-relacao-dir { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: flex-end; }
+.bx-vistas { background: rgba(255, 255, 255, 0.1); border-radius: 9px; display: inline-flex; gap: 2px; padding: 3px; }
+.bx-vistas button { align-items: center; background: transparent; border: 0; border-radius: 7px; color: rgba(255, 255, 255, 0.72); cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 600; gap: 6px; height: 28px; padding: 0 11px; }
+.bx-vistas button svg { height: 14px; width: 14px; }
+.bx-vistas button:hover { color: var(--branco); }
+.bx-vistas button[aria-pressed="true"] { background: var(--branco); color: var(--vinho); }
+
+.bx-mapa-zona { border-bottom: 1px solid var(--fio); display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+.bx-vista-mapa .bx-mapa-zona { border-bottom: 0; }
+@media (max-width: 900px) { .bx-mapa-zona { grid-template-columns: minmax(0, 1fr); } }
+.bx-mapa-col { align-content: start; display: grid; gap: 10px; min-width: 0; padding: 16px 18px; }
+.bx-mapa-ferramentas { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.bx-mapa-dica { color: var(--texto-2); font-size: 12px; }
+.bx-mapa-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bx-mapa-seg { border: 1px solid var(--fio-forte); border-radius: var(--r-p); display: inline-flex; overflow: hidden; }
+.bx-mapa-seg button { background: transparent; border: 0; color: var(--texto-2); cursor: pointer; font-size: 12px; font-weight: 600; padding: 5px 10px; }
+.bx-mapa-seg button[aria-pressed="true"] { background: var(--acento-fundo); color: var(--acento); }
+.bx-mapa-zoom { display: inline-flex; gap: 4px; }
+.bx-mapa-zoom button { background: transparent; border: 1px solid var(--fio-forte); border-radius: 6px; color: var(--texto); cursor: pointer; font-size: 12px; font-weight: 600; height: 28px; min-width: 28px; padding: 0 8px; }
+.bx-mapa-zoom button:disabled { cursor: default; opacity: 0.4; }
+
+.bx-mapa { display: block; height: auto; max-height: 540px; width: 100%; }
+.bx-vista-ambos .bx-mapa { max-height: 420px; }
+.bx-mapa-uf { cursor: pointer; stroke: var(--mapa-borda); stroke-width: 0.8; transition: opacity 0.15s; }
+.bx-mapa-uf:hover { opacity: 0.82; }
+.bx-mapa-uf.apagado { opacity: 0.32; }
+.bx-mapa-uf.n0 { fill: var(--mapa-0); }
+.bx-mapa-uf.n1 { fill: var(--mapa-1); }
+.bx-mapa-uf.n2 { fill: var(--mapa-2); }
+.bx-mapa-uf.n3 { fill: var(--mapa-3); }
+.bx-mapa-uf.n4 { fill: var(--mapa-4); }
+.bx-mapa-uf.n5 { fill: var(--mapa-5); }
+.bx-mapa-legenda .n0 { background: var(--mapa-0); }
+.bx-mapa-legenda .n1 { background: var(--mapa-1); }
+.bx-mapa-legenda .n2 { background: var(--mapa-2); }
+.bx-mapa-legenda .n3 { background: var(--mapa-3); }
+.bx-mapa-legenda .n4 { background: var(--mapa-4); }
+.bx-mapa-legenda .n5 { background: var(--mapa-5); }
+.bx-mapa-sigla { fill: var(--texto); font-weight: 700; paint-order: stroke; pointer-events: none; stroke: var(--sobre); }
+.bx-mapa-ponto { cursor: pointer; --cor: var(--texto-2); }
+.bx-mapa-ponto.curto { --cor: var(--prazo-curto); }
+.bx-mapa-ponto.medio { --cor: var(--prazo-medio); }
+.bx-mapa-ponto.folgado { --cor: var(--prazo-folgado); }
+.bx-mapa-ponto .miolo { fill: var(--cor); stroke: var(--sobre); }
+.bx-mapa-ponto .halo { fill: var(--cor); opacity: 0; transition: opacity 0.15s; }
+.bx-mapa-ponto:hover .halo, .bx-mapa-ponto.ativo .halo { opacity: 0.32; }
+.bx-mapa-ponto.ativo .miolo { stroke: var(--texto); }
+.bx-mapa-ponto text { fill: #ffffff; font-weight: 800; pointer-events: none; }
+
+.bx-mapa-legenda { align-items: center; color: var(--texto-2); display: flex; flex-wrap: wrap; font-size: 11.5px; gap: 8px 14px; }
+.bx-mapa-legenda .escala { align-items: center; display: inline-flex; gap: 3px; }
+.bx-mapa-legenda .escala i { border-radius: 2px; display: inline-block; height: 9px; width: 20px; }
+.bx-mapa-legenda .ponto { align-items: center; display: inline-flex; gap: 5px; }
+.bx-mapa-legenda .ponto i { border-radius: 50%; display: inline-block; height: 10px; width: 10px; }
+.bx-mapa-legenda .curto i { background: var(--prazo-curto); }
+.bx-mapa-legenda .medio i { background: var(--prazo-medio); }
+.bx-mapa-legenda .folgado i { background: var(--prazo-folgado); }
+.bx-mapa-legenda .varias i { border: 2px solid var(--texto-2); }
+
+.bx-mapa-lado { align-content: start; border-left: 1px solid var(--fio); display: grid; gap: 16px; padding: 18px; }
+@media (max-width: 900px) { .bx-mapa-lado { border-left: 0; border-top: 1px solid var(--fio); } }
+.bx-mapa-k { color: var(--acento); font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.bx-mapa-nome { font-size: 15px; font-weight: 700; margin-top: 2px; }
+.bx-mapa-grande { font-size: 38px; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-top: 4px; }
+.bx-mapa-sub { color: var(--texto-2); font-size: 12px; margin-top: 4px; }
+.bx-mapa-fatos { border-top: 1px solid var(--fio); display: grid; gap: 10px 12px; grid-template-columns: 1fr 1fr; margin: 0; padding-top: 12px; }
+.bx-mapa-fatos dt { color: var(--texto-2); font-size: 11.5px; }
+.bx-mapa-fatos dd { font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 700; margin: 0; }
+.bx-mapa-ranking { display: grid; gap: 1px; list-style: none; margin: 6px 0 0; padding: 0; }
+.bx-mapa-ranking button { align-items: center; background: none; border: 0; border-radius: 6px; color: var(--texto); cursor: pointer; display: grid; gap: 4px 8px; grid-template-columns: 22px minmax(0, 1fr) auto; padding: 6px 4px; text-align: left; width: 100%; }
+.bx-mapa-ranking button:hover { background: var(--cinza-08); }
+.bx-mapa-ranking .pos { color: var(--texto-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.bx-mapa-ranking .val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.bx-mapa-ranking .barra { background: var(--mapa-0); border-radius: 2px; grid-column: 2 / 4; height: 3px; overflow: hidden; }
+.bx-mapa-ranking .barra i { background: var(--mapa-5); display: block; height: 100%; }
+
+/* Ficha da licitação escolhida no mapa: grade 2 × 2 e ações do mesmo tamanho. */
+.bx-ficha { background: var(--mesa); border: 1px solid var(--fio-forte); border-radius: var(--r-m); overflow: hidden; }
+.bx-ficha-topo { align-items: center; background: var(--cinza-04); border-bottom: 1px solid var(--fio); display: flex; gap: 8px; padding: 10px 12px 10px 14px; }
+.bx-ficha-topo .bx-mapa-k { margin-right: auto; }
+.bx-ficha-prazo { border-radius: 999px; font-size: 11.5px; font-weight: 700; padding: 2px 9px; white-space: nowrap; }
+.bx-ficha-prazo.curto { background: color-mix(in srgb, var(--prazo-curto) 14%, transparent); color: var(--prazo-curto); }
+.bx-ficha-prazo.medio { background: color-mix(in srgb, var(--prazo-medio) 16%, transparent); color: var(--prazo-medio); }
+.bx-ficha-prazo.folgado { background: color-mix(in srgb, var(--prazo-folgado) 16%, transparent); color: var(--prazo-folgado); }
+.bx-ficha-prazo.sem-data { background: var(--cinza-08); color: var(--texto-2); }
+.bx-ficha-fechar { background: none; border: 0; color: var(--texto-2); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.bx-ficha-corpo { display: grid; gap: 14px; padding: 14px; }
+.bx-ficha-objeto { -webkit-box-orient: vertical; -webkit-line-clamp: 4; display: -webkit-box; font-size: 12.5px; font-weight: 800; line-height: 1.4; overflow: hidden; text-transform: uppercase; }
+.bx-ficha-orgao { color: var(--texto-2); font-size: 11.5px; margin-top: 4px; text-transform: uppercase; }
+.bx-ficha-fatos { border: 1px solid var(--fio); border-radius: var(--r-p); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; overflow: hidden; }
+.bx-ficha-fatos > div { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; }
+.bx-ficha-fatos > div:nth-child(odd) { border-right: 1px solid var(--fio); }
+.bx-ficha-fatos > div:nth-child(n + 3) { border-top: 1px solid var(--fio); }
+.bx-ficha-fatos dt { color: var(--texto-2); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.bx-ficha-fatos dd { font-size: 13.5px; font-variant-numeric: tabular-nums; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+.bx-ficha-fatos dd.curto { color: var(--prazo-curto); }
+.bx-ficha .bx-acao .par { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.bx-ficha .bx-acao .bx-bt { width: 100%; }
+.bx-ficha-link { color: var(--acento); font-size: 12.5px; font-weight: 600; justify-self: center; }
+@media (prefers-reduced-motion: reduce) { .bx-mapa-uf, .bx-mapa-ponto .halo { transition: none; } }
+
+.bx-local-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.bx-local-link:hover { color: var(--acento); }
