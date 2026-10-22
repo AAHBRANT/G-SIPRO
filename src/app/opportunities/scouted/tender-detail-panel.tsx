@@ -12,6 +12,7 @@ import { rotulosDeEsfera as sphereLabels } from "@/modules/scouting/domain/esfer
 import { compararAcervo, type SituacaoDoServico } from "@/modules/scouting/domain/comparativo-de-acervo";
 import { summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import type { ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
+import { faixaDoPrazo, type FaixaDePrazo } from "@/modules/scouting/domain/fila-no-mapa";
 import type { ScoredTender } from "@/modules/scouting/application/score-tender";
 import { BaixarDocumentos } from "@/app/opportunities/scouted/baixar-documentos";
 import { AdherenceGauge } from "./adherence-gauge";
@@ -55,8 +56,8 @@ const dataCurta = (value: Date | string | null | undefined) =>
 const dinheiroCurto = (valor: number) =>
   `R$ ${(valor / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
 
-function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return <div className="bx-item"><dt>{rotulo}</dt><dd>{valor}</dd></div>;
+function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
+  return <div className="bx-item"><dt>{rotulo}</dt><dd className={destaque ? "curto" : undefined}>{valor}</dd></div>;
 }
 
 const tick = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>;
@@ -254,19 +255,29 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
       </div>
 
       <dl className="bx-abas-corpo">
+        {/* Visual de 22/10/2026 (pedido do dono, a partir da prévia do mapa):
+            cada aba em grade simétrica — rótulo pequeno em cima, valor em
+            negrito embaixo — e listas em duas colunas com ícone. */}
         <div className="bx-aba-painel" id={`${tender.id}-p1`}>
-          <Linha rotulo="Órgão" valor={tender.authorityName}/>
-          <Linha rotulo="Esfera" valor={sphereLabels[tender.sphere] ?? tender.sphere}/>
-          <Linha rotulo="Modalidade" valor={tender.modality}/>
-          <Linha rotulo="Processo" valor={tender.processNumber ?? "—"}/>
-          <Linha rotulo="Localidade" valor={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}/>
+          <div className="bx-fatos">
+            <Linha rotulo="Órgão" valor={tender.authorityName}/>
+            <Linha rotulo="Local" valor={tender.city ? `${tender.city} / ${tender.state ?? ""}` : tender.state ?? "—"}/>
+            <Linha rotulo="Modalidade" valor={tender.modality}/>
+            <Linha rotulo="Esfera" valor={sphereLabels[tender.sphere] ?? tender.sphere}/>
+            <Linha rotulo="Valor estimado" valor={currency(tender.estimatedValue, tender.valueUndisclosed) ?? "Sigiloso"}/>
+            <Linha rotulo="Processo" valor={tender.processNumber ?? "—"}/>
+            <Linha rotulo="Tipo de obra" valor={tender.adherence.workTypes.length > 0 ? tender.adherence.workTypes.map((type) => workTypeLabels[type] ?? type).join(", ") : "Não reconhecido"}/>
+            <Linha rotulo="CNPJ do órgão" valor={cnpj(tender.authorityDocument)}/>
+          </div>
         </div>
 
         <div className="bx-aba-painel" id={`${tender.id}-p2`}>
-          <Linha rotulo="Abertura das propostas" valor={dataCurta(tender.proposalOpensAt) ?? "—"}/>
-          <Linha rotulo="Encerramento" valor={dataCurta(tender.proposalClosesAt) ?? "—"}/>
-          <Linha rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
-          <Linha rotulo="Captada em" valor={dataCurta(tender.createdAt) ?? "—"}/>
+          <div className="bx-fatos">
+            <Linha rotulo="Abertura das propostas" valor={dataCurta(tender.proposalOpensAt) ?? "—"}/>
+            <Linha rotulo="Entrega da proposta" valor={dataCurta(tender.proposalClosesAt) ?? "—"}/>
+            <Linha destaque={days !== undefined && days <= SHORT_DEADLINE_DAYS} rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
+            <Linha rotulo="Captada em" valor={dataCurta(tender.createdAt) ?? "—"}/>
+          </div>
         </div>
 
         <div className="bx-aba-painel" id={`${tender.id}-p3`}>
@@ -274,11 +285,13 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
               só que lá ("3/8 pré-requisitos") e aqui não, obrigando a
               pessoa a contar ✓/– na mão pra saber o que atende. */}
           <p className="bx-aba-resumo">
-            {tender.resumo.met} de {tender.resumo.total} atendidos
+            Pré-requisitos · {tender.resumo.met} de {tender.resumo.total} atendidos
             {tender.resumo.notMet > 0 ? `, ${tender.resumo.notMet} não atende${tender.resumo.notMet > 1 ? "m" : ""}` : ""}
             {tender.resumo.unknown > 0 ? `, ${tender.resumo.unknown} a conferir` : ""}
           </p>
-          {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
+          <div className="bx-checklist">
+            {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
+          </div>
           <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
             {!tender.edital
               ? <>O que está marcado como <strong>a conferir</strong> depende de ler o edital. A leitura automática ainda não passou por esta licitação — a próxima chamada do agendador cobre a fila pendente por ordem de prazo.</>
@@ -397,7 +410,10 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
               22/09/2026: misturar as duas coisas num "100%" só fazia
               parecer que a licitação estava liberada quando só o
               gosto configurado batia, não a exigência real. */}
-          {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
+          <p className="bx-aba-resumo">Preferências do perfil configurado</p>
+          <div className="bx-checklist">
+            {tender.adherence.reasons.map((reason) => <Motivo key={reason.criterion} met={reason.met} rotulo={reason.label} skipped={reason.skipped}/>)}
+          </div>
         </div>
 
         {tender.signal?.note && <div className="bx-aba-painel" id={`${tender.id}-p7`}>
@@ -411,11 +427,12 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
               {/* Procedência: sem cópia guardada, é isto que diz QUAL
                   arquivo foi lido — e o hash é o que denuncia edital
                   retificado depois da leitura. */}
-              <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
-              <Linha rotulo="Lido em" valor={dataCurta(tender.edital.source.fetchedAt) ?? "—"}/>
-              <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
-              {tender.edital.requirement.confidence !== undefined
-                && <Linha rotulo="Confiança da leitura" valor={`${Math.round(tender.edital.requirement.confidence * 100)}%`}/>}
+              <div className="bx-fatos">
+                <Linha rotulo="Arquivo" valor={tender.edital.source.filename}/>
+                <Linha rotulo="Lido em" valor={dataCurta(tender.edital.source.fetchedAt) ?? "—"}/>
+                <Linha rotulo="SHA-256" valor={`${tender.edital.source.fileHash.slice(0, 12)}…`}/>
+                <Linha rotulo="Confiança da leitura" valor={tender.edital.requirement.confidence === undefined ? "—" : `${Math.round(tender.edital.requirement.confidence * 100)}%`}/>
+              </div>
             </>
             : <p className="bx-nota">
               Acervo exigido, consórcio, garantia e visita técnica só constam do edital. Enquanto ele não for lido, a exigência acima é <strong>deduzida do objeto</strong>.
@@ -433,24 +450,44 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
                  para montar proposta.
               3. A origem: saída manual quando o pacote não fecha
                  (órgão fora do ar, anexo gigante). */}
-          <div className="bx-links">
-            {/* Botão, e não link: a sessão do Teams não acompanha
-                navegação de topo. Ver baixar-documentos.tsx. */}
-            <BaixarDocumentos id={tender.id}/>
-            {tender.edital && <a className="bx-link" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
+          {/* Baixar e abrir no PNCP moraram aqui até 22/10/2026; foram para o
+              rodapé do painel, visível em qualquer aba. Aqui fica só o que é
+              desta aba: o arquivo que a IA leu, para conferir a leitura. */}
+          {tender.edital && <div className="bx-links">
+            <a className="bx-link" href={tender.edital.source.uri} rel="noreferrer" target="_blank">
               Arquivo lido pela IA
               <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
-            </a>}
-            {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
-              Abrir no PNCP
-              <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
-            </a>}
-          </div>
+            </a>
+          </div>}
           <p className="bx-nota">
             O download é montado na hora, direto do PNCP — nada fica guardado no G-SIPRO. Vem um <strong>.zip</strong> com todos os documentos, ou o próprio arquivo quando o órgão publica um só. Licitação com muitos projetos demora, e o que não couber vem listado num <strong>_NAO-INCLUIDOS.txt</strong> dentro do zip.
           </p>
         </div>
       </dl>
+
+      {/* Rodapé de qualquer aba: os três destinos que a pessoa procura e o
+          prazo em uma palavra. Baixar continua botão, e não link — a sessão
+          do Teams não acompanha navegação de topo (ver baixar-documentos.tsx). */}
+      <div className="bx-rodape-ficha">
+        <div className="bx-links">
+          <BaixarDocumentos id={tender.id}/>
+          {tender.noticeUrl && <a className="bx-link" href={tender.noticeUrl} rel="noreferrer" target="_blank">
+            Abrir no PNCP
+            <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/></svg>
+          </a>}
+          {tender.state && <LocalNoMapa simples texto="Ver no mapa" uf={tender.state}/>}
+        </div>
+        <span className={`bx-ficha-prazo ${faixaDoPrazo(days)}`}>{rotuloDoPrazo[faixaDoPrazo(days)]}</span>
+      </div>
     </div>
   );
+}
+
+const rotuloDoPrazo: Record<FaixaDePrazo, string> = { curto: "Prazo curto", medio: "Prazo médio", folgado: "Prazo folgado", "sem-data": "Sem data publicada" };
+
+/** CNPJ com máscara quando vier com 14 dígitos; senão, como veio. */
+function cnpj(documento: string | null | undefined): string {
+  const digitos = documento?.replace(/\D/g, "") ?? "";
+  if (digitos.length !== 14) return documento || "—";
+  return digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
