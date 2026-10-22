@@ -1428,3 +1428,48 @@ button.bx-link:disabled { cursor: progress; opacity: 0.6; text-decoration: none;
 
 .bx-local-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
 .bx-local-link:hover { color: var(--acento); }
+
+/* ---------- detalhe da licitação em grade (22/10/2026) ----------
+   Pedido do dono a partir da prévia do mapa: manter as abas, mas cada uma
+   em grade simétrica (rótulo em cima, valor embaixo), listas em duas colunas
+   com ícone, e um rodapé com os atalhos visível em qualquer aba. */
+
+.bx-abas-painel { background: transparent; border: 0; border-radius: 0; overflow: visible; }
+.bx-abas-nav { background: transparent; border-bottom: 1px solid var(--fio); gap: 2px; padding: 0; }
+.bx-aba-lbl { border-bottom: 2px solid transparent; border-radius: 0; font-size: 12.5px; margin-bottom: -1px; padding: 10px 12px; }
+.bx-aba-lbl:hover { background: transparent; color: var(--texto); }
+.bx-aba-rd:checked + .bx-aba-lbl { background: transparent; border-bottom-color: var(--acento); box-shadow: none; color: var(--acento); }
+.bx-abas-corpo { padding: 16px 0 0; }
+.bx-aba-painel { padding: 0; }
+
+.bx-aba-resumo { color: var(--texto-2); font-size: 11px; letter-spacing: 0.14em; padding: 0 0 12px; text-transform: uppercase; }
+
+/* Grade de fatos: 4 colunas, 2 no celular. As linhas entre células saem da
+   borda direita/inferior de cada uma, e a margem negativa esconde a última
+   coluna e a última linha sob a borda do quadro. */
+.bx-fatos { background: var(--mesa); border: 1px solid var(--fio-forte); border-radius: var(--r-m); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; }
+@media (max-width: 900px) { .bx-fatos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bx-fatos .bx-item { border-bottom: 1px solid var(--fio); border-right: 1px solid var(--fio); display: grid; gap: 4px; justify-content: stretch; margin: 0 -1px -1px 0; padding: 12px 14px; }
+.bx-fatos .bx-item dt { color: var(--texto-2); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.bx-fatos .bx-item dd { color: var(--texto); font-size: 14px; font-weight: 700; overflow-wrap: anywhere; text-align: left; }
+.bx-fatos .bx-item dd.curto { color: var(--prazo-curto); }
+
+/* Lista com ícone: duas colunas; requisito com subitens ocupa a largura toda. */
+.bx-checklist { display: grid; gap: 10px 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .bx-checklist { grid-template-columns: minmax(0, 1fr); } }
+.bx-checklist > div:has(.bx-subitens) { grid-column: 1 / -1; }
+.bx-checklist .bx-motivo { align-items: flex-start; font-size: 13px; gap: 10px; padding: 0; }
+.bx-checklist .bx-subitens { margin-top: 8px; }
+
+/* Ícone em círculo, com a cor da situação — vale para todas as abas. */
+.bx-motivo .marca { background: color-mix(in srgb, currentColor 15%, transparent); border-radius: 50%; box-sizing: content-box; flex-shrink: 0; height: 12px; padding: 4px; width: 12px; }
+.bx-motivo.atende .marca { color: var(--prazo-folgado); }
+.bx-motivo.falha .marca, .bx[data-tema="escuro"] .bx-motivo.falha .marca { color: var(--prazo-curto); }
+.bx-motivo.atencao .marca, .bx[data-tema="escuro"] .bx-motivo.atencao .marca { color: var(--prazo-medio); }
+.bx-motivo.pulado .marca { color: var(--texto-3); }
+
+.bx-aba-painel > .bx-nota { margin-top: 14px; padding: 12px 0 0; }
+.bx-aba-painel > .bx-links { border-top: 0; margin-top: 14px; padding: 0; }
+
+.bx-rodape-ficha { align-items: center; border-top: 1px solid var(--fio); display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; margin-top: 18px; padding-top: 14px; }
+.bx-rodape-ficha .bx-links { align-items: center; border-top: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 0; padding: 0; }
