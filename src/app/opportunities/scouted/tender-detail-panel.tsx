@@ -13,6 +13,7 @@ import { compararAcervo, type SituacaoDoServico } from "@/modules/scouting/domai
 import { summarize, type Prerequisite } from "@/modules/scouting/domain/prerequisites";
 import type { ScoutWorkType } from "@/modules/scouting/domain/scout-filter";
 import { faixaDoPrazo, type FaixaDePrazo } from "@/modules/scouting/domain/fila-no-mapa";
+import { MOTIVO_DIGITALIZADO, MOTIVO_NAO_ENCONTRADO, MOTIVO_REMISSAO, MOTIVO_SO_SIMILAR } from "@/modules/scouting/domain/motivo-sem-quantitativo";
 import type { ScoredTender } from "@/modules/scouting/application/score-tender";
 import { BaixarDocumentos } from "@/app/opportunities/scouted/baixar-documentos";
 import { AdherenceGauge } from "./adherence-gauge";
@@ -164,6 +165,8 @@ export function TenderSummaryHeader({
           <span className={tender.edital ? (tender.edital.reviewedAt ? "bx-eti" : "bx-eti aviso") : "bx-eti"}>
             {tender.edital ? (tender.edital.reviewedAt ? "edital conferido" : "edital lido, a conferir") : "edital não lido"}
           </span>
+          {/* Por que não há quantitativo, quando a leitura soube dizer. */}
+          {motivoDaLeitura(tender) && <span className="bx-eti">{rotuloDoMotivo[motivoDaLeitura(tender)!]}</span>}
           {(() => {
             const r = summarize(tender.prerequisites);
             return <span className={r.notMet > 0 ? "bx-eti alerta" : "bx-eti"}>
@@ -292,6 +295,9 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
           <div className="bx-checklist">
             {tender.prerequisites.map((requisito) => <PreRequisito key={requisito.id} requisito={requisito}/>)}
           </div>
+          {motivoDaLeitura(tender) && <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
+            <strong>Sem quantitativo lido:</strong> {motivoDaLeitura(tender)}.
+          </p>}
           <p className="bx-nota" style={{ borderTop: "1px solid var(--fio)" }}>
             {!tender.edital
               ? <>O que está marcado como <strong>a conferir</strong> depende de ler o edital. A leitura automática ainda não passou por esta licitação — a próxima chamada do agendador cobre a fila pendente por ordem de prazo.</>
@@ -502,3 +508,16 @@ function cnpj(documento: string | null | undefined): string {
   if (digitos.length !== 14) return documento || "—";
   return digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
+
+/** Motivo gravado pela leitura quando ela terminou sem quantitativo (23/10/2026). */
+const MOTIVOS = [MOTIVO_DIGITALIZADO, MOTIVO_REMISSAO, MOTIVO_SO_SIMILAR, MOTIVO_NAO_ENCONTRADO] as const;
+function motivoDaLeitura(tender: ScoredTender): (typeof MOTIVOS)[number] | undefined {
+  const limitacoes = tender.edital?.requirement.limitations ?? [];
+  return MOTIVOS.find((motivo) => limitacoes.includes(motivo));
+}
+const rotuloDoMotivo: Record<(typeof MOTIVOS)[number], string> = {
+  [MOTIVO_DIGITALIZADO]: "edital digitalizado (sem texto)",
+  [MOTIVO_REMISSAO]: "quantitativos no TR não publicado",
+  [MOTIVO_SO_SIMILAR]: "sem quantitativo mínimo exigido",
+  [MOTIVO_NAO_ENCONTRADO]: "quantitativo não encontrado",
+};

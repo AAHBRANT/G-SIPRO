@@ -40,6 +40,8 @@ describe("extractPdfText", () => {
  * é comum). Um .docx mínimo de verdade — o zip com o XML do Word — passa pelo
  * leitor real, e não um dublê.
  */
+// O mammoth é carregado sob demanda: a primeira chamada pode levar vários
+// segundos numa máquina ocupada — o limite padrão de 5 s derrubava o teste.
 describe("extractDocxText", () => {
   it("devolve o texto corrido de um .docx", async () => {
     const { zipSync, strToU8 } = await import("fflate");
@@ -52,7 +54,7 @@ describe("extractDocxText", () => {
     const texto = await extractDocxText(docx);
     expect(texto).toContain("Parcelas de maior relevância técnica:");
     expect(texto).toContain("Microdrenagem de no mínimo 103 m.");
-  });
+  }, 30_000);
 
   it("o leitor escolhe o formato pelo parâmetro: sem ele, é PDF", async () => {
     await expect(new PdfjsTextExtraction().extract(Buffer.from("não é PDF"))).rejects.toThrow();
