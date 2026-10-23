@@ -35,6 +35,7 @@
  * exatamente o que torna uma extração mais crua do que a de IA ainda segura
  * de usar: ninguém trata isto como certeza antes de alguém olhar.
  */
+import { parcelasPorPadrao } from "@/modules/scouting/domain/parcelas-por-padrao";
 import { type EditalRequirement, type RequiredService } from "@/modules/scouting/domain/edital-requirement";
 import { normalizeUnit, parseQuantity as parseQuantidadeUnidade } from "@/modules/scouting/domain/quantity";
 import { normalizeText } from "@/modules/scouting/domain/qualification";
@@ -413,11 +414,18 @@ export function editalRequirementFromText(textoOriginal: string): EditalRequirem
   const secaoServicos = extractRelevantServicesSection(textoOriginal);
   const institucional = extractInstitutionalRequirement(textoOriginal);
   const daTabela = secaoServicos ? parseRelevantServicesTable(secaoServicos) : [];
-  const services = daTabela.length > 0 ? daTabela : (secaoServicos ? parseRelevantServicesBulletList(secaoServicos) : []);
+  const dosDoisFormatos = daTabela.length > 0 ? daTabela : (secaoServicos ? parseRelevantServicesBulletList(secaoServicos) : []);
+  // Terceiro leitor (22/10/2026): tabela achatada de outros formatos, quadros
+  // do DNIT e frases com "quantidade mínima" / "não inferior a". Só entra
+  // quando os dois formatos originais não acharam nada — o que já era lido
+  // continua sendo lido do mesmo jeito.
+  const porPadrao = dosDoisFormatos.length > 0 ? [] : parcelasPorPadrao(textoOriginal);
+  const services = dosDoisFormatos.length > 0 ? dosDoisFormatos : porPadrao;
 
   const limitations = [
-    ...(secaoServicos ? [] : ["não foi possível localizar no texto: a lista de parcelas de maior relevância"]),
+    ...(services.length === 0 && !secaoServicos ? ["não foi possível localizar no texto: a lista de parcelas de maior relevância"] : []),
     ...(secaoServicos && services.length === 0 ? ["achou a seção de parcelas de maior relevância, mas não reconheceu o formato da tabela"] : []),
+    ...(porPadrao.length > 0 ? ["parcelas lidas automaticamente de tabela/texto em formato livre — confira os quantitativos contra o edital; a lista pode estar incompleta"] : []),
     ...institucional.limitations,
   ];
 
