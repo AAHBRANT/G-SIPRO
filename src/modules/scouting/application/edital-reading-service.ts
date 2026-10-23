@@ -204,7 +204,12 @@ const docxPeloNome = (filename: string): boolean => /\.docx$/i.test(filename.tri
  * "ARQ_PE_10") que não dizem "prancha" e passavam pelo filtro de peso 90 —
  * 60 s de leitura de desenho, e o edital da mesma licitação nem foi baixado.
  */
-const anexoRelevante = (documento: Readable): boolean => documento.weight < PESO_NEUTRO;
+const anexoRelevante = (documento: Readable): boolean =>
+  documento.weight < PESO_NEUTRO
+  // O Estudo Técnico Preliminar repete quantitativos do projeto que não são
+  // exigência de habilitação — no corpus de 22/10/2026, três parcelas
+  // inventadas vinham dele.
+  && !/estudo\s*t[ée]cnico\s*preliminar|(^|[^a-z])etp([^a-z]|$)/i.test(`${documento.label} ${documento.documentType}`);
 /**
  * Pacote que não vale baixar depois do principal: desenho CAD (não vira
  * texto) e pacote (.rar/.zip/.7z) cujo NOME não diz que é documento — o

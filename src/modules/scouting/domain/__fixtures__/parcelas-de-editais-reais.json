@@ -1,0 +1,927 @@
+[
+ {
+  "id": "F1a",
+  "licitacao": "04838496000128-1-000040/2026",
+  "texto": "Parcela de maior relevância técnica Quantidade prevista na obra Quantidade mínima exigida – 40% Execução e assentamento de aduela ou galeria fechada pré - moldada de concreto armado, com seção, finalidade, capacidade hidráulica e complexidade técnica equivalentes ou superiores 530,00 m 212,00 m Execução de rede de drenagem pluvial com tubos de concreto armado de diâmetro nominal igual ou superior a DN 800 mm 2.449,77 m 979,91 m Execução de pavimentação em concreto asfáltico – CBUQ ou solução tecnicamente equivalente 11.000,00 m² 4.400,00 m² Execução de enrocamento de pedra, incluindo fornecimento e assentamento 4.481,03 m³ 1.792,41 m³",
+  "esperado": [
+   {
+    "quantity": 212,
+    "unit": "m",
+    "description": "Execução e assentamento de aduela ou galeria fechada pré - moldada de concreto armado, com seção, finalidade, capacidade hidráulica e complexidade técnica equivalentes ou superiores"
+   },
+   {
+    "quantity": 979.91,
+    "unit": "m",
+    "description": "Execução de rede de drenagem pluvial com tubos de concreto armado de diâmetro nominal igual ou superior a DN 800 mm"
+   },
+   {
+    "quantity": 4400,
+    "unit": "m²",
+    "description": "Execução de pavimentação em concreto asfáltico – CBUQ ou solução tecnicamente equivalente"
+   },
+   {
+    "quantity": 1792.41,
+    "unit": "m³",
+    "description": "Execução de enrocamento de pedra, incluindo fornecimento e assentamento"
+   }
+  ]
+ },
+ {
+  "id": "F1b",
+  "licitacao": "27080555000147-1-000080/2026",
+  "texto": "Rua Raimundo Nonato, 116 – Forte São João – Vitória-ES – CEP 29017-160 – (27) 3636-3650 CNPJ: 27.080.555/0001-47 – site: www.seag.es.gov.br Item Descrição dos Serviços Quant. de planilha Quant. Mínima a ser comprovada 01 Pavimentação com blocos de concreto 47.632,15 m² 23.816,07 m² 02 Execução de base ou sub- base de brita graduada 8.280,94 m³ 4.140,47 m³",
+  "esperado": [
+   {
+    "quantity": 23816.07,
+    "unit": "m²",
+    "description": "Pavimentação com blocos de concreto"
+   },
+   {
+    "quantity": 4140.47,
+    "unit": "m³",
+    "description": "Execução de base ou sub- base de brita graduada"
+   }
+  ]
+ },
+ {
+  "id": "F1c",
+  "licitacao": "34841267000123-1-000189/2026",
+  "texto": "TABELA DE QUANTIDADES MINIMAS EXIGIDAS Item Quantidade contratada Quantidade exigida Percentual exigido Execução de pavimento com aplicação de concreto asfáltico, camada de rolamento - exclusive carga e transporte. af_11/2019 597,36 m³ 298,68 m³ 50,00% Gabião com tela de arame galvanizado, fio 2,7mm, malha hexagonal 8 x 10cm, tipo caixa 1.380,74 m³ 690,37 m³ 50,00% Alvenaria pedra granitica argamassada traço (1:5) - 1 saco cimento 50kg / 5 padio las areia dim. 0,35z0,45x0,23m - Confecção mecânica e transporte 1.176,37 m ³ 588,18 m³ 50,00% Piso em concreto simples desempolado, fck = 21 MPa, e = 7 cm, com forma em quadro s 2,0x2,0m, para juntas de concretagem - tres usos 6.667,92 m² 3.333,96 m² 50,00%",
+  "esperado": [
+   {
+    "quantity": 298.68,
+    "unit": "m³",
+    "description": "Execução de pavimento com aplicação de concreto asfáltico, camada de rolamento - exclusive carga e transporte. af_11/2019"
+   },
+   {
+    "quantity": 690.37,
+    "unit": "m³",
+    "description": "Gabião com tela de arame galvanizado, fio 2,7mm, malha hexagonal 8 x 10cm, tipo caixa"
+   },
+   {
+    "quantity": 588.18,
+    "unit": "m³",
+    "description": "Alvenaria pedra granitica argamassada traço (1:5) - 1 saco cimento 50kg / 5 padio las areia dim. 0,35z0,45x0,23m - Confecção mecânica e transporte"
+   },
+   {
+    "quantity": 3333.96,
+    "unit": "m²",
+    "description": "Piso em concreto simples desempolado, fck = 21 MPa, e = 7 cm, com forma em quadro s 2,0x2,0m, para juntas de concretagem - tres usos"
+   }
+  ]
+ },
+ {
+  "id": "F1d",
+  "licitacao": "27142058000126-1-000469/2026",
+  "texto": "Quadro E – Qualificação a partir da Curva ABC ITEM SERVIÇOS QUANTIDADE DE PLANILHA QUANTIDADE MÍNIMA EXIGIDA (40%) 1 Execução de obras de urbanização costeiras ou ribeirinhas com implantação 9.558 m² 3.823 m²\nPrefeitura Municipal de Vitória Secretaria Municipal de Obras Av. Vitória, nº 2552 – Bento Ferreira – Vitória – ES – CEP.: 29050-140- Tel.: 3382-6630 www.vitoria.es.gov.br 41 de passeios , ciclovias e iluminação sobre Deck 2 Construção de decks em concreto armado 9.558 m² 3.823 m² 3 Instalação de píeres atracadouros, flutuantes com rampas articuladas 2.356 m² 942 m² 4 Execução de fundação em estaca raiz, com camisa metálica, em mar, utilizando apoio náutico 16.230m 6.492 m",
+  "esperado": [
+   {
+    "quantity": 3823,
+    "unit": "m²",
+    "description": "Execução de obras de urbanização costeiras ou ribeirinhas com implantação de passeios , ciclovias e iluminação sobre Deck"
+   },
+   {
+    "quantity": 3823,
+    "unit": "m²",
+    "description": "Construção de decks em concreto armado"
+   },
+   {
+    "quantity": 942,
+    "unit": "m²",
+    "description": "Instalação de píeres atracadouros, flutuantes com rampas articuladas"
+   },
+   {
+    "quantity": 6492,
+    "unit": "m",
+    "description": "Execução de fundação em estaca raiz, com camisa metálica, em mar, utilizando apoio náutico"
+   }
+  ]
+ },
+ {
+  "id": "F1e",
+  "licitacao": "27142033000122-1-000014/2026",
+  "texto": "Item Descrição dos Serviços Quant. de planilha Quant. Mínima a ser comprovada 01 Elaboração de Projeto Básico e Executivo de Implantação e/ou requalificação de sistema viário urbano (tráfego intenso), executadas em vias urbanas, avenidas, corredores urbanos, destinado à mobilidade urbana, contendo as disciplinas: geometria de vias, drenagem, pavimentação, ciclovia, sinalização viária, semafórica e iluminação pública. QUALITATIVO QUALITATIVO 02 Execução de obras de Implantação e/ou requalificação de sistema viário urbano (tráfego intenso), executadas em vias urbanas, avenidas, corredores urbanos, destinado à mobilidade urbana, incluindo drenagem, pavimentação, ciclovia, sinalização viária, semafórica e iluminação pública. 70.051,03 m² 35.025,51 m²",
+  "esperado": [
+   {
+    "quantity": 35025.51,
+    "unit": "m²",
+    "description": "Execução de obras de Implantação e/ou requalificação de sistema viário urbano (tráfego intenso), executadas em vias urbanas, avenidas, corredores urbanos, destinado à mobilidade urbana, incluindo drenagem, pavimentação, ciclovia, sinalização viária, semafórica e iluminação pública."
+   }
+  ]
+ },
+ {
+  "id": "F2a",
+  "licitacao": "13664245000165-1-000011/2026",
+  "texto": "Item Escopo dos Atestados Objeto Licitado Unidade de Medida Quantidade mínima exigida de até 50%, conforme a NLL Lei 14.133/2021 Exigências aos licitantes destinados a Etapa de Execução de Obras I Atestados ou Certidões para Execução de Obras de Drenagem profunda em tubo de concreto 3. 241,60 m 1.620,00 II Atestados ou Certidões para Execução de Obras de rede de distribuição de energia elétrica 14.074,00 m 7.037,00 III Atestados ou Certidões para Execução de Pavimentação em CBUQ 1.295,00 m³ 647,00 IV Atestados ou Certidões para Execu ção de Obras de Pavimentação em Bloquete 31.094,35 m² 15.547,00 OBS: É permitido a somatória de atestados.",
+  "esperado": [
+   {
+    "quantity": 1620,
+    "unit": "m",
+    "description": "Atestados ou Certidões para Execução de Obras de Drenagem profunda em tubo de concreto"
+   },
+   {
+    "quantity": 7037,
+    "unit": "m",
+    "description": "Atestados ou Certidões para Execução de Obras de rede de distribuição de energia elétrica"
+   },
+   {
+    "quantity": 647,
+    "unit": "m³",
+    "description": "Atestados ou Certidões para Execução de Pavimentação em CBUQ"
+   },
+   {
+    "quantity": 15547,
+    "unit": "m²",
+    "description": "Atestados ou Certidões para Execu ção de Obras de Pavimentação em Bloquete"
+   }
+  ]
+ },
+ {
+  "id": "F2b",
+  "licitacao": "17684344000160-1-000047/2026",
+  "texto": "TABELA - COMPROVAÇÃO DE CAPACIDADE TÉCNICA-OPERACIONAL – CTO Item Escopo dos Atestados Objeto Licitado Unidade de Medida Quantidade mínima exigida de até 50%, conforme a NLL Lei 14.133/2021 Exigências aos licitantes destinados a Etapa de Execução de Obras I Atestados ou Certidões para Execução de Obras de Pavimentação Tratamento superficial duplo 892.643,728 m² 446.321,864 II Atestados ou Certidões para Execução de Obras de Sub-base de solo estabilizado granulometricamente 217.266,171 m³ 108.633,085 III Atestados ou Certidões para Execução de Obras Dreno longitudinal profundo para corte em solo 24.356,000 m 12.178,000 OBS: É permitido a somatória de atestados.",
+  "esperado": [
+   {
+    "quantity": 446321.864,
+    "unit": "m²",
+    "description": "Atestados ou Certidões para Execução de Obras de Pavimentação Tratamento superficial duplo"
+   },
+   {
+    "quantity": 108633.085,
+    "unit": "m³",
+    "description": "Atestados ou Certidões para Execução de Obras de Sub-base de solo estabilizado granulometricamente"
+   },
+   {
+    "quantity": 12178,
+    "unit": "m",
+    "description": "Atestados ou Certidões para Execução de Obras Dreno longitudinal profundo para corte em solo"
+   }
+  ]
+ },
+ {
+  "id": "F2c",
+  "licitacao": "05553216000106-1-000053/2026",
+  "texto": "Exigências aos licitantes destinados a Etapa de Execução de Projetos I Atestados ou Certidões para Construção/Execução de armação de pilar ou viga de estrutura convencional de concreto armado utilizando aço ca-50 de 20,0 mm 11.605,10 Kg 5.802,55 II Atestados ou Certidões para Construção/Execução de alvenaria de vedação de blocos cerâmicos furados na vertical de 19x19x39 cm 3.775,83 M² 1.887,92 III Atestados ou Certidões para Construção/Execução de contrapiso em argamassa traço 1:4 (cimento e areia), preparo mecânico com betoneira 400 l, aplicado em áreas secas sobre laje 2.182,65 M² 1.091,33 IV Atestados ou Certidões para Construção/Execução de piso em granito aplicado em ambientes internos 1.723,04 M² 861,52",
+  "esperado": [
+   {
+    "quantity": 5802.55,
+    "unit": "kg",
+    "description": "Atestados ou Certidões para Construção/Execução de armação de pilar ou viga de estrutura convencional de concreto armado utilizando aço ca-50 de 20,0 mm"
+   },
+   {
+    "quantity": 1887.92,
+    "unit": "m²",
+    "description": "Atestados ou Certidões para Construção/Execução de alvenaria de vedação de blocos cerâmicos furados na vertical de 19x19x39 cm"
+   },
+   {
+    "quantity": 1091.33,
+    "unit": "m²",
+    "description": "Atestados ou Certidões para Construção/Execução de contrapiso em argamassa traço 1:4 (cimento e areia), preparo mecânico com betoneira 400 l, aplicado em áreas secas sobre laje"
+   },
+   {
+    "quantity": 861.52,
+    "unit": "m²",
+    "description": "Atestados ou Certidões para Construção/Execução de piso em granito aplicado em ambientes internos"
+   }
+  ]
+ },
+ {
+  "id": "F2d",
+  "licitacao": "13646740000141-1-000047/2026",
+  "texto": "DESCRIÇÃO QUANTIDADE TOTAL PREVISTA QUANTIDADE MÍNIMA EXIGIDA ALAMBRADO PARA QUADRA POLIESPORTIVA, ESTRUTURADO POR TUBOS DE AÇO GALVANIZADO, (MONTANTES COM DIÂMETRO 2\", TRAVESSAS E ESCORAS COM DIÂMETRO 1 ¼\"), COM TELA DE ARAME GALVANIZADO, FIO 12 BWG E MALHA 640 M² 256",
+  "esperado": [
+   {
+    "quantity": 256,
+    "unit": "m²",
+    "description": "ALAMBRADO PARA QUADRA POLIESPORTIVA, ESTRUTURADO POR TUBOS DE AÇO GALVANIZADO, (MONTANTES COM DIÂMETRO 2\", TRAVESSAS E ESCORAS COM DIÂMETRO 1 ¼\"), COM TELA DE ARAME GALVANIZADO, FIO 12 BWG E MALHA"
+   }
+  ]
+ },
+ {
+  "id": "P1",
+  "licitacao": "17684344000160-1-000053/2026",
+  "texto": "TABELA - COMPROVAÇÃO DE CAPACIDADE TÉCNICA-OPERACIONAL – CTO Item Escopo dos Atestados Objeto Licitado Unidade de Medida Quantidade mínima exigida de até 50%, conforme a NLL Lei 14.133/2021 Exigências aos licitantes destinados a Etapa de Execução de Obras\nRod. TO-010, km 1, lote 11, setor leste, CEP 77006-210 – Palmas/TO | (63) 9 8505 0074 Site: www.ageto.to.gov.br E-mail: licitacao@ageto.to.gov.br I Atestados ou Certidões para Execução de Obras de Pavimentação Tratamento superficial duplo 237.228,0 m² 119.114,00 II Atestados ou Certidões para Execução de Obras de Dreno longitudinal profundo 9.536,0 m 4.768,00",
+  "esperado": [
+   {
+    "quantity": 119114,
+    "unit": "m²",
+    "description": "Atestados ou Certidões para Execução de Obras de Pavimentação Tratamento superficial duplo"
+   },
+   {
+    "quantity": 4768,
+    "unit": "m",
+    "description": "Atestados ou Certidões para Execução de Obras de Dreno longitudinal profundo"
+   }
+  ]
+ },
+ {
+  "id": "F3a",
+  "licitacao": "06003636000173-1-000070/2026",
+  "texto": "ITEM DISCRIMINAÇÃO DOS SERVIÇOS UNID QUANT. ORÇADA QUANT. SOLICITADA 3.6 CONCRETAGEM DE RADIER, PISO DE CONCRETO OU LAJE SOBRE SOLO, FCK 30 MPA M3 6.480,00 2.916,00 2.2/2.5/ 2.9 TRANSPORTE COM CAMINHÃO BASCULANTE DE 10 M³, EM VIA URBANA PAVIMENTADA, DMT ATÉ 30 KM M3XKM 431.100,00 193.995,00",
+  "esperado": [
+   {
+    "quantity": 2916,
+    "unit": "m³",
+    "description": "CONCRETAGEM DE RADIER, PISO DE CONCRETO OU LAJE SOBRE SOLO, FCK 30 MPA"
+   },
+   {
+    "quantity": 193995,
+    "unit": "m³xkm",
+    "description": "TRANSPORTE COM CAMINHÃO BASCULANTE DE 10 M³, EM VIA URBANA PAVIMENTADA, DMT ATÉ 30 KM"
+   }
+  ]
+ },
+ {
+  "id": "F3b",
+  "licitacao": "76017458000115-1-000002/2027",
+  "texto": "Item Descrição Unidade Quantidade Orçada Quantidade Mínima Exigida (50%) 531000 Brita Graduada m³ 5.044,08 2.522,04 570000F CBUQ – Novos Traços – Faixa C 50/70 t 13.533,81 6.766,91 505000 Fresagem Contínua a Frio m³ 4.876,22 2.438,11 810150 Meio-Fio com Sarjeta DER – Tipo 2 – Pré- Moldado m 27.274,70 13.637,35",
+  "esperado": [
+   {
+    "quantity": 2522.04,
+    "unit": "m³",
+    "description": "Brita Graduada"
+   },
+   {
+    "quantity": 6766.91,
+    "unit": "t",
+    "description": "CBUQ – Novos Traços – Faixa C 50/70"
+   },
+   {
+    "quantity": 2438.11,
+    "unit": "m³",
+    "description": "Fresagem Contínua a Frio"
+   },
+   {
+    "quantity": 13637.35,
+    "unit": "m",
+    "description": "Meio-Fio com Sarjeta DER – Tipo 2 – Pré- Moldado"
+   }
+  ]
+ },
+ {
+  "id": "F3c",
+  "licitacao": "13915632000127-1-000155/2026",
+  "texto": "ITEM DESCRIÇÃO UNID. QTD TOTAL QUANTID ADE MÍNIMA EXIGIDA VALOR (R$) % DO VALOR ESTIMADO 1 EXECUÇÃO DE CANAL DE MACRODRENAGEM URBANA, INCLUINDO REVESTIMENTO DE FUNDO E PAREDES M 5.000,00 1.500,00 (30%) 35.175.733,03 75,77% 2 EXECUÇÃO DE ESTRUTURAS DE CONCRETO ARMADO M3 13.907,44 4.200,00 (30%) 11.803.592,08 25,43% 3 GEOCÉLULA EM PEAD, PAREDES PERFURADAS, SOLDADAS - ALTURA DE 75 MM E 460 CM² DE ÁREA DE CÉLULA - FORNECIMENTO E INSTALAÇÃO M2 121.992,96 4.600,00 (3,75%) 5.494.562,91 11,84% 4 BUEIRO METÁLICO SEM INTERRUPÇÃO DE TRÁFEGO - D = 2,60 M - CHAPA GALVANIZADA - ESCAVADO EM MATERIAL DE 1ª CATEGORIA - ATERRO RODOVIÁRIO MÁXIMO = 4,10 M M 208,40 63,00 (30%) 3.311.234,26 7,13%",
+  "esperado": [
+   {
+    "quantity": 1500,
+    "unit": "m",
+    "description": "EXECUÇÃO DE CANAL DE MACRODRENAGEM URBANA, INCLUINDO REVESTIMENTO DE FUNDO E PAREDES"
+   },
+   {
+    "quantity": 4200,
+    "unit": "m³",
+    "description": "EXECUÇÃO DE ESTRUTURAS DE CONCRETO ARMADO"
+   },
+   {
+    "quantity": 4600,
+    "unit": "m²",
+    "description": "GEOCÉLULA EM PEAD, PAREDES PERFURADAS, SOLDADAS - ALTURA DE 75 MM E 460 CM² DE ÁREA DE CÉLULA - FORNECIMENTO E INSTALAÇÃO"
+   },
+   {
+    "quantity": 63,
+    "unit": "m",
+    "description": "BUEIRO METÁLICO SEM INTERRUPÇÃO DE TRÁFEGO - D = 2,60 M - CHAPA GALVANIZADA - ESCAVADO EM MATERIAL DE 1ª CATEGORIA - ATERRO RODOVIÁRIO MÁXIMO = 4,10 M"
+   }
+  ]
+ },
+ {
+  "id": "F3d",
+  "licitacao": "46523163000150-1-000247/2026",
+  "texto": "FONTE CÓDIGO DESCRIÇÃO UNID. QUANT. A EXECUTA R QUANT. MÍNIMA A COMPROVAR NOS ATESTADOS SINAPI 97914 TRANSPORTE COM CAMINHÃO BASCULANTE DE 6 M³, EM VIA URBANA PAVIMENTADA, DMT ATÉ 30 KM (UNIDADE: M3XKM). AF_02/2026 M3XK M 862.187,66 431.093,83 SIURB 07.025.000 (I) IN.14 - FORNECIMENTO E COLOCAÇÃO DE GABIÃO TIPO CAIXA, H = 0,50M, DE MALHA 8 X 10CM, GALVANIZADO E REVESTIDO EM PVC, DE FIO Ø = 2,4MM M3 2.181,04 1.090,52 SIURB 03.053.018 (I) PROJETO EXECUTIVO (PRANCHA A1) UN 77,00 38,50 SIURB 02.001.084 (E) ESTACA ESCAVADA HÉLICE CONTÍNUA - DIÂMETRO 50CM M 170,00 85,00",
+  "esperado": [
+   {
+    "quantity": 431093.83,
+    "unit": "m³xkm",
+    "description": "TRANSPORTE COM CAMINHÃO BASCULANTE DE 6 M³, EM VIA URBANA PAVIMENTADA, DMT ATÉ 30 KM (UNIDADE: M3XKM). AF_02/2026"
+   },
+   {
+    "quantity": 1090.52,
+    "unit": "m³",
+    "description": "IN.14 - FORNECIMENTO E COLOCAÇÃO DE GABIÃO TIPO CAIXA, H = 0,50M, DE MALHA 8 X 10CM, GALVANIZADO E REVESTIDO EM PVC, DE FIO Ø = 2,4MM"
+   },
+   {
+    "quantity": 38.5,
+    "unit": "un",
+    "description": "PROJETO EXECUTIVO (PRANCHA A1)"
+   },
+   {
+    "quantity": 85,
+    "unit": "m",
+    "description": "ESTACA ESCAVADA HÉLICE CONTÍNUA - DIÂMETRO 50CM"
+   }
+  ]
+ },
+ {
+  "id": "F3e",
+  "licitacao": "53576563000199-1-000010/2026",
+  "texto": "Itens da planilha Descrição Und. Quant. total Planilha Quant. Exigida (40%) 02/10/26, 13:21 SEI/GRR - 24484925 - Edital https://sei.rr.gov.br/sei/controlador.php?acao=documento_imprimir_web&acao_origem=arvore_visualizar&id_documento=26726090&infra_sistema=100000100&infra_unidade_atual=110007834&infra_hash=828a0… 12/60\n4.3.1 - 4.2.1 - 4.1.1 - 4.4.1 CBUQ - Capa de Rolamento (faixa \"C\") t 11.624,01 4.649,60 4.1.5 - 4.2.5 Base Estabilizada Granulometricamente sem mistura m³ 17.339,16 6.935,66 4.1.6 - 4.2.6 Sub-Base Estabilizada Granulometricamente com mistura m³ 8.675,83 3.470,33 3.11 Meio-fio de concreto - MFC 01 - areia e brita comerciais - fôrma de madeira m 3.268,00 1.307,20",
+  "esperado": [
+   {
+    "quantity": 4649.6,
+    "unit": "t",
+    "description": "CBUQ - Capa de Rolamento (faixa \"C\")"
+   },
+   {
+    "quantity": 6935.66,
+    "unit": "m³",
+    "description": "Base Estabilizada Granulometricamente sem mistura"
+   },
+   {
+    "quantity": 3470.33,
+    "unit": "m³",
+    "description": "Sub-Base Estabilizada Granulometricamente com mistura"
+   },
+   {
+    "quantity": 1307.2,
+    "unit": "m",
+    "description": "Meio-fio de concreto - MFC 01 - areia e brita comerciais - fôrma de madeira"
+   }
+  ]
+ },
+ {
+  "id": "P3",
+  "licitacao": "27165554000103-1-000410/2026",
+  "texto": "Item da curva ABC/planilha: Escoramento contínuo de cavas 2 Execução de galerias pré-moldadas (seção mínima 3,0 x 3,0 m) Item da curva ABC/planilha: galerias celulares pré- moldadas (seção mínima de 3,0 x 3,0 m) m 676 270,40 3 Execução de base/sub-base de brita Item da curva ABC/planilha: Base e sub-base de brita graduada m3 9.929,19 3.971,68 4 Execução de pavimento asfáltico/recapeamento asfáltico Itens da curva ABC/planilha: Corresponde à execução das camadas de concreto asfáltico previstas para o empreendimento, compreendendo concreto asfáltico com asfalto polímero nas faixas A, B e C , cujos quantitativos somados totalizam 9.575,34 toneladas , representando 4,00% do valor do orçamento, conforme Curva ABC T 9.575,34 3.830,14",
+  "esperado": [
+   {
+    "quantity": 270.4,
+    "unit": "m",
+    "description": "Execução de galerias pré-moldadas (seção mínima 3,0 x 3,0 m) Item da curva ABC/planilha: galerias celulares pré- moldadas (seção mínima de 3,0 x 3,0 m)"
+   },
+   {
+    "quantity": 3971.68,
+    "unit": "m³",
+    "description": "Execução de base/sub-base de brita Item da curva ABC/planilha: Base e sub-base de brita graduada"
+   },
+   {
+    "quantity": 3830.14,
+    "unit": "t",
+    "description": "Execução de pavimento asfáltico/recapeamento asfáltico Itens da curva ABC/planilha: Corresponde à execução das camadas de concreto asfáltico previstas para o empreendimento, compreendendo concreto asfáltico com asfalto polímero nas faixas A, B e C , cujos quantitativos somados totalizam 9.575,34 toneladas , representando 4,00% do valor do orçamento, conforme Curva ABC"
+   }
+  ]
+ },
+ {
+  "id": "P2",
+  "licitacao": "11294386000108-1-000181/2026",
+  "texto": "TE. M3 11.151,4 9 7,38% 5.575,74 4 GEOGRELHA UNIDIRECIONAL COM RESISTÊNCIA À TRAÇÃO - FORNECIMENTO E INSTALAÇÃO M² 37.171,6 4 6,57% 18.585,82",
+  "esperado": [
+   {
+    "quantity": 18585.82,
+    "unit": "m²",
+    "description": "GEOGRELHA UNIDIRECIONAL COM RESISTÊNCIA À TRAÇÃO - FORNECIMENTO E INSTALAÇÃO"
+   }
+  ]
+ },
+ {
+  "id": "F4a",
+  "licitacao": "08892295000160-1-000061/2026",
+  "texto": "ITENS DE RELEVÂNCIA PARA O LOTE ITEM SERVIÇO(S) REQUERIDO(S) UND. QUANTIDADE 01 Concreto Asfáltico - Faixa C-12,5 - Areia e Brita Comerciais t 5.544,00 02 Meio-fio de concreto - MFC 01 - areia e brita comerciais - fôrma de madeira m 4.125,00 03 Base estabilizada granulometricamente com mistura de solos na pista com material de jazida - 100% proctor modificado m³ 29.160,00",
+  "esperado": [
+   {
+    "quantity": 5544,
+    "unit": "t",
+    "description": "Concreto Asfáltico - Faixa C-12,5 - Areia e Brita Comerciais"
+   },
+   {
+    "quantity": 4125,
+    "unit": "m",
+    "description": "Meio-fio de concreto - MFC 01 - areia e brita comerciais - fôrma de madeira"
+   },
+   {
+    "quantity": 29160,
+    "unit": "m³",
+    "description": "Base estabilizada granulometricamente com mistura de solos na pista com material de jazida - 100% proctor modificado"
+   }
+  ]
+ },
+ {
+  "id": "F4b",
+  "licitacao": "82892282000143-1-000306/2026",
+  "texto": "cujas parcelas de maior relevância técnica e de valores significativos são: LOTE I 1 Aduela/galeria fechada pré-moldada de concreto armado – com seções variadas: 2,00 x 2,00 metros 2,50 x 1,50 metros 2,00 x 1,50 metros 2,00 x 1,00 metros Altura de aterro variando entre 0.25 a 2,50 metros. M 522,00 2 Execução de base e ou sub base para pavimentação em brita graduada simples. M³ 499,00 LOTE III 1 Aduela/galeria fechada pré-moldada de concreto armado – com seções variadas: 2,00 x 1,00 metros 2,50 x 1,50 metros 2,00 x 1,10 metros 300 x 1,50 metros Altura de aterro variando entre 0.25 a 2,50 metros. M 486,00 2 Execução de base e ou sub base para pavimentação em brita graduada simples. M³ 611,00 3 Execução de passeio (calçada) com placas de concreto lisa pré-fabricadas assentada com argamassa. Placas 45 x 45 cm não armada. M² 1.402,00",
+  "esperado": [
+   {
+    "quantity": 522,
+    "unit": "m",
+    "description": "Aduela/galeria fechada pré-moldada de concreto armado – com seções variadas: 2,00 x 2,00 metros 2,50 x 1,50 metros 2,00 x 1,50 metros 2,00 x 1,00 metros Altura de aterro variando entre 0.25 a 2,50 metros."
+   },
+   {
+    "quantity": 499,
+    "unit": "m³",
+    "description": "Execução de base e ou sub base para pavimentação em brita graduada simples."
+   },
+   {
+    "quantity": 486,
+    "unit": "m",
+    "description": "Aduela/galeria fechada pré-moldada de concreto armado – com seções variadas: 2,00 x 1,00 metros 2,50 x 1,50 metros 2,00 x 1,10 metros 300 x 1,50 metros Altura de aterro variando entre 0.25 a 2,50 metros."
+   },
+   {
+    "quantity": 611,
+    "unit": "m³",
+    "description": "Execução de base e ou sub base para pavimentação em brita graduada simples."
+   },
+   {
+    "quantity": 1402,
+    "unit": "m²",
+    "description": "Execução de passeio (calçada) com placas de concreto lisa pré-fabricadas assentada com argamassa. Placas 45 x 45 cm não armada."
+   }
+  ]
+ },
+ {
+  "id": "F4c",
+  "licitacao": "76282656000106-1-000929/2026",
+  "texto": "REQUISITOS DE CAPACIDADE TÉCNICO-OPERACIONAL - LOTE 03 ITEM DESCRIÇÃO UNIDADE QTDE 01 EXECUÇÃO E COMPACTAÇÃO DE BASE E/OU SUB BASE PARA PAVIMENTAÇÃO DE BRITA GRADUADA SIMPLES, INCL. CARGA, TRANSPORTE E DESCARGA m³ (metros cúbicos) 11.924,50 02 CONCRETO ASFÁLTICO - FAIXA C - AREIA E BRITA COMERCIAIS, EXCL. CIMENTO ASFÁLTICO CAP, INCL. CARGA, TRANSPORTE E DESCARGA T (toneladas) 4.519,50 03 TUBO PEAD CORRUGADO PARA DRENAGEM - Ø100CM FORNECIMENTO E ASSENTAMENTO M 675,50 04 TUBO DE CONCRETO PARA REDES COLETORAS DE ÁGUAS PLUVIAIS, DIÂMETRO DE 600 MM, JUNTA RÍGIDA, INSTALADO EM LOCAL COM BAIXO NÍVEL DE INTERFERÊNCIAS - FORNECIMENTO E ASSENTAMENTO. AF_03/2024 M 1.504,00",
+  "esperado": [
+   {
+    "quantity": 11924.5,
+    "unit": "m³",
+    "description": "EXECUÇÃO E COMPACTAÇÃO DE BASE E/OU SUB BASE PARA PAVIMENTAÇÃO DE BRITA GRADUADA SIMPLES, INCL. CARGA, TRANSPORTE E DESCARGA"
+   },
+   {
+    "quantity": 4519.5,
+    "unit": "t",
+    "description": "CONCRETO ASFÁLTICO - FAIXA C - AREIA E BRITA COMERCIAIS, EXCL. CIMENTO ASFÁLTICO CAP, INCL. CARGA, TRANSPORTE E DESCARGA"
+   },
+   {
+    "quantity": 675.5,
+    "unit": "m",
+    "description": "TUBO PEAD CORRUGADO PARA DRENAGEM - Ø100CM FORNECIMENTO E ASSENTAMENTO"
+   },
+   {
+    "quantity": 1504,
+    "unit": "m",
+    "description": "TUBO DE CONCRETO PARA REDES COLETORAS DE ÁGUAS PLUVIAIS, DIÂMETRO DE 600 MM, JUNTA RÍGIDA, INSTALADO EM LOCAL COM BAIXO NÍVEL DE INTERFERÊNCIAS - FORNECIMENTO E ASSENTAMENTO. AF_03/2024"
+   }
+  ]
+ },
+ {
+  "id": "F4d",
+  "licitacao": "15031669000118-1-000009/2026",
+  "texto": "Item Parcela de maior relevância Unidade Quantidade mínima exigida 01 Execução de sistema de drenagem urbana, compreendendo microdrenagem ou macrodrenagem, com implantação de galerias de águas pluviais ou canais m 500 02 Execução de pavimentação asfáltica em vias urbanas m² 17.500 03 Execução de proteção ou estabilização hidráulica ou geotécnica com gabiões, colchões, muros ou m² 2.000\nESTADO DE MATO GROSSO GOVERNO MUNICIPAL DE SANTA TEREZINHA-MT CNPJ: 15.031.66Y/0001-18 DEPARTAMENTO DE LICITAÇÃO E CONTRATOS Edifício Sede do Poder Executivo Municipal, Rua 25 S/N | CEP: 78650-000 | Santa Terezinha-MT E-mail: licitacao@santaterezinha.mt.gov.br | Contato: (66) 9 9254-5935 Página 24 de 127 estruturas tecnicamente equivalentes",
+  "esperado": [
+   {
+    "quantity": 500,
+    "unit": "m",
+    "description": "Execução de sistema de drenagem urbana, compreendendo microdrenagem ou macrodrenagem, com implantação de galerias de águas pluviais ou canais"
+   },
+   {
+    "quantity": 17500,
+    "unit": "m²",
+    "description": "Execução de pavimentação asfáltica em vias urbanas"
+   },
+   {
+    "quantity": 2000,
+    "unit": "m²",
+    "description": "Execução de proteção ou estabilização hidráulica ou geotécnica com gabiões, colchões, muros ou estruturas tecnicamente equivalentes"
+   }
+  ]
+ },
+ {
+  "id": "F4e",
+  "licitacao": "27165554000103-1-000401/2026",
+  "texto": "b.1) Os atestados devem atender às seguintes parcelas de maior relevância: Descrição do Serviço 1 Unid. Quantitativo mínimo 2 1 Execução de escoramento de cavas Item da curva ABC/planilha: Escoramento contínuo de cavas m² 6.458,42 2 Execução de galerias pré-moldadas (seção mínima 3,0 x 3,0 m) Item da curva ABC/planilha: galerias celulares pré- moldadas (seção mínima de 3,0 x 3,0 m) m 270,40 3 Execução de base/sub-base de brita m³ 3.971,68",
+  "esperado": [
+   {
+    "quantity": 6458.42,
+    "unit": "m²",
+    "description": "Execução de escoramento de cavas Item da curva ABC/planilha: Escoramento contínuo de cavas"
+   },
+   {
+    "quantity": 270.4,
+    "unit": "m",
+    "description": "Execução de galerias pré-moldadas (seção mínima 3,0 x 3,0 m) Item da curva ABC/planilha: galerias celulares pré- moldadas (seção mínima de 3,0 x 3,0 m)"
+   },
+   {
+    "quantity": 3971.68,
+    "unit": "m³",
+    "description": "Execução de base/sub-base de brita"
+   }
+  ]
+ },
+ {
+  "id": "F5a",
+  "licitacao": "17309790000194-1-000109/2026",
+  "texto": "Descrição do Serviço Unid. Qtde % da Qtde total Sub-Base ou Base estabilizada granulometricamente com mistura m3 51.914,260 49,9999975922% Compactação de Aterros m3 647.689,660 49,9999996140% Concreto asfáltico - faixa C t 16.546,820 50,0000000000% Defensa metálica m 10.924,000 50,0000000000% Empedramento para fundação de aterro m3 24.969,490 50,0000000000% Escavação, carga e transporte de material de 1ª e 2ª categoria m3 880.449,860 50,0000000000%",
+  "esperado": [
+   {
+    "quantity": 51914.26,
+    "unit": "m³",
+    "description": "Sub-Base ou Base estabilizada granulometricamente com mistura"
+   },
+   {
+    "quantity": 647689.66,
+    "unit": "m³",
+    "description": "Compactação de Aterros"
+   },
+   {
+    "quantity": 16546.82,
+    "unit": "t",
+    "description": "Concreto asfáltico - faixa C"
+   },
+   {
+    "quantity": 10924,
+    "unit": "m",
+    "description": "Defensa metálica"
+   },
+   {
+    "quantity": 24969.49,
+    "unit": "m³",
+    "description": "Empedramento para fundação de aterro"
+   },
+   {
+    "quantity": 880449.86,
+    "unit": "m³",
+    "description": "Escavação, carga e transporte de material de 1ª e 2ª categoria"
+   }
+  ]
+ },
+ {
+  "id": "F5b",
+  "licitacao": "17309790000194-1-000150/2026",
+  "texto": "Descrição do Serviço Unid. Qtde % da Qtde total Sub-base ou base estabilizada granulométricamente com mistura na pista m 3 53.912,4350 50,00% Concreto asfáltico faixa C t 17.737,1600 50,00% Defensa Metálica m 10.896,5000 50,00% Empedramento para fundação de aterro (Execução, incluindo fornecimento do material, espalhamento e compactação com trator de esteira, exclui o transporte da pedra) m 3 48.500,0000 50,00% Escavação, carga e transporte de Material de 1ª e 2ª Categoria m 3 1.300.392,2150 50,00% Escavação, carga e transporte de material de 3ª categoria m 3 95.293,0000 50,00%",
+  "esperado": [
+   {
+    "quantity": 53912.435,
+    "unit": "m³",
+    "description": "Sub-base ou base estabilizada granulométricamente com mistura na pista"
+   },
+   {
+    "quantity": 17737.16,
+    "unit": "t",
+    "description": "Concreto asfáltico faixa C"
+   },
+   {
+    "quantity": 10896.5,
+    "unit": "m",
+    "description": "Defensa Metálica"
+   },
+   {
+    "quantity": 48500,
+    "unit": "m³",
+    "description": "Empedramento para fundação de aterro (Execução, incluindo fornecimento do material, espalhamento e compactação com trator de esteira, exclui o transporte da pedra)"
+   },
+   {
+    "quantity": 1300392.215,
+    "unit": "m³",
+    "description": "Escavação, carga e transporte de Material de 1ª e 2ª Categoria"
+   },
+   {
+    "quantity": 95293,
+    "unit": "m³",
+    "description": "Escavação, carga e transporte de material de 3ª categoria"
+   }
+  ]
+ },
+ {
+  "id": "F5c",
+  "licitacao": "00003848000174-1-000027/2026",
+  "texto": "CAPACITAÇÃO TÉCNICO OPERACIONAL (EMPRESA) ITEM CÓDIGO DESCRIÇÃO UNIDADE QUANTIDADE PORCENTAGEM 1.2.4.0.3. 004 REVESTIMENTO CERÂMICO PARA PAREDES INTERNAS COM PLACAS TIPO PASTILHA DE DIMENSÕES 5 X 5 CM (PLACAS DE 30 X 30 CM) CM APLICADAS NA ALTURA INTEIRA DAS PAREDES. AF_02/2023 M2 109,75 50% 1.6.1.0.4. 92397 EXECUÇÃO DE PAVIMENTO EM PISO INTERTRAVADO, COM BLOCO RETANGULAR COR NATURAL DE 20 X 10 CM, ESPESSURA 6 CM. AF_10/2022 M2 195,25 50% 1.6.2.0.1. 004 BANCO FIXO (0,70 X 1,50) M EM MADEIRA PINUS OU EUCALIPTO TRATADO, COM ACABAMENTO EM VERNIZ FOSCO, REF. MODELO M312 DA LÚDICO PARQUES OU SIMILAR - FORNECIMENTO E MONTAGEM UN 35,00 50% 1.6.2.0.4. 103315 INSTALAÇÃO DE PERGOLADO DE MADEIRA, EM MAÇARANDUBA, ANGELIM OU EQUIVALENTE DA REGIÃO, FIXADO COM CONCRETO SOBRE SOLO. AF_11/2021 M2 99,05 50%",
+  "esperado": [
+   {
+    "quantity": 109.75,
+    "unit": "m²",
+    "description": "REVESTIMENTO CERÂMICO PARA PAREDES INTERNAS COM PLACAS TIPO PASTILHA DE DIMENSÕES 5 X 5 CM (PLACAS DE 30 X 30 CM) CM APLICADAS NA ALTURA INTEIRA DAS PAREDES. AF_02/2023"
+   },
+   {
+    "quantity": 195.25,
+    "unit": "m²",
+    "description": "EXECUÇÃO DE PAVIMENTO EM PISO INTERTRAVADO, COM BLOCO RETANGULAR COR NATURAL DE 20 X 10 CM, ESPESSURA 6 CM. AF_10/2022"
+   },
+   {
+    "quantity": 35,
+    "unit": "un",
+    "description": "BANCO FIXO (0,70 X 1,50) M EM MADEIRA PINUS OU EUCALIPTO TRATADO, COM ACABAMENTO EM VERNIZ FOSCO, REF. MODELO M312 DA LÚDICO PARQUES OU SIMILAR - FORNECIMENTO E MONTAGEM"
+   },
+   {
+    "quantity": 99.05,
+    "unit": "m²",
+    "description": "INSTALAÇÃO DE PERGOLADO DE MADEIRA, EM MAÇARANDUBA, ANGELIM OU EQUIVALENTE DA REGIÃO, FIXADO COM CONCRETO SOBRE SOLO. AF_11/2021"
+   }
+  ]
+ },
+ {
+  "id": "F6a",
+  "licitacao": "76669324000189-1-000124/2026",
+  "texto": "OBRA SERVIÇOS A SEREM COMPROVADOS QUANTIDADE MÍNIMA (*) Execução de terraplenagem: escavação, carga e transporte de material de 1ª e/ou 2ª e/ou 3ª categoria. 15.900,00 m³ Execução de Base e/ou Sub-base para Pavimentação em Rodovias em Material Granular. 25.500,00 m³ Execução de Pavimento Flexível Rodoviário, CBUQ ou Binder. 7.300,00 t",
+  "esperado": [
+   {
+    "quantity": 15900,
+    "unit": "m³",
+    "description": "Execução de terraplenagem: escavação, carga e transporte de material de 1ª e/ou 2ª e/ou 3ª categoria."
+   },
+   {
+    "quantity": 25500,
+    "unit": "m³",
+    "description": "Execução de Base e/ou Sub-base para Pavimentação em Rodovias em Material Granular."
+   },
+   {
+    "quantity": 7300,
+    "unit": "t",
+    "description": "Execução de Pavimento Flexível Rodoviário, CBUQ ou Binder."
+   }
+  ]
+ },
+ {
+  "id": "F6b",
+  "licitacao": "82951344000140-1-000108/2026",
+  "texto": "Quadro 01 – Qualificação técnico-operacional Item Serviços a serem comprovados Quantidades Mínimas a serem comprovados 1 Execução de concreto compactado a rolo – CCR em obras de barragem 31.941,55 m³ 2 Execução de armação em aço 222.412,73 kg 3 Execução de estruturas em concreto convencional fck = 20 MPa ou mais 3.395,10 m³",
+  "esperado": [
+   {
+    "quantity": 31941.55,
+    "unit": "m³",
+    "description": "Execução de concreto compactado a rolo – CCR em obras de barragem"
+   },
+   {
+    "quantity": 222412.73,
+    "unit": "kg",
+    "description": "Execução de armação em aço"
+   },
+   {
+    "quantity": 3395.1,
+    "unit": "m³",
+    "description": "Execução de estruturas em concreto convencional fck = 20 MPa ou mais"
+   }
+  ]
+ },
+ {
+  "id": "F6c",
+  "licitacao": "90836693000140-1-000822/2026",
+  "texto": "ITEM DESCRIÇÃO DOS SERVIÇOS QUANTIDADE MÍNIMA A COM- PROVAR 23 EXECUÇÃO DE PAVIMENTO COM APLICAÇÃO DE CONCRETO ASFÁLTICO - EXCLUSIVE CARGA E TRANSPORTE. AF_11/2019 887,83 m³ 35 EXECUÇÃO DE PASSEIO (CALÇADA) OU PISO DE CONCRETO COM CONCRE- TO MOLDADO IN LOCO, USINADO, ACABAMENTO CONVENCIONAL, ESPES- SURA 8 CM, ARMADO. AF_08/2022 4.894,21 m²\n9 ITEM DESCRIÇÃO DOS SERVIÇOS QUANTIDADE MÍNIMA A COM- PROVAR 38 CONSTRUÇÃO DE BASE E SUB-BASE PARA PAVIMENTAÇÃO DE BRITA GRA- DUADA SIMPLES, COM ESPESSURA DE 15 CM - EXCLUSIVE CARGA E TRANSPORTE. AF_09/2024 2.663,48 m³ 51 CONSTRUÇÃO DE BASE E SUB-BASE PARA PAVIMENTAÇÃO DE MACADAME SECO, COM ESPESSURA DE 20 CM - EXCLUSIVE CARGA E TRANSPORTE. AF_09/2024 3.551,31 m³",
+  "esperado": [
+   {
+    "quantity": 887.83,
+    "unit": "m³",
+    "description": "EXECUÇÃO DE PAVIMENTO COM APLICAÇÃO DE CONCRETO ASFÁLTICO - EXCLUSIVE CARGA E TRANSPORTE. AF_11/2019"
+   },
+   {
+    "quantity": 4894.21,
+    "unit": "m²",
+    "description": "EXECUÇÃO DE PASSEIO (CALÇADA) OU PISO DE CONCRETO COM CONCRE- TO MOLDADO IN LOCO, USINADO, ACABAMENTO CONVENCIONAL, ESPES- SURA 8 CM, ARMADO. AF_08/2022"
+   },
+   {
+    "quantity": 2663.48,
+    "unit": "m³",
+    "description": "CONSTRUÇÃO DE BASE E SUB-BASE PARA PAVIMENTAÇÃO DE BRITA GRA- DUADA SIMPLES, COM ESPESSURA DE 15 CM - EXCLUSIVE CARGA E TRANSPORTE. AF_09/2024"
+   },
+   {
+    "quantity": 3551.31,
+    "unit": "m³",
+    "description": "CONSTRUÇÃO DE BASE E SUB-BASE PARA PAVIMENTAÇÃO DE MACADAME SECO, COM ESPESSURA DE 20 CM - EXCLUSIVE CARGA E TRANSPORTE. AF_09/2024"
+   }
+  ]
+ },
+ {
+  "id": "F6d",
+  "licitacao": "77816510000166-1-000310/2026",
+  "texto": "comprovando a execução das seguintes parcelas de maior relevância técnica e valor significativo em quantitativos mínimos: Descrição do Serviço Quantidade mínima exigida de Acervo CONSTRUÇÃO DE PONTES (OAEs) 1.091,51 m² PAVIMENTAÇÃO EM CONCRETO BETUMINOSO USINADO À QUENTE (CBUQ) 136,38 TON",
+  "esperado": [
+   {
+    "quantity": 1091.51,
+    "unit": "m²",
+    "description": "CONSTRUÇÃO DE PONTES (OAEs)"
+   },
+   {
+    "quantity": 136.38,
+    "unit": "t",
+    "description": "PAVIMENTAÇÃO EM CONCRETO BETUMINOSO USINADO À QUENTE (CBUQ)"
+   }
+  ]
+ },
+ {
+  "id": "F7a",
+  "licitacao": "04892707002235-1-000055/2026",
+  "texto": "QUADRO 1 - CAPACIDADE TÉCNICA OPERACIONAL - EXECUÇÃO DO OBJETO - EXPERIÊNCIA NO(S) SERVIÇO(S) REQUERIDO(S) Lote Descrição Extensão do Lote Pretendido Extensão a ser comprovada 4 Execução de Serviços de Restauração e/ou Recuperação em Rodovias Pavimentadas 98,90 km ext ≥ 49,00 km QUADRO 2 - CAPACIDADE TÉCNICA OPERACIONAL - ITENS DE MAIOR RELEVÂNCIA - EXPERIÊNCIA NO(S) SERVIÇO(S) REQUERIDO(S) Lote Descrição Quantidade pretendida Quantidade a ser comprovada 4 Execução de Concreto Asfáltico (CBUQ) - Execução de capa de rolamento, inclusive usinagem 86.412,412 t ≥ 43.000 t",
+  "esperado": [
+   {
+    "quantity": 49,
+    "unit": "km",
+    "description": "Execução de Serviços de Restauração e/ou Recuperação em Rodovias Pavimentadas"
+   },
+   {
+    "quantity": 43000,
+    "unit": "t",
+    "description": "Execução de Concreto Asfáltico (CBUQ) - Execução de capa de rolamento, inclusive usinagem"
+   }
+  ]
+ },
+ {
+  "id": "F7b",
+  "licitacao": "04892707000100-1-000128/2026",
+  "texto": "Quadro 19 - Critério de aceitação para atestados de Projeto de Engenharia SERVIÇO QUANTIDADE MÍNIMA A COMPROVAR POR SERVIÇO E LOTE LOTE 1 LOTE 2 LOTE 3 LOTE 4 LOTE 5 Projeto de Duplicação/Ampliação de capacidade Rodoviária e Melhoria de Segurança 30 km 40 km 50 km 50 km 50 km Projeto de Pavimentação que contenha a especialidade de pavimento rígido 20 km 20 km 20 km 20 km 20 km Quantidade de atestados a serem apresentados 2 2 2 2 2",
+  "esperado": [
+   {
+    "quantity": 30,
+    "unit": "km",
+    "description": "Projeto de Duplicação/Ampliação de capacidade Rodoviária e Melhoria de Segurança"
+   },
+   {
+    "quantity": 20,
+    "unit": "km",
+    "description": "Projeto de Pavimentação que contenha a especialidade de pavimento rígido"
+   }
+  ]
+ },
+ {
+  "id": "F9a",
+  "licitacao": "42498600000171-1-003627/2026",
+  "texto": "4.2 São consideradas parcelas de maior relevância técnica: 1- Execução de revestimento em CBUQ – Concreto Betuminoso Usinado a Quente; Quantidade a ser contratada: 1.656,46 t Quantidade mínima exigida para comprovação: 828,23 t 2- Execução de pátio de concreto. Quantidade a ser contratada: 13.613,36 m² Quantidade mínima exigida para comprovação: 6.806,68 m²\n5 de 121 3- Execução/implantação de rede de drenagem com emprego de tubos de concreto e/ou execução de galeria em concreto para captação de águas pluviais; Quantidade a ser contratada: 2.265,50 m Quantidade mínima exigida para comprovação: 1.132,75 m",
+  "esperado": [
+   {
+    "quantity": 828.23,
+    "unit": "t",
+    "description": "Execução de revestimento em CBUQ – Concreto Betuminoso Usinado a Quente"
+   },
+   {
+    "quantity": 6806.68,
+    "unit": "m²",
+    "description": "Execução de pátio de concreto."
+   },
+   {
+    "quantity": 1132.75,
+    "unit": "m",
+    "description": "Execução/implantação de rede de drenagem com emprego de tubos de concreto e/ou execução de galeria em concreto para captação de águas pluviais"
+   }
+  ]
+ },
+ {
+  "id": "F10a",
+  "licitacao": "07954605000160-1-000675/2026",
+  "texto": "a) ELABORAÇÃO DE “PROJETO FINAL DE ENGENHARIA” E/OU “PROJETO EXECUTIVO” DE 01 (UMA) PONTE, VIADUTO E/OU TÚNEL, EM QUANTIDADE NÃO INFERIOR A 1.850,00 M²; b) EXECUÇÃO DE 01 (UMA) PONTE, VIADUTO E/OU TÚNEL, EM QUANTIDADE NÃO INFERIOR A 1.850,00M²; c) EXECUÇÃO DE GALERIA RETANGULAR DE CONCRETO ARMADO, COM ÁREA MÍNIMA DA SEÇÃO DE CONCRETO DE 1,2M², FCK MÍNIMO DE 20MPA EM QUANTIDADE NÃO INFERIOR A 490,00 M; d) EXECUÇÃO DE PAVIMENTAÇÃO FLEXÍVEL, RÍGIDA E/OU MISTA, EM QUANTIDADE NÃO INFERIOR A 8.500,00 M² OU 1.700,00M³.",
+  "esperado": [
+   {
+    "quantity": 1850,
+    "unit": "m²",
+    "description": "ELABORAÇÃO DE “PROJETO FINAL DE ENGENHARIA” E/OU “PROJETO EXECUTIVO” DE 01 (UMA) PONTE, VIADUTO E/OU TÚNEL"
+   },
+   {
+    "quantity": 1850,
+    "unit": "m²",
+    "description": "EXECUÇÃO DE 01 (UMA) PONTE, VIADUTO E/OU TÚNEL"
+   },
+   {
+    "quantity": 490,
+    "unit": "m",
+    "description": "EXECUÇÃO DE GALERIA RETANGULAR DE CONCRETO ARMADO, COM ÁREA MÍNIMA DA SEÇÃO DE CONCRETO DE 1,2M², FCK MÍNIMO DE 20MPA"
+   },
+   {
+    "quantity": 8500,
+    "unit": "m²",
+    "description": "EXECUÇÃO DE PAVIMENTAÇÃO FLEXÍVEL, RÍGIDA E/OU MISTA"
+   }
+  ]
+ },
+ {
+  "id": "F10b",
+  "licitacao": "42498733000148-1-001813/2026",
+  "texto": "seguintes parcelas de maior relevância : 1 Execução de passeio (calçada) e/ou piso de concreto moldado in loco – quantidade mínima de 3.000 m³ ou, alternativamente, 37.500 m², considerando espessura mínima de 8 cm 2 Execução de rede de drenagem em galeria retangular pré-fabricada em concreto armado e/ou protendido – fornecimento e assentamento de, no mínimo, 650,00 m de galeria fechada para drenagem pluvial, com perímetro interno mínimo de 3,00 m 3 Execução de pavimento em concreto asfáltico – quantidade mínima de 750 m³ ou, alternativamente, 15.000 m², considerando espessura mínima de 5 cm 4 Execução de superestrutura de pontes, viadutos ou passarelas em concreto protendido pré-fabricada – quantidade mínima de 85 m.",
+  "esperado": [
+   {
+    "quantity": 3000,
+    "unit": "m³",
+    "description": "Execução de passeio (calçada) e/ou piso de concreto moldado in loco"
+   },
+   {
+    "quantity": 650,
+    "unit": "m",
+    "description": "Execução de rede de drenagem em galeria retangular pré-fabricada em concreto armado e/ou protendido – fornecimento e assentamento de"
+   },
+   {
+    "quantity": 750,
+    "unit": "m³",
+    "description": "Execução de pavimento em concreto asfáltico"
+   },
+   {
+    "quantity": 85,
+    "unit": "m",
+    "description": "Execução de superestrutura de pontes, viadutos ou passarelas em concreto protendido pré-fabricada"
+   }
+  ]
+ },
+ {
+  "id": "F10c",
+  "licitacao": "33781055000135-1-000239/2026",
+  "texto": "9.34.1.1. execução de obra (construção ou reforma) de edificação de pesquisa biomédica ou hospitalar ou industrial farmacêutica, com 7.500 m² no mínimo; 9.34.1.2. execução de obra (construção ou reforma) de estrutura de concreto armado, com 06 pavimentos e 7.500 m² no mínimo; 9.34.1.3. execução de obra (construção ou reforma) com fundação tipo estaca hélice contínua, com 5.000 m no mínimo; 9.34.1.4. execução de obra com subestação de média tensão, contendo gerador de energia com potência de 1.000 kVA no mínimo;",
+  "esperado": [
+   {
+    "quantity": 7500,
+    "unit": "m²",
+    "description": "execução de obra (construção ou reforma) de edificação de pesquisa biomédica ou hospitalar ou industrial farmacêutica"
+   },
+   {
+    "quantity": 7500,
+    "unit": "m²",
+    "description": "execução de obra (construção ou reforma) de estrutura de concreto armado, com 06 pavimentos"
+   },
+   {
+    "quantity": 5000,
+    "unit": "m",
+    "description": "execução de obra (construção ou reforma) com fundação tipo estaca hélice contínua"
+   },
+   {
+    "quantity": 1000,
+    "unit": "kVA",
+    "description": "execução de obra com subestação de média tensão, contendo gerador de energia com potência de"
+   }
+  ]
+ },
+ {
+  "id": "F10d",
+  "licitacao": "45751435000106-1-000089/2026",
+  "texto": "2) BASE BETUMINOSA RECICLADA Execução de camada estrutural de base ou sub-base de pavimento mediante reciclagem a frio de materiais contendo RCC e/ou RAP, com estabilização mediante incorporação de CAP – Cimento Asfáltico de Petróleo sob forma de espuma de asfalto – quantidade mínima: 2.677,74 m³.",
+  "esperado": [
+   {
+    "quantity": 2677.74,
+    "unit": "m³",
+    "description": "BASE BETUMINOSA RECICLADA Execução de camada estrutural de base ou sub-base de pavimento mediante reciclagem a frio de materiais contendo RCC e/ou RAP, com estabilização mediante incorporação de CAP – Cimento Asfáltico de Petróleo sob forma de espuma de asfalto"
+   }
+  ]
+ },
+ {
+  "id": "F10e",
+  "licitacao": "76105618000188-1-000656/2026",
+  "texto": "I. Execução de sistema de drenagem pluvial com assentamento de tubulações de concreto, em quantitativo mínimo de 831,22 m; Justificativa: A drenagem pluvial constitui parcela de elevada relevância técnica, sendo responsável pela coleta, condução e destinação adequada das águas pluviais, condição indispensável para a durabilidade do pavimento e para a segurança da infraestrutura projetada. O grupo \"Drenagem\" representa aproximadamente 31,65% do valor total da contratação, correspondendo a R$ 780.346,64. O quantitativo mínimo exigido foi obtido a partir da soma das extensões dos tubos de concreto previstos em projeto, compreendendo 1.362,04 m de BSTC Ø 0,40 m, 292,56 m de BSTC Ø 0,60 m e 7,84 m de BSTC Ø 0,80 m totalizando 1.662,44 m. Aplicando-se o percentual de 50%, obtém-se o quantitativo mínimo de 831,22 m. II. Execução de base e/ou sub-base granular para pavimentação viária, em quantitativo mínimo de 1.003,12 m³;",
+  "esperado": [
+   {
+    "quantity": 831.22,
+    "unit": "m",
+    "description": "Execução de sistema de drenagem pluvial com assentamento de tubulações de concreto"
+   },
+   {
+    "quantity": 1003.12,
+    "unit": "m³",
+    "description": "Execução de base e/ou sub-base granular para pavimentação viária"
+   }
+  ]
+ },
+ {
+  "id": "F10f",
+  "licitacao": "63025530000104-1-000013/2027",
+  "texto": "característica(s) mínima(s): 8.30.1.1. Capacitação técnico-operacional da licitante deverá considerar 50% da área dos edifícios,ou seja 531,93 m2.",
+  "esperado": [
+   {
+    "quantity": 531.93,
+    "unit": "m²",
+    "description": "Capacitação técnico-operacional da licitante deverá considerar 50% da área dos edifícios"
+   }
+  ]
+ },
+ {
+  "id": "F10g",
+  "licitacao": "34023077000107-1-000078/2026",
+  "texto": "9.33.1.1. Execução de obra de construção, conclusão, ampliação ou reforma de edificação vertical, com área construída igual ou superior a 3.800 m² (três mil e oitocentos mil metros quadrados), constituída por, no mínimo, 4 (quatro) pavimentos, além de pavimento técnico, ou edificação de complexidade equivalente ou superior, compreendendo serviços civis, vedações e divisórias, revestimentos, acabamentos e instalações prediais. 9.33.1.2. Execução de instalações elétricas prediais, compreendendo infraestrutura de distribuição, cabos alimentadores, leitos, eletrocalhas e/ou eletrodutos, quadros de distribuição, Quadro Geral de Baixa Tensão – QGBT, circuitos de força e iluminação, sistema de aterramento e instalação e/ou integração de conjunto de transformadores com potência total instalada igual ou superior a 1.500 kVA.",
+  "esperado": [
+   {
+    "quantity": 3800,
+    "unit": "m²",
+    "description": "Execução de obra de construção, conclusão, ampliação ou reforma de edificação vertical, com área construída"
+   },
+   {
+    "quantity": 1500,
+    "unit": "kVA",
+    "description": "Execução de instalações elétricas prediais, compreendendo infraestrutura de distribuição, cabos alimentadores, leitos, eletrocalhas e/ou eletrodutos, quadros de distribuição, Quadro Geral de Baixa Tensão – QGBT, circuitos de força e iluminação, sistema de aterramento e instalação e/ou integração de conjunto de transformadores com potência total instalada"
+   }
+  ]
+ },
+ {
+  "id": "F8a",
+  "licitacao": "05529895000170-1-000014/2026",
+  "texto": "conforme abaixo: Fundação de rachão: 7.219 m³; Geogrelha de reforço em polietileno, ou material tecnicamente equivalente, com resistência transversal mínima de 100 kN/m e resistência longitudinal mínima de 100 kN/m: 4.373 m²; Revestimento de mistura asfáltica tipo SMA com polímero e fibra: 366,86 m³; Base betuminosa de materiais provenientes dos resíduos sólidos da construção civil (rcc) e/ou da fresagem de pavimentos asfálticos (rap) reciclado em usina móvel com até 3% de cap, fornecimento e aplicação: 714,08 m³; Concreto asfáltico usinado a quente - Binder : 276 m³; Passeio de concreto armado, incluindo a caixa: 261m³; Sarjeta de concreto, inclusive preparo da caixa: 140m³;",
+  "esperado": [
+   {
+    "quantity": 7219,
+    "unit": "m³",
+    "description": "Fundação de rachão"
+   },
+   {
+    "quantity": 4373,
+    "unit": "m²",
+    "description": "Geogrelha de reforço em polietileno, ou material tecnicamente equivalente, com resistência transversal mínima de 100 kN/m e resistência longitudinal mínima de 100 kN/m"
+   },
+   {
+    "quantity": 366.86,
+    "unit": "m³",
+    "description": "Revestimento de mistura asfáltica tipo SMA com polímero e fibra"
+   },
+   {
+    "quantity": 714.08,
+    "unit": "m³",
+    "description": "Base betuminosa de materiais provenientes dos resíduos sólidos da construção civil (rcc) e/ou da fresagem de pavimentos asfálticos (rap) reciclado em usina móvel com até 3% de cap, fornecimento e aplicação"
+   },
+   {
+    "quantity": 276,
+    "unit": "m³",
+    "description": "Concreto asfáltico usinado a quente - Binder"
+   },
+   {
+    "quantity": 261,
+    "unit": "m³",
+    "description": "Passeio de concreto armado, incluindo a caixa"
+   },
+   {
+    "quantity": 140,
+    "unit": "m³",
+    "description": "Sarjeta de concreto, inclusive preparo da caixa"
+   }
+  ]
+ }
+]
