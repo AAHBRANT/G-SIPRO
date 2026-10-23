@@ -899,3 +899,46 @@ direito de realizar a vistoria técnica.`;
     expect(lidos.some((nome) => nome.endsWith(".docx"))).toBe(false);
   });
 });
+
+/** Achados do corpus de 22/10/2026 sobre a escolha dos documentos. */
+describe("escolha dos documentos na leitura com anexos", () => {
+  const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  // Um .docx de verdade É um zip: era aberto como pacote e descartado.
+  const docxDeVerdade = Buffer.from(zipSync({ "word/document.xml": strToU8("<w:document/>"), "[Content_Types].xml": strToU8("<Types/>") }));
+
+  it("lê o edital publicado em Word (.docx é zip por dentro, mas é documento)", async () => {
+    const { service, pdfText } = montar({
+      files: {
+        list: vi.fn(async () => [arquivo({ title: "Edital CE 07/2026" })]),
+        download: vi.fn(async () => baixado({ filename: "CE_07_2026.docx", mimeType: DOCX, bytes: docxDeVerdade })),
+      },
+      pdfText: { extract: vi.fn(async () => "Empresas reunidas em consórcio: é vedada a participação de consórcio.") },
+    });
+    const outcome = await service.read("t-1", auth, undefined, false, true);
+
+    expect(outcome.status).toBe("READ");
+    expect(pdfText.extract).toHaveBeenCalledWith(docxDeVerdade, "docx");
+  });
+
+  it("ignora o lixo do Mac e o cronograma/BDI/planilha que vêm como 'anexo'", async () => {
+    const pacote = Buffer.from(zipSync({
+      "EDITAL.pdf": strToU8("edital"),
+      "__MACOSX/._EDITAL.pdf": strToU8("lixo"),
+      "ANEXO XIV - CRONOGRAMA.pdf": strToU8("cronograma"),
+      "ANEXO XV - B.D.I..pdf": strToU8("bdi"),
+      "ANEXO XIII - TERMO DE REFERENCIA.pdf": strToU8("tr"),
+    }));
+    const { service, readings } = montar({
+      files: {
+        list: vi.fn(async () => [arquivo({ title: "Edital.zip" })]),
+        download: vi.fn(async () => baixado({ filename: "documento.zip", mimeType: "application/zip", bytes: pacote })),
+      },
+      pdfText: { extract: vi.fn(async () => "Empresas reunidas em consórcio: é vedada a participação de consórcio.") },
+    });
+    await service.read("t-1", auth, undefined, false, true);
+
+    const lidos = vi.mocked(readings.save).mock.calls[0]?.[0].documentos?.map((d) => d.filename) ?? [];
+    expect(lidos.some((n) => /MACOSX|CRONOGRAMA|B\.D\.I/i.test(n))).toBe(false);
+    expect(lidos.some((n) => /TERMO DE REFERENCIA/i.test(n))).toBe(true);
+  });
+});

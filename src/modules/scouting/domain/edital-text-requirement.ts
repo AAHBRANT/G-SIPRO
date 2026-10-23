@@ -419,8 +419,12 @@ export function editalRequirementFromText(textoOriginal: string): EditalRequirem
   // do DNIT e frases com "quantidade mínima" / "não inferior a". Só entra
   // quando os dois formatos originais não acharam nada — o que já era lido
   // continua sendo lido do mesmo jeito.
-  const porPadrao = dosDoisFormatos.length > 0 ? [] : parcelasPorPadrao(textoOriginal);
-  const services = dosDoisFormatos.length > 0 ? dosDoisFormatos : porPadrao;
+  // Os dois rodam, e vale o que achou mais parcelas: no corpus de 23/10/2026
+  // o leitor "100%" casou uma tabela de outro formato pela metade e devolveu
+  // UMA parcela suja, escondendo a tabela inteira que o terceiro leitor lia.
+  const novo = parcelasPorPadrao(textoOriginal);
+  const porPadrao = novo.length > dosDoisFormatos.length ? novo : [];
+  const services = porPadrao.length > 0 ? porPadrao : dosDoisFormatos;
 
   const limitations = [
     ...(services.length === 0 && !secaoServicos ? ["não foi possível localizar no texto: a lista de parcelas de maior relevância"] : []),

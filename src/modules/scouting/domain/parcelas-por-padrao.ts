@@ -64,8 +64,12 @@ export function limparTexto(texto: string): string {
     // e o PDF real costuma trazer vários ("28.961,4 5   9,65%").
     .replace(/\s+/g, " ")
     .replace(/https?:\/\/\S+/gi, " ")
-    // Tensão não é potência: "11,4 kV" não pode virar parcela em kVA.
+    // Tensão não é potência: "11,4 kV" não pode virar parcela em kVA — nem
+    // quando a extração parte o número ("1 1,4kV").
+    .replace(/(\d)\s(\d,\d+)\s*kV(?![A-Za-z])/g, "$1$2kV")
     .replace(/(\d)\s*kV(?![A-Za-z])/g, "$1 quilovolts")
+    // "(Quantidade: 4841 metros)": a palavra por extenso vira a unidade.
+    .replace(/(quantidade\s*:\s*[\d.,]+)\s*metros?\b/gi, "$1 m")
     .replace(/\S+@\S+\.\S+/g, " ")
     .replace(/P\s?á\s?g\s?i\s?n\s?a\s+\d+\s*\|\s*\d+/gi, " ")
     .replace(/P[áa]gina\s+\d+\s+de\s+\d+/gi, " ")
@@ -147,7 +151,10 @@ const pareceMinimo = (total: number, minimo: number) => minimo <= total && minim
  */
 function minimoSuspeito(texto: string, total: Extract<Token, { k: "num" }>, minimo: Extract<Token, { k: "num" }>): boolean {
   const bruto = texto.slice(minimo.ini, minimo.fim);
-  return /^0\d/.test(bruto) || (/^\d{1,2}$/.test(bruto) && /,/.test(texto.slice(total.ini, total.fim)));
+  return /^0\d/.test(bruto)
+    || (/^\d{1,2}$/.test(bruto) && /,/.test(texto.slice(total.ini, total.fim)))
+    // "m 59 8.17.2.4": o "mínimo" é o começo da numeração do subitem.
+    || /^\.\s?\d/.test(texto.slice(minimo.fim, minimo.fim + 3));
 }
 
 /**
@@ -193,9 +200,11 @@ function caudaEm(t: readonly Token[], i: number, texto: string): Cauda | undefin
   const quantidadeDeVerdade = (n: Extract<Token, { k: "num" }>, depois: number) => {
     const bruto = texto.slice(n.ini, n.fim);
     return !/^0\d/.test(bruto)
-      // Numeração de subitem: "25.4 Comprovação", "8.17.2.4".
-      && !/^\.\d/.test(texto.slice(n.fim, n.fim + 2))
+      // Numeração de subitem: "25.4 Comprovação", "25. 4", "8.17.2.4".
+      && !/^\.\s?\d/.test(texto.slice(n.fim, n.fim + 3))
       && !/\d\.$/.test(texto.slice(Math.max(0, n.ini - 2), n.ini))
+      // Código de material colado ao número: "aço CA-50 kg" não é 50 kg.
+      && !/\b[A-Z]{1,3}-\s?$/.test(texto.slice(Math.max(0, n.ini - 6), n.ini))
       && !POR_TEMPO.test(texto.slice(depois, depois + 6))
       && !/^\s*quilovolts/.test(texto.slice(n.fim, n.fim + 12));
   };
@@ -218,7 +227,7 @@ function caudaEm(t: readonly Token[], i: number, texto: string): Cauda | undefin
 }
 
 /** Palavras de cabeçalho de tabela: a descrição da 1ª linha começa depois delas. */
-const CABECALHO = /%\s*da\s*(?:qtde?|quantidade)\.?\s*total|(?:quantidade|quant\.?|qtd\.?|qtde\.?)\s*(?:m[íi]nima|a ser comprovada|exigida|de planilha|prevista(?: na obra)?|pretendida|total|or[çc]ada)?[^A-Za-zÀ-ÿ]*(?:\(?\s*\d+\s*%\s*\)?)?|extens[ãa]o (?:a ser comprovada|do lote pretendido|total)[^A-Za-zÀ-ÿ]*|\bunid(?:ade)?\.?\b|\bund\.?\b|\bdescri[çc][ãa]o(?: dos servi[çc]os)?\b|\bservi[çc]os?\b(?= )|\bparcelas? de maior relev[âa]ncia(?: t[ée]cnica)?\b|\bitem\b|\blote\b|valor \(r\$\)|% do valor estimado/gi;
+const CABECALHO = /percentual\s+exigido|(?:quant(?:idade|\.)?\s+)?estimad[ao]\s*(?:\d+\s*%)?|%\s*da\s*(?:qtde?|quantidade)\.?\s*total|(?:quantidade|quant\.?|qtd\.?|qtde\.?)\s*(?:m[íi]nima|a ser comprovada|exigida|de planilha|prevista(?: na obra)?|pretendida|total|or[çc]ada)?[^A-Za-zÀ-ÿ]*(?:\(?\s*\d+\s*%\s*\)?)?|extens[ãa]o (?:a ser comprovada|do lote pretendido|total)[^A-Za-zÀ-ÿ]*|\bunid(?:ade)?\.?\b|\bund\.?\b|\bdescri[çc][ãa]o(?: dos servi[çc]os)?\b|\bservi[çc]os?\b(?= )|\bparcelas? de maior relev[âa]ncia(?: t[ée]cnica)?\b|\bitem\b|\blote\b|valor \(r\$\)|% do valor estimado/gi;
 
 const DESCARTAR = /qualitativ|quantidade de atestados|^total\s*$|total geral|engenheir|pontua[çc]|capital social|patrim[ôo]nio|dist[âa]ncia\s+m[áa]xima/i;
 
@@ -245,8 +254,10 @@ function limparDescricao(bruta: string): string {
       .replace(/^\s*(?:itens|parcelas|servi[çc]os)\s+de\s+maior\s+relev[âa]ncia(?:\s+t[ée]cnica)?(?:\s+e\s+valor\s+significativo)?\s*:?\s*/i, "")
       .replace(/^\s*[A-Za-zÀ-ÿ ]{3,40}:\s*\d{1,2}\s+(?=[A-Za-zÀ-ÿ])/, "");
   }
+  // Introdução terminada em ":" seguida de marcador de lista ("•", "" do Word).
+  d = d.replace(/^.*:\s*(?=[•\uf0b7▪●])/, "").replace(/^[\s•\uf0b7▪●◦]+/, "");
   // Marcador de item ou de lote no começo: "1", "01", "1.1", "IV", "a)", "4 ".
-  d = d.replace(/^(?:[\s–—\-:;,.]*(?:\d{1,2}(?:\.\d{1,2})*|[IVXL]{1,5}|[a-z])[).\-–—]?\s+)+/i, "");
+  d = d.replace(/^(?:[\s–—\-:;,.]*(?:[a-z]\.\d{1,2}(?:\.\d{1,2})*|\d{1,2}(?:\.\d{1,2})*|[IVXL]{1,5}|[a-z])[).\-–—]?\s+)+/i, "");
   return d.replace(/^[\s–—\-:;,.]+|[\s–—\-:;,]+$/g, "").replace(/\s+/g, " ").trim();
 }
 
@@ -256,12 +267,17 @@ const descricaoValida = (d: string) =>
 /** Linhas de tabela achatada dentro de um trecho já limpo. */
 export function parcelasEmTabelaAchatada(trecho: string): RequiredService[] {
   const t = tokens(trecho);
+  // Tabela com coluna total+mínimo: cauda de um número só, COLADA na unidade ("cimento 50kg"), é medida da descrição.
+  let duplas = 0, simples = 0;
+  for (let k = 0; k < t.length;) { const c = caudaEm(t, k, trecho); if (c && c.tamanho >= 3) { duplas += 1; k += c.tamanho; } else if (c) { simples += 1; k += c.tamanho; } else k += 1; }
+  const tabelaDeDuasColunas = duplas >= 2 && duplas > simples;
+  const colada = (c: Cauda) => /^\d[\d.,]*[A-Za-z]/.test(trecho.slice(c.ini, c.fim));
   const parcelas: RequiredService[] = [];
   let inicioDaDescricao = 0;
   let i = 0;
   while (i < t.length) {
     const cauda = caudaEm(t, i, trecho);
-    if (!cauda) { i += 1; continue; }
+    if (!cauda || (tabelaDeDuasColunas && cauda.tamanho < 3 && colada(cauda))) { i += 1; continue; }
     // Pula o que acompanha a cauda e ainda é da mesma linha: "(30%)",
     // "R$ 35.175.733,03", o valor sem "R$" e o "75,77%" das colunas de
     // valor — até a primeira palavra, que já é a linha seguinte.
@@ -288,13 +304,17 @@ const ANCORAS_DE_MINIMO = [
   String.raw`(?:em\s+)?quantitativo\s+m[íi]nimo\s+de\s+`,
   String.raw`(?:em\s+quantidade\s+)?n[ãa]o\s+inferior\s+a\s+`,
   String.raw`igual\s+ou\s+superior\s+a\s+`,
+  // "(Quantidade: 831,42 m³)" ou "… in loco”. Quantidade : 26 unidades",
+  // logo depois da descrição do item.
+  String.raw`(?:\(|(?<=[.;”"]\s))\s*quantidade\s*:\s*`,
   // "(?<!\p{L})": "interno mínimo de 3,00 m" não é "no mínimo".
   String.raw`(?<![A-Za-zÀ-ÿ])no\s+m[íi]nimo,?\s+`,
   String.raw`ou\s+seja,?\s+`,
+  String.raw`[áa]rea\s+(?:n?o\s+)?m[íi]nim[ao]\s+(?:de\s+)?`,
 ];
 const FRASE = new RegExp(String.raw`(?:${ANCORAS_DE_MINIMO.join("|")})${QTD_UN}`, "gi");
 /** Onde começa um item na prosa: "a)", "b)", "1-", "2 ", "II.", "9.34.1.1.", ";". */
-const INICIO_DE_ITEM = /(?:^|[;.]\s+|\s)(?:[a-z]\)|\d{1,2}\s?[-–)]|\d{1,2}(?:\.\d{1,2}){1,4}\.?|[IVX]{1,4}[.)-])\s+|;\s*/gi;
+const INICIO_DE_ITEM = /(?:^|[;.]\s+|\s)(?:[a-z]\.\d{1,2}(?:\.\d{1,2})*\)|[a-z]\)|\d{1,2}\s?[-–)]|\d{1,2}(?:\.\d{1,2}){1,6}\.?|[IVX]{1,4}[.)-])\s+|;\s*/gi;
 
 export function parcelasEmFrase(trecho: string): RequiredService[] {
   const parcelas: RequiredService[] = [];
@@ -303,6 +323,9 @@ export function parcelasEmFrase(trecho: string): RequiredService[] {
     const unidade = unidadeDe(m[2]!);
     if (!unidade) continue;
     if (JUSTIFICATIVA.test(trecho.slice(Math.max(0, m.index! - 80), m.index))) continue;
+    // Linha de quadro de pontuação: "com área mínima de 10.000m². 1 5" — as
+    // duas notas (por atestado, máxima) logo depois da medida.
+    if (/^\.?\s+\d{1,2}\s+\d{1,2}(?!\d|[.,]\d)/.test(trecho.slice(m.index! + m[0].length, m.index! + m[0].length + 10))) continue;
     // A descrição é o item em que a âncora está: do último marcador de item
     // (ou do fim da frase anterior) até a âncora.
     // "Quantidade a ser contratada: 1.656,46 t" é o TOTAL, que vem antes do
@@ -321,6 +344,17 @@ export function parcelasEmFrase(trecho: string): RequiredService[] {
   return parcelas;
 }
 
+const LOTE_PCT = new RegExp(String.raw`\bLOTE\s*(\d{1,2})\s*[=:–-]\s*(${NUM})\s*(${UNIDADE_TEXTO})(?![A-Za-zÀ-ÿ0-9])[\s.]*(\d{1,3}(?:,\d+)?)\s*%\s*d[eo]\s*(${NUM})\s*(${UNIDADE_TEXTO})(?![A-Za-zÀ-ÿ0-9])`, "gi");
+export function parcelasPorLote(trecho: string): RequiredService[] {
+  const r: RequiredService[] = [];
+  for (const m of trecho.matchAll(LOTE_PCT)) {
+    const u = unidadeDe(m[3]!); const q = numeroBR(m[2]!); const p = numeroBR(m[4]!); const tot = numeroBR(m[5]!);
+    if (!u || u !== unidadeDe(m[6]!) || Math.abs(q - tot * p / 100) > Math.max(0.05, tot * 0.005)) continue;
+    r.push({ description: `Lote ${m[1]!.padStart(2, "0")} – área construída mínima (${p}% de ${m[5]} ${u})`, quantity: q, unit: u });
+  }
+  return r;
+}
+
 export function parcelasEmListaComDoisPontos(trecho: string): RequiredService[] {
   const parcelas: RequiredService[] = [];
   for (const item of trecho.split(/;/)) {
@@ -337,8 +371,8 @@ export function parcelasEmListaComDoisPontos(trecho: string): RequiredService[] 
 // Onde procurar
 // ---------------------------------------------------------------------------
 
-const ANCORA_DA_SECAO = /parcelas? de maior relev[âa]ncia|itens? de maior relev[âa]ncia|servi[çc]os? de maior relev[âa]ncia|qualifica[çc][ãa]o t[ée]cnico[\s-]*operacional|capacidade t[ée]cnico[\s-]*operacional|capacidade t[ée]cnica operacional|quantitativos? m[íi]nimos?|quantidade m[íi]nima|a ser comprovad[ao]|crit[ée]rio de aceita[çc][ãa]o/gi;
-const FIM_DA_SECAO = /qualifica[çc][ãa]o t[ée]cnico[\s-]*profissional|capacidade t[ée]cnico[\s-]*profissional|qualifica[çc][ãa]o econ[ôo]mico|observa[çc][õo]es\s*:|quantidade de atestados|da subcontrata[çc][ãa]o|planilha or[çc]ament[áa]ria sint[ée]tica|tabela de pontua[çc][ãa]o|proposta t[ée]cnica|crit[ée]rios? de julgamento|rela[çc][ãa]o de m[áa]quinas|discrimina[çc][ãa]o\s+(?:dos\s+)?equipamentos|rela[çc][ãa]o\s+(?:de|dos)\s+equipamentos|aparelhamento\s+(?:t[ée]cnico|m[íi]nimo)|estudo t[ée]cnico preliminar/i;
+const ANCORA_DA_SECAO = /parcelas?\s+(?:considerad[ao]s?\s+)?(?:de\s+)?(?:maior|mais)\s+relev[âa]n(?:cia|tes?)|quantidades\s+m[íi]nimas|aptid[ãa]o\s+t[ée]cnico[\s-]*operacional|complexidade\s+tecnol[óo]gica\s+e\s+operacional|comprova[çc][ãa]o\s+de\s+forma\s+quantitativa|certid[ãa]o\s+de\s+acervo\s+operacional|itens? de maior relev[âa]ncia|servi[çc]os? de maior relev[âa]ncia|qualifica[çc][ãa]o t[ée]cnico[\s-]*operacional|capacidade t[ée]cnico[\s-]*operacional|capacidade t[ée]cnica operacional|quantitativos? m[íi]nimos?|quantidade m[íi]nima|a ser comprovad[ao]|crit[ée]rio de aceita[çc][ãa]o/gi;
+const FIM_DA_SECAO = /comprova[çc][ãa]o\s+de\s+forma\s*(?:qualitativa|;)|qualifica[çc][ãa]o t[ée]cnico[\s-]*profissional|capacidade t[ée]cnico[\s-]*profissional|qualifica[çc][ãa]o econ[ôo]mico|observa[çc][õo]es\s*:|quantidade de atestados|da subcontrata[çc][ãa]o|planilha or[çc]ament[áa]ria sint[ée]tica|tabela de pontua[çc][ãa]o|proposta t[ée]cnica|crit[ée]rios? de julgamento|rela[çc][ãa]o de m[áa]quinas|discrimina[çc][ãa]o\s+(?:dos\s+)?equipamentos|rela[çc][ãa]o\s+(?:de|dos)\s+equipamentos|aparelhamento\s+(?:t[ée]cnico|m[íi]nimo)|estudo t[ée]cnico preliminar/i;
 
 /**
  * Tabela sem coluna de quantidade (a do técnico-profissional, a de serviços
@@ -361,7 +395,7 @@ const CABECALHO_DE_TABELA = /(?:unid(?:ade)?\.?|und\.?|\bun\b)\s+(?:quant|qtd|qt
  * < Y" e conceitos Ótimo/Bom/Regular. Não é exigência de habilitação — no
  * corpus, 40 parcelas inventadas vinham daí.
  */
-const QUADRO_DE_PONTUACAO = /(?:(?<!n[ãa]o\s)\be\s+inferior\s+[aà]\b[^]{0,300}){3}|(?:(?:≥|>=|superior\s+[aà])[^<;]{0,60}(?:<|inferior\s+[aà])[^;]{0,200}){2}|\(N[1-4]\)|\b(?:[óo]tim[ao]|insuficiente)\b[^.;]{0,80}\b(?:bo[am]|ruim|regular)\b|(?:\d+(?:,\d+)?\s+pontos?\b[^]{0,300}){2}|(?:<\s*[\d.,]+\s*(?:m²|m³|m|km|t)?\s+at[ée]\s+[\d.,]+[^]{0,300}){2}/i;
+const QUADRO_DE_PONTUACAO = /(?:(?<!n[ãa]o\s)\be\s+inferior\s+[aà]\b[^]{0,300}){3}|(?:(?:≥|>=|superior\s+[aà])[^<;]{0,60}(?:<|inferior\s+[aà])[^;]{0,200}){2}|\(N[1-4]\)|\b(?:[óo]tim[ao]|insuficiente)\b[^.;]{0,80}\b(?:bo[am]|ruim|regular)\b|(?:\d+(?:,\d+)?\s+pontos?\b[^]{0,300}){2}|pontua[çc][ãa]o\s+m[áa]xima|(?:\b\d,\d0\s+\d{1,2},\d0\b[^]{0,300}){2}|(?:<\s*[\d.,]+\s*(?:m²|m³|m|km|t)?\s+at[ée]\s+[\d.,]+[^]{0,300}){2}/i;
 /** Tabela de habilitação de verdade nunca cai pelo quadro de pontuação que vem logo depois. */
 const TABELA_DE_HABILITACAO = /quantidade\s+m[íi]nima\s+exigida|qtd\.?\s+total[^.;]{0,40}m[íi]nima|quant(?:idade|\.)?\s+m[íi]nima\s+a\s+(?:ser\s+)?comprova/i;
 
@@ -409,6 +443,8 @@ function semRepetir(lista: readonly RequiredService[]): RequiredService[] {
 export function parcelasPorPadrao(textoBruto: string): RequiredService[] {
   const texto = limparTexto(textoBruto);
   let melhor: RequiredService[] = [];
+  const porLote = semRepetir(parcelasPorLote(texto));
+  if (porLote.length >= 2 && porLote.length <= MAX_PARCELAS) return porLote;
   for (const ancora of texto.matchAll(ANCORA_DA_SECAO)) {
     const ini = ancora.index!;
     // Âncora citada dentro da regra de subcontratação não é a exigência.
@@ -450,4 +486,31 @@ function escolher(frase: RequiredService[], lista: RequiredService[], tabela: Re
   }
   if (valida(lista)) return lista;
   return tabelaValida;
+}
+
+const palavras = (s: string) => new Set(s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").match(/[a-z]{4,}/g) ?? []);
+
+/**
+ * A mesma parcela lida em dois documentos da licitação (edital e termo de
+ * referência repetem a tabela) chega com descrições diferentes — uma limpa,
+ * outra com cabeçalho colado — e a junção por descrição deixava as duas. No
+ * corpus de 23/10/2026: 23 duplicatas assim. Mesma quantidade, mesma unidade
+ * e descrição parecida (ao menos 40% das palavras em comum) é a mesma
+ * parcela: fica a descrição mais curta, que é a sem sujeira. Itens diferentes
+ * com o mesmo número (dois trechos de 7.200 m de serviços distintos) têm
+ * descrições sem palavras em comum e continuam separados.
+ */
+export function semDuplicatasEntreDocumentos(lista: readonly RequiredService[]): RequiredService[] {
+  const resultado: RequiredService[] = [];
+  for (const parcela of lista) {
+    const igual = resultado.findIndex((outra) => {
+      if (outra.quantity !== parcela.quantity || outra.unit !== parcela.unit) return false;
+      const a = palavras(outra.description), b = palavras(parcela.description);
+      const comuns = [...a].filter((p) => b.has(p)).length;
+      return comuns / Math.max(1, Math.min(a.size, b.size)) >= 0.4;
+    });
+    if (igual < 0) resultado.push(parcela);
+    else if (parcela.description.length < resultado[igual]!.description.length) resultado[igual] = parcela;
+  }
+  return resultado;
 }

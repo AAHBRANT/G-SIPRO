@@ -923,5 +923,326 @@
     "description": "Sarjeta de concreto, inclusive preparo da caixa"
    }
   ]
+ },
+ {
+  "id": "R22112109-0001632026",
+  "licitacao": "22112109000153-1-000163/2026",
+  "texto": "8.2   Exigências de habilitação – Qualificação Técnica  8.2.1   Área mínima, correspondente a 40% do total previsto a ser contratada por lote  •   LOTE 01 = 462,46 m²   40% de 1.156,16 m²  •   LOTE 02 = 433,56 m²   40% de 1.083,90 m²  •   LOTE 03 = 520,27 m²   40% de 1.300,68 m²  •   LOTE 04 = 346,84 m²   40% de 867,12 m²  •   LOTE 05 = 549,17 m²   40% de 1.372,94 m²  •   LOTE 06 = 1.445,20 m²   40% de 3.613,00 m²  8.2.2   Capacitação técnico-operacional  8.2.2.1 Certidão de Registro de Pessoa Jurídica",
+  "esperado": [
+   {
+    "quantity": 462.46,
+    "unit": "m²",
+    "description": "Lote 01 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.156,16 m²)"
+   },
+   {
+    "quantity": 433.56,
+    "unit": "m²",
+    "description": "Lote 02 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.083,90 m²)"
+   },
+   {
+    "quantity": 520.27,
+    "unit": "m²",
+    "description": "Lote 03 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.300,68 m²)"
+   },
+   {
+    "quantity": 346.84,
+    "unit": "m²",
+    "description": "Lote 04 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 867,12 m²)"
+   },
+   {
+    "quantity": 549.17,
+    "unit": "m²",
+    "description": "Lote 05 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.372,94 m²)"
+   },
+   {
+    "quantity": 1445.2,
+    "unit": "m²",
+    "description": "Lote 06 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 3.613,00 m²)"
+   }
+  ]
+ },
+ {
+  "id": "R22112109-0001642026",
+  "licitacao": "22112109000153-1-000164/2026",
+  "texto": "8.2   Exigências de habilitação – Qualificação Técnica  8.2.1   Área mínima, correspondente a 40% do total previsto a ser contratada por lote  •   LOTE 01 = 462,46 m²   40% de 1.156,16 m²  •   LOTE 02 = 433,56 m²   40% de 1.083,90 m²  •   LOTE 03 = 520,27 m²   40% de 1.300,68 m²  •   LOTE 04 = 346,84 m²   40% de 867,12 m²  •   LOTE 05 = 549,17 m²   40% de 1.372,94 m²  •   LOTE 06 = 1.445,20 m²   40% de 3.613,00 m²  8.2.2   Capacitação técnico-operacional  8.2.2.1 Certidão de Registro de Pessoa Jurídica",
+  "esperado": [
+   {
+    "quantity": 462.46,
+    "unit": "m²",
+    "description": "Lote 01 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.156,16 m²)"
+   },
+   {
+    "quantity": 433.56,
+    "unit": "m²",
+    "description": "Lote 02 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.083,90 m²)"
+   },
+   {
+    "quantity": 520.27,
+    "unit": "m²",
+    "description": "Lote 03 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.300,68 m²)"
+   },
+   {
+    "quantity": 346.84,
+    "unit": "m²",
+    "description": "Lote 04 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 867,12 m²)"
+   },
+   {
+    "quantity": 549.17,
+    "unit": "m²",
+    "description": "Lote 05 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 1.372,94 m²)"
+   },
+   {
+    "quantity": 1445.2,
+    "unit": "m²",
+    "description": "Lote 06 – execução concluída de obra completa (mesmo sistema construtivo), área construída mínima (40% de 3.613,00 m²)"
+   }
+  ]
+ },
+ {
+  "id": "R34841267-0001892026",
+  "licitacao": "34841267000123-1-000189/2026",
+  "texto": "TABELA DE QUANTIDADES MINIMAS EXIGIDAS  Item   Quantidade contratada  Quantidade exigida  Percentual exigido  Execução de pavimento com aplicação de concreto asfáltico, camada de rolamento - exclusive carga e transporte. af_11/2019  597,36 m³   298,68 m³   50,00%  Gabião com tela de arame galvanizado, fio 2,7mm, malha hexagonal 8 x 10cm, tipo caixa  1.380,74 m³   690,37 m³   50,00%  Alvenaria pedra granitica argamassada traço (1:5) - 1 saco cimento 50kg / 5 padio las areia dim. 0,35z0,45x0,23m - Confecção mecânica e transporte  1.176,37 m ³   588,18 m³   50,00%  Piso em concreto simples desempolado, fck = 21 MPa, e = 7 cm, com forma em quadro s 2,0x2,0m, para juntas de concretagem - tres usos  6.667,92 m²   3.333,96 m²   50,00%",
+  "esperado": [
+   {
+    "quantity": 298.68,
+    "unit": "m³",
+    "description": "Execução de pavimento com aplicação de concreto asfáltico, camada de rolamento - exclusive carga e transporte"
+   },
+   {
+    "quantity": 690.37,
+    "unit": "m³",
+    "description": "Gabião com tela de arame galvanizado, fio 2,7mm, malha hexagonal 8 x 10cm, tipo caixa"
+   },
+   {
+    "quantity": 588.18,
+    "unit": "m³",
+    "description": "Alvenaria pedra granítica argamassada traço (1:5) - confecção mecânica e transporte"
+   },
+   {
+    "quantity": 3333.96,
+    "unit": "m²",
+    "description": "Piso em concreto simples desempolado, fck = 21 MPa, e = 7 cm, com forma em quadros 2,0x2,0m"
+   }
+  ]
+ },
+ {
+  "id": "R34841267-0001902026",
+  "licitacao": "34841267000123-1-000190/2026",
+  "texto": "TABELA DE QUANTIDADES MINIMAS EXIGIDAS  Item   Quantidade contratada  Quantidade exigida  Percentual exigido  Execução de pavimento com aplicação de concreto asfáltico, camada de rolamento - exclusive carga e transporte. af_11/2019  597,36 m³   298,68 m³   50,00%  Gabião com tela de arame galvanizado, fio 2,7mm, malha hexagonal 8 x 10cm, tipo caixa  1.380,74 m³   690,37 m³   50,00%  Alvenaria pedra granitica argamassada traço (1:5) - 1 saco cimento 50kg / 5 padio las areia dim. 0,35z0,45x0,23m - Confecção mecânica e transporte  1.176,37 m ³   588,18 m³   50,00%  Piso em concreto simples desempolado, fck = 21 MPa, e = 7 cm, com forma em quadro s 2,0x2,0m, para juntas de concretagem - tres usos  6.667,92 m²   3.333,96 m²   50,00%",
+  "esperado": [
+   {
+    "quantity": 298.68,
+    "unit": "m³",
+    "description": "Execução de pavimento com aplicação de concreto asfáltico, camada de rolamento - exclusive carga e transporte"
+   },
+   {
+    "quantity": 690.37,
+    "unit": "m³",
+    "description": "Gabião com tela de arame galvanizado, fio 2,7mm, malha hexagonal 8 x 10cm, tipo caixa"
+   },
+   {
+    "quantity": 588.18,
+    "unit": "m³",
+    "description": "Alvenaria pedra granítica argamassada traço (1:5) - confecção mecânica e transporte"
+   },
+   {
+    "quantity": 3333.96,
+    "unit": "m²",
+    "description": "Piso em concreto simples desempolado, fck = 21 MPa, e = 7 cm, com forma em quadros 2,0x2,0m"
+   }
+  ]
+ },
+ {
+  "id": "R46392171-0000022027",
+  "licitacao": "46392171000104-1-000002/2027",
+  "texto": "b)   Comprovação de aptidão para execução de serviço de complexidade tecnológica e operacional equivalente ou superior com o objeto desta contratação, ou com o item pertinente, por meio da apresentação de certidões ou atestados, por pessoas jurídicas de direito público ou privado, ou regularmente emitido(s) pelo conselho profissional competente, com as seguintes características mínimas:  • Injeção de nata de cimento – 982597,22 kg;     Estaca tipo raiz, 400mm, com perfuração em solo – 13OT – 4493,00m;     Tirante 40TF 5 fios D = ½” forn. e inst. – 5254,50m;     Perfuração em solos ou rochas decompostas HX – 2830m;     Fornecimento e aplilcação de aço CA-50 – diâmetro ≥ ½” – 69539,24 kg.",
+  "esperado": [
+   {
+    "quantity": 982597.22,
+    "unit": "kg",
+    "description": "Injeção de nata de cimento"
+   },
+   {
+    "quantity": 4493,
+    "unit": "m",
+    "description": "Estaca tipo raiz, 400mm, com perfuração em solo – 13OT"
+   },
+   {
+    "quantity": 5254.5,
+    "unit": "m",
+    "description": "Tirante 40TF 5 fios D = ½” forn. e inst."
+   },
+   {
+    "quantity": 2830,
+    "unit": "m",
+    "description": "Perfuração em solos ou rochas decompostas HX"
+   },
+   {
+    "quantity": 69539.24,
+    "unit": "kg",
+    "description": "Fornecimento e aplicação de aço CA-50 – diâmetro ≥ ½”"
+   }
+  ]
+ },
+ {
+  "id": "R55021455-0001782026",
+  "licitacao": "55021455000185-1-000178/2026",
+  "texto": "Constituem as parcelas mais relevantes do objeto:\nPágina   148   de   239  FLS N°__________ Proc. Nº 8.512/2026 Ass._____________  COMPROVAÇÃO DE FORMA QUANTITATIVA  ITEM   Descrição   Und   Quant. Estimada   50%  1   ACO CA 50 (A OU B) FYK= 500 M PA   KG   71.123,38   35.561,69  2   ATERRO MECANIZADO DE VALA COM ESCAVADEIRA HIDRÁULICA   M3   11.600,64   5.800,32  3   FORNECIMENTO DE PERFIL SIMPLES \"I\" OU \"H\"   KG   62.800,00   31.400,00  4   PERFURAÇÃO EM SOLOS OU ROCHAS DECOMPOSTAS   M   1.668,00   834,00  5   Fornecimento e montagem de estrutura em aço ASTM-A36, sem pintura   KG   19.858,65   9.929,33  6   TRANSPORTE COM CAMINHÃO BASCULANTE DE 10 M³   M3XKM   139.398,35   69.699,18  7  Proteção passiva contra incêndio com tinta intumescente, com tempo requerido de resistência ao fogo TRRF = 60 min - aplicação em estrutura metálica  M2   1.460,84   730,42  8   TUBULÃO A CÉU ABERTO   M3   382,35   191,18  COMPROVAÇÃO DE FORMA QUALITATIVA",
+  "esperado": [
+   {
+    "quantity": 35561.69,
+    "unit": "kg",
+    "description": "Aço CA 50 (A ou B) fyk = 500 MPa"
+   },
+   {
+    "quantity": 5800.32,
+    "unit": "m³",
+    "description": "Aterro mecanizado de vala com escavadeira hidráulica"
+   },
+   {
+    "quantity": 31400,
+    "unit": "kg",
+    "description": "Fornecimento de perfil simples \"I\" ou \"H\""
+   },
+   {
+    "quantity": 834,
+    "unit": "m",
+    "description": "Perfuração em solos ou rochas decompostas"
+   },
+   {
+    "quantity": 9929.33,
+    "unit": "kg",
+    "description": "Fornecimento e montagem de estrutura em aço ASTM-A36, sem pintura"
+   },
+   {
+    "quantity": 69699.18,
+    "unit": "m³xkm",
+    "description": "Transporte com caminhão basculante de 10 m³"
+   },
+   {
+    "quantity": 730.42,
+    "unit": "m²",
+    "description": "Proteção passiva contra incêndio com tinta intumescente, TRRF = 60 min - aplicação em estrutura metálica"
+   },
+   {
+    "quantity": 191.18,
+    "unit": "m³",
+    "description": "Tubulão a céu aberto"
+   }
+  ]
+ },
+ {
+  "id": "R76416932-0002632026",
+  "licitacao": "76416932000181-1-000263/2026",
+  "texto": "b) Comprovação de possuir, em nome do licitante, Certidão de Acervo Operacional (CAO) emitida pelo  CAU ou CREA, ou atestado de responsabilidade técnica emitido por pessoa jurídica de direito público ou privado, impresso em papel timbrado do seu emitente, contendo a identificação do signatário e dados para eventual contato, comprovando que:  b.1) executou obra de construção e realizou os serviços de construção civil em conformidade aos  elementos   técnicos   instrutores,   contemplando   execução   de   estruturas   de   concreto,   instalações hidráulicas e sanitárias e instalações elétricas de ao menos 01 (uma) edificação com área de construção igual ou superior a 3.500 m² (três mil e quinhentos metros quadrados).",
+  "esperado": [
+   {
+    "quantity": 3500,
+    "unit": "m²",
+    "description": "Execução de obra de construção civil de edificação (estruturas de concreto, instalações hidráulicas, sanitárias e elétricas) – área de construção"
+   }
+  ]
+ },
+ {
+  "id": "R76416932-0002642026",
+  "licitacao": "76416932000181-1-000264/2026",
+  "texto": "b) Comprovação de possuir, em nome do licitante, Certidão de Acervo Operacional (CAO) emitida pelo  CAU ou CREA, ou atestado de responsabilidade técnica emitido por pessoa jurídica de direito público ou privado, impresso em papel timbrado do seu emitente, contendo a identificação do signatário e dados para eventual contato, comprovando que:  b.1) executou obra de construção e realizou os serviços de construção civil em conformidade aos  elementos   técnicos   instrutores,   contemplando   execução   de   estruturas   de   concreto,   instalações hidráulicas e sanitárias e instalações elétricas de ao menos 01 (uma) edificação com área de construção igual ou superior a 3.500 m² (três mil e quinhentos metros quadrados).",
+  "esperado": [
+   {
+    "quantity": 3500,
+    "unit": "m²",
+    "description": "Execução de obra de construção civil de edificação (estruturas de concreto, instalações hidráulicas, sanitárias e elétricas) – área de construção"
+   }
+  ]
+ },
+ {
+  "id": "R76416932-0002952026",
+  "licitacao": "76416932000181-1-000295/2026",
+  "texto": "b) Comprovação de possuir, em nome do licitante, Certidão de Acervo Operacional (CAO) emitida pelo CAU ou CREA, ou atestado de responsabilidade técnica emitido por pessoa jurídica de direito público ou privado, impresso em papel timbrado do seu emitente, contendo a identificação do signatário e dados para eventual contato, comprovando que: b.1) executou obra de construção e realizou os serviços de construção civil em conformidade aos elementos técnicos instrutores, contemplando execução de estruturas de concreto, instalações hidráulicas e sanitárias e instalações elétricas de ao menos 01 (uma) edificação com área de construção igual ou superior a 964m² (novecentos e sessenta e quatro metros quadrados).",
+  "esperado": [
+   {
+    "quantity": 964,
+    "unit": "m²",
+    "description": "Execução de obra de construção civil de edificação (estruturas de concreto, instalações hidráulicas, sanitárias e elétricas) – área de construção"
+   }
+  ]
+ },
+ {
+  "id": "R76416932-0002962026",
+  "licitacao": "76416932000181-1-000296/2026",
+  "texto": "b) Comprovação de possuir, em nome do licitante, Certidão de Acervo Operacional (CAO) emitida pelo CAU ou CREA, ou atestado de responsabilidade técnica emitido por pessoa jurídica de direito público ou privado, impresso em papel timbrado do seu emitente, contendo a identificação do signatário e dados para eventual contato, comprovando que: b.1) executou obra de construção e realizou os serviços de construção civil em conformidade aos elementos técnicos instrutores, contemplando execução de estruturas de concreto, instalações hidráulicas e sanitárias e instalações elétricas de ao menos 01 (uma) edificação com área de construção igual ou superior a 964m² (novecentos e sessenta e quatro metros quadrados).",
+  "esperado": [
+   {
+    "quantity": 964,
+    "unit": "m²",
+    "description": "Execução de obra de construção civil de edificação (estruturas de concreto, instalações hidráulicas, sanitárias e elétricas) – área de construção"
+   }
+  ]
+ },
+ {
+  "id": "R76416932-0003352026",
+  "licitacao": "76416932000181-1-000335/2026",
+  "texto": "b) Comprovação de possuir, em nome do licitante, Certidão de Acervo Operacional (CAO) emitida pelo  CAU ou CREA, ou atestado de responsabilidade técnica emitido por pessoa jurídica de direito público ou privado, impresso em papel timbrado do seu emitente, contendo a identificação do signatário e dados para eventual contato, comprovando que:  b.1) executou obra de construção e realizou os serviços de construção civil em conformidade aos  elementos   técnicos   instrutores,   contemplando   execução   de   estruturas   de   concreto,   instalações hidráulicas e sanitárias e instalações elétricas de ao menos 01 (uma) edificação com área de construção igual ou superior a 1500m² (mil e quinhentos metros quadrados).",
+  "esperado": [
+   {
+    "quantity": 1500,
+    "unit": "m²",
+    "description": "Execução de obra de construção civil de edificação (estruturas de concreto, instalações hidráulicas, sanitárias e elétricas) – área de construção"
+   }
+  ]
+ },
+ {
+  "id": "R87246120-0001922026",
+  "licitacao": "87246120000151-1-000192/2026",
+  "texto": "A parcela considerada de maior relevância técnica e de valor significativo, para comprovar a execução de serviços de características semelhantes, é a seguinte:  10.1   Elaboração de projeto Executivo de edificação com 4 pavimentos para fins de licitação e execução com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.  10.2   Execução de demolições de edificações com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.  10.3   Execução de edificações arquitetônico com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.  10.4   Execução de Estrutura de concreto armado com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.  Para fins da comprovação de que trata este subitem, os atestados deverão dizer respeito a contratos executados com as seguintes características mínimas:  10.5   Arquiteto",
+  "esperado": [
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Elaboração de projeto executivo de edificação com 4 pavimentos para fins de licitação e execução"
+   },
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Execução de demolições de edificações"
+   },
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Execução de edificações arquitetônico"
+   },
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Execução de estrutura de concreto armado"
+   }
+  ]
+ },
+ {
+  "id": "R87246120-0001932026",
+  "licitacao": "87246120000151-1-000193/2026",
+  "texto": "5.1.4.2.3.   As parcelas consideradas de maior relevância técnica e de valor significativo, para comprovar a execução de serviços de características semelhantes, são:  5.1.4.2.3.1.   Elaboração de projeto Executivo de edificação com 4 pavimentos para fins de licitação e execução com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.  5.1.4.2.3.2.   Execução de demolições de edificações com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.\nESTADO DO RIO GRANDE DO SUL   –   BRASIL  Prefeitura Municipal de Estrela  SETOR DE LICITAÇÕES  Rua Júlio de Castilhos, nº. 380   –   Centro   –   CEP 95880-000  Fone: (51) 3981-1025  9  5.1.4.2.3.3.   Execução de edificações arquitetônico com Área o Mínimo 2500,00m². Deverá comprovar com atestados de capacidade técnica que já executou projetos desta magnitude.  5.1.4.2.3.4.   Projeto e Execução de Estrutura de concreto armado com Área o Mínimo 2500,00m². Deverá   comprovar   com   atestados   de   capacidade   técnica   que   já   executou   projetos   desta magnitude.  5.1.4.2.4.   Será admitida",
+  "esperado": [
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Elaboração de projeto executivo de edificação com 4 pavimentos para fins de licitação e execução"
+   },
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Execução de demolições de edificações"
+   },
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Execução de edificações arquitetônico"
+   },
+   {
+    "quantity": 2500,
+    "unit": "m²",
+    "description": "Projeto e execução de estrutura de concreto armado"
+   }
+  ]
  }
 ]

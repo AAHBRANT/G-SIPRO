@@ -50,6 +50,8 @@ import { editalRelevance, isEdital, PESO_NEUTRO } from "@/modules/scouting/domai
 import { completarAcervo, extrairQuantitativosDaDescricao, faltaAcervo } from "@/modules/scouting/domain/acervo-exigido";
 import { editalRequirementFromText } from "@/modules/scouting/domain/edital-text-requirement";
 import { parcelasEmListaCorrida } from "@/modules/scouting/domain/parcelas-em-lista";
+import { MOTIVO_DIGITALIZADO, motivoSemQuantitativo } from "@/modules/scouting/domain/motivo-sem-quantitativo";
+import { semDuplicatasEntreDocumentos } from "@/modules/scouting/domain/parcelas-por-padrao";
 import { parsePncpIdentifier } from "@/modules/scouting/domain/pncp-identifier";
 import { normalizeText } from "@/modules/scouting/domain/qualification";
 import { listArchive } from "@/modules/scouting/infrastructure/archive-files";
@@ -209,7 +211,14 @@ const anexoRelevante = (documento: Readable): boolean =>
   // O Estudo Técnico Preliminar repete quantitativos do projeto que não são
   // exigência de habilitação — no corpus de 22/10/2026, três parcelas
   // inventadas vinham dele.
-  && !/estudo\s*t[ée]cnico\s*preliminar|(^|[^a-z])etp([^a-z]|$)/i.test(`${documento.label} ${documento.documentType}`);
+  && !/estudo\s*t[ée]cnico\s*preliminar|(^|[^a-z])etp([^a-z]|$)/i.test(`${documento.label} ${documento.documentType}`)
+  // "ANEXO XIV - CRONOGRAMA", "ANEXO XV - B.D.I.", "ANEXO XII - PLANILHA DE
+  // ITENS": a palavra "anexo" dá peso baixo, mas o conteúdo é orçamento —
+  // ocupavam as vagas de leitura do termo de referência e do memorial.
+  && !/cronograma|b\.?\s?d\.?\s?i\b|planilha|or[çc]amento|curva\s*abc|composi[çc][ãa]o\s+de\s+(?:custos|pre[çc]os)|modelo\s+de\s+proposta/i.test(documento.label);
+
+/** Lixo que o compactador do Mac põe nos pacotes: "__MACOSX/._edital.pdf". */
+const lixoDePacote = (caminho: string): boolean => /(^|[/\\])__MACOSX([/\\]|$)|(^|[/\\])\._/i.test(caminho);
 /**
  * Pacote que não vale baixar depois do principal: desenho CAD (não vira
  * texto) e pacote (.rar/.zip/.7z) cujo NOME não diz que é documento — o
@@ -527,6 +536,8 @@ export class EditalReadingService {
       // onde ele costuma estar — "vazão mínima 7,5 m³/s", "no mínimo 30.000
       // m²" — enquanto o campo próprio volta vazio da leitura.
       requirement = extrairQuantitativosDaDescricao(requirement);
+      // A mesma parcela lida no edital e no TR vira uma só (corpus de 23/10/2026).
+      requirement = { ...requirement, services: semDuplicatasEntreDocumentos(requirement.services) };
 
       // Só então, e só se ainda faltar, os outros anexos já baixados.
       // ⚠️ O PRINCIPAL ENTRA NA VARREDURA, e entra primeiro. Excluí-lo parece
@@ -617,9 +628,14 @@ export class EditalReadingService {
       baixados += 1;
       if (!file) { oversized ??= candidate; continue; }
 
-      const membros = await listArchive(file);
+      // ⚠️ .docx é um zip por dentro: aberto como pacote, ele "contém" só XML e
+      // era descartado inteiro. Achado no corpus de 22/10/2026 — duas
+      // licitações com o edital todo em Word ficavam sem leitura. Word é
+      // documento, nunca pacote.
+      const docxSolto = comAnexos && isDocx(file);
+      const membros = docxSolto ? [] : await listArchive(file);
       if (membros.length === 0) {
-        const formato: FormatoDeTexto | undefined = isPdf(file) ? "pdf" : comAnexos && isDocx(file) ? "docx" : undefined;
+        const formato: FormatoDeTexto | undefined = isPdf(file) ? "pdf" : docxSolto ? "docx" : undefined;
         if (formato) {
           pool.push({
             weight: editalRelevance(candidate.documentType, candidate.title, file.filename),
@@ -637,7 +653,7 @@ export class EditalReadingService {
 
       for (const membro of membros) {
         const formato: FormatoDeTexto | undefined = pdfPeloNome(membro.filename) ? "pdf" : comAnexos && docxPeloNome(membro.filename) ? "docx" : undefined;
-        if (!formato) continue;
+        if (!formato || lixoDePacote(membro.path)) continue;
         pool.push({
           weight: editalRelevance(membro.filename),
           ehEdital: isEdital(membro.filename),
@@ -738,7 +754,9 @@ export class EditalReadingService {
         // Segundo formato de edital: a exigência vem em lista corrida, não em
         // tabela — ver `parcelas-em-lista`. O leitor de tabela devolve vazio
         // nesse caso, e a licitação cai em "estimado a partir do objeto".
-        const emLista = parcelasEmListaCorrida(texto);
+        // A lista corrida só entra quando os outros leitores não acharam
+        // parcela com quantidade: somada sempre, ela trazia lixo ("CA-50 kg").
+        const emLista = doAnexo.services.some((sv) => sv.quantity !== undefined) ? [] : parcelasEmListaCorrida(texto);
         const combinado = emLista.length > 0
           ? completarAcervo(doAnexo, { ...doAnexo, services: emLista })
           : doAnexo;
@@ -778,6 +796,8 @@ export class EditalReadingService {
     const fila = [principal, ...ordenados.filter((d) => d !== principal && anexoRelevante(d))]
       .slice(0, MAX_DOCUMENTOS_LIDOS);
     const lidos: Readable[] = [];
+    const abertos: Readable[] = [];
+    const textos: string[] = [];
     let requirement: EditalRequirement | undefined;
     let textoChars = 0;
     let erroExtracao: string | undefined;
@@ -791,6 +811,8 @@ export class EditalReadingService {
         if (documento === principal) { textoChars = -1; erroExtracao = message(erro).slice(0, 300); }
         continue;
       }
+      abertos.push(documento);
+      textos.push(texto);
       if (texto.trim().length === 0) continue;
       textoChars += texto.length;
       lidos.push(documento);
@@ -798,7 +820,7 @@ export class EditalReadingService {
       let doDocumento: EditalRequirement;
       try {
         const lido = editalRequirementFromText(texto);
-        const emLista = parcelasEmListaCorrida(texto);
+        const emLista = lido.services.some((sv) => sv.quantity !== undefined) ? [] : parcelasEmListaCorrida(texto);
         doDocumento = emLista.length > 0 ? completarAcervo(lido, { ...lido, services: emLista }) : lido;
       } catch (erro) {
         if (documento === principal) erroExtracao = message(erro).slice(0, 300);
@@ -807,6 +829,21 @@ export class EditalReadingService {
       requirement = requirement
         ? completarAcervo(mergeReadings(requirement, doDocumento, documento.label), doDocumento)
         : doDocumento;
+    }
+
+    // Tudo aberto e nenhum texto: documentos digitalizados (imagem). Grava a
+    // leitura com o motivo, em vez de não gravar nada — sem isso a varredura
+    // tentava de novo toda semana sem chance de mudar, e a tela mostrava só
+    // "edital não lido", sem dizer por quê.
+    if (lidos.length === 0 && abertos.length > 0 && !erroExtracao) {
+      return { requirement: { services: [], limitations: [MOTIVO_DIGITALIZADO] }, textoChars: 0, lidos: abertos };
+    }
+
+    // Leu e não achou quantitativo: diz o motivo quando o texto mostra qual é
+    // (edital pede só "obra similar"; exigência no TR não publicado).
+    if (requirement && !requirement.services.some((s) => s.quantity !== undefined)) {
+      const motivo = motivoSemQuantitativo(textos, lidos.map((d) => d.label));
+      if (motivo) requirement = { ...requirement, limitations: [...requirement.limitations, motivo] };
     }
 
     const vazio = !requirement || (requirement.services.length === 0 && requirement.consortiumAllowed === undefined
