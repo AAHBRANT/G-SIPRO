@@ -1,11 +1,12 @@
-name: G-SIPRO Buscador — varredura semanal
+name: G-SIPRO Buscador — varredura diária
 
 on:
   workflow_dispatch:
   schedule:
-    # Domingo, 09:00 UTC (06:00 em Brasília): não há publicação de novos editais
-    # e o portal está descongestionado.
-    - cron: "0 9 * * 0"
+    # Todo dia, 04:00 UTC (01:00 em Brasília) — pedido do Junior em 26/10/2026,
+    # para a fila amanhecer atualizada. Antes era só aos domingos. O GitHub
+    # pode atrasar o disparo agendado em alguns minutos nos horários cheios.
+    - cron: "0 4 * * *"
 
 concurrency:
   group: gsipro-buscador-scan

@@ -23,11 +23,11 @@ export default async function ScoutingPage() {
   ]);
 
   return <main className="mx-auto w-full max-w-[1200px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-    <PageHeader eyebrow="Buscador G-SIPRO" icon="search" subtitle="Define o que a varredura semanal procura e como trata cada condição do certame." title="Configuração de filtros" variant="executive"/>
+    <PageHeader eyebrow="Buscador G-SIPRO" icon="search" subtitle="Define o que a varredura diária procura e como trata cada condição do certame." title="Configuração de filtros" variant="executive"/>
 
     <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
       <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-xs text-slate-600">
-        <span>A varredura é executada <strong className="text-slate-900">semanalmente, aos domingos</strong>, quando o portal está mais estável e não há publicação de novos editais.</span>
+        <span>A varredura é executada <strong className="text-slate-900">todos os dias, à 1h da manhã</strong>, horário em que o portal está mais estável.</span>
         <span className="ml-auto">Aguardando triagem: <strong className="text-slate-900">{pending}</strong></span>
       </div>
     </section>
