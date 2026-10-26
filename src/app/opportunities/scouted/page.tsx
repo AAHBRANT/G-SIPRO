@@ -277,7 +277,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
       <div>
         <p className="bx-sobrenome">Buscador G-SIPRO</p>
         <h1 className="bx-titulo">Oportunidades rastreadas</h1>
-        <p className="bx-sub">Captadas na varredura de domingo. Aprovar cadastra a oportunidade automaticamente; descartar guarda no histórico.</p>
+        <p className="bx-sub">Captadas na varredura diária (1h da manhã). Aprovar cadastra a oportunidade automaticamente; descartar guarda no histórico.</p>
       </div>
       <ThemeToggle/>
     </header>
@@ -341,7 +341,7 @@ export default async function ScoutedTendersPage({ searchParams }: { searchParam
 
         {tenders.length === 0 && <div className="bx-vazio">
           <p>{total === 0 ? "Nenhuma licitação aguardando triagem" : "Nada com esses filtros"}</p>
-          <span>{total === 0 ? "A próxima varredura ocorre no domingo." : "Baixe a exigência técnica mínima ou desmarque alguma região."}</span>
+          <span>{total === 0 ? "A próxima varredura ocorre à 1h da manhã." : "Baixe a exigência técnica mínima ou desmarque alguma região."}</span>
         </div>}
     </FilaNoMapa>
       </div>

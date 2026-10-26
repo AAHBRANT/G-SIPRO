@@ -26,7 +26,7 @@ const commandSchema = z.object({
 const HORIZON_MONTHS = 12;
 
 /**
- * Dispara a varredura semanal do Buscador. Chamada pelo agendador (domingo),
+ * Dispara a varredura diária do Buscador. Chamada pelo agendador (todo dia, 1h),
  * autenticada por token dedicado — não por sessão de usuário.
  *
  * ⚠️ Só busca, qualifica e salva — nada mais. Resolução de duplicata e leitura
