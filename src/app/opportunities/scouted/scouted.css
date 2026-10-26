@@ -1454,6 +1454,15 @@ button.bx-link:disabled { cursor: progress; opacity: 0.6; text-decoration: none;
 .bx-fatos .bx-item dd { color: var(--texto); font-size: 14px; font-weight: 700; overflow-wrap: anywhere; text-align: left; }
 .bx-fatos .bx-item dd.curto { color: var(--prazo-curto); }
 
+/* Dica de rótulo (dica.tsx): ícone discreto ao lado do rótulo; o balão é fixo
+   na tela porque `.bx-fatos` corta o que transborda. */
+.bx-dica { background: none; border: 0; border-radius: 50%; color: var(--texto-3); cursor: help; display: inline-flex; height: 14px; margin-left: 5px; padding: 0; vertical-align: -2px; width: 14px; }
+.bx-dica svg { height: 100%; width: 100%; }
+.bx-dica:hover, .bx-dica:focus-visible { color: var(--acento); }
+.bx-dica:focus-visible { outline: 2px solid var(--acento-fio); outline-offset: 2px; }
+.bx-dica-balao { background: var(--texto); border-radius: var(--r-p); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); color: var(--fundo); display: none; font-size: 12px; font-weight: 500; letter-spacing: normal; line-height: 1.45; max-width: 260px; padding: 8px 10px; pointer-events: none; position: fixed; text-transform: none; transform: translateX(-50%); width: max-content; z-index: 95; }
+.bx-dica-balao[data-aberta] { display: block; }
+
 /* Lista com ícone: duas colunas; requisito com subitens ocupa a largura toda. */
 .bx-checklist { display: grid; gap: 10px 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 760px) { .bx-checklist { grid-template-columns: minmax(0, 1fr); } }

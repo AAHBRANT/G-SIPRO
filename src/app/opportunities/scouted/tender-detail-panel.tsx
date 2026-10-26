@@ -17,6 +17,7 @@ import { MOTIVO_DIGITALIZADO, MOTIVO_NAO_ENCONTRADO, MOTIVO_REMISSAO, MOTIVO_SO_
 import type { ScoredTender } from "@/modules/scouting/application/score-tender";
 import { BaixarDocumentos } from "@/app/opportunities/scouted/baixar-documentos";
 import { AdherenceGauge } from "./adherence-gauge";
+import { Dica } from "./dica";
 import { Flag, SignalActions } from "./signal-actions";
 import { ShareTenderAction } from "./share-tender-action";
 import { LocalNoMapa } from "./local-no-mapa";
@@ -57,8 +58,8 @@ const dataCurta = (value: Date | string | null | undefined) =>
 const dinheiroCurto = (valor: number) =>
   `R$ ${(valor / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
 
-function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
-  return <div className="bx-item"><dt>{rotulo}</dt><dd className={destaque ? "curto" : undefined}>{valor}</dd></div>;
+function Linha({ rotulo, valor, destaque, dica }: { rotulo: string; valor: string; destaque?: boolean; dica?: string }) {
+  return <div className="bx-item"><dt>{rotulo}{dica && <Dica rotulo={rotulo} texto={dica}/>}</dt><dd className={destaque ? "curto" : undefined}>{valor}</dd></div>;
 }
 
 const tick = <svg aria-hidden="true" className="marca" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>;
@@ -279,10 +280,10 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
             {/* No PNCP, "abertura da proposta" é o início do recebimento, não a
                 sessão de abertura dos envelopes — o rótulo antigo dava a
                 impressão de a entrega vir depois da abertura. */}
-            <Linha rotulo="Início do recebimento" valor={dataCurta(tender.proposalOpensAt) ?? "—"}/>
-            <Linha rotulo="Prazo final da proposta" valor={dataCurta(tender.proposalClosesAt) ?? "—"}/>
-            <Linha destaque={days !== undefined && days <= SHORT_DEADLINE_DAYS} rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
-            <Linha rotulo="Captada em" valor={dataCurta(tender.createdAt) ?? "—"}/>
+            <Linha dica="Data em que o órgão passou a aceitar propostas no sistema de compras. Marca o começo do prazo — não é a sessão de disputa." rotulo="Início do recebimento" valor={dataCurta(tender.proposalOpensAt) ?? "—"}/>
+            <Linha dica="Último dia para enviar a proposta pelo sistema do órgão. Depois dele, o envio é fechado. O horário exato está no edital." rotulo="Prazo final da proposta" valor={dataCurta(tender.proposalClosesAt) ?? "—"}/>
+            <Linha destaque={days !== undefined && days <= SHORT_DEADLINE_DAYS} dica="Dias corridos de hoje até o prazo final da proposta. Fica em destaque quando o prazo está curto." rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
+            <Linha dica="Dia em que o Buscador encontrou esta licitação no PNCP. Não é a data de publicação do edital." rotulo="Captada em" valor={dataCurta(tender.createdAt) ?? "—"}/>
           </div>
         </div>
 
