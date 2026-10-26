@@ -276,8 +276,11 @@ export function TenderDetailPanel({ tender }: { tender: ScoredTender }) {
 
         <div className="bx-aba-painel" id={`${tender.id}-p2`}>
           <div className="bx-fatos">
-            <Linha rotulo="Abertura das propostas" valor={dataCurta(tender.proposalOpensAt) ?? "—"}/>
-            <Linha rotulo="Entrega da proposta" valor={dataCurta(tender.proposalClosesAt) ?? "—"}/>
+            {/* No PNCP, "abertura da proposta" é o início do recebimento, não a
+                sessão de abertura dos envelopes — o rótulo antigo dava a
+                impressão de a entrega vir depois da abertura. */}
+            <Linha rotulo="Início do recebimento" valor={dataCurta(tender.proposalOpensAt) ?? "—"}/>
+            <Linha rotulo="Prazo final da proposta" valor={dataCurta(tender.proposalClosesAt) ?? "—"}/>
             <Linha destaque={days !== undefined && days <= SHORT_DEADLINE_DAYS} rotulo="Dias restantes" valor={days === undefined ? "—" : `${days} dias`}/>
             <Linha rotulo="Captada em" valor={dataCurta(tender.createdAt) ?? "—"}/>
           </div>
