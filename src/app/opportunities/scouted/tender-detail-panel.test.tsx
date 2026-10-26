@@ -76,7 +76,21 @@ describe("TenderDetailPanel em grade", () => {
     expect(prazos).not.toContain('class="curto"');
 
     const curto = render(linha({ proposalClosesAt: new Date("2026-10-30T18:00:00-03:00") }));
-    expect(curto).toContain('<dt>Dias restantes</dt><dd class="curto">');
+    expect(curto).toMatch(/<dt>Dias restantes.*?<\/dt><dd class="curto">/);
+  });
+
+  /**
+   * Pedido do Junior (26/10/2026): "Início do recebimento" antes do "Prazo
+   * final" confundia — ele achou que a entrega vinha depois da abertura. Cada
+   * data de Prazos explica o que é ao passar o mouse.
+   */
+  it("cada data de Prazos explica o que é ao passar o mouse", () => {
+    const html = render();
+    const prazos = html.slice(html.indexOf('id="11111111-1111-4111-8111-111111111111-p2"'), html.indexOf('id="11111111-1111-4111-8111-111111111111-p3"'));
+    expect(prazos.match(/role="tooltip"/g)).toHaveLength(4);
+    expect(prazos).toContain('aria-label="O que é Início do recebimento?"');
+    expect(prazos).toContain("não é a sessão de disputa");
+    expect(prazos).toContain("Último dia para enviar a proposta");
   });
 
   it("pré-requisitos e aderência vêm em lista com ícone", () => {
