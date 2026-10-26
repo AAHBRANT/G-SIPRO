@@ -27,6 +27,12 @@ jobs:
       # compromete os demais. Quem tiver estados configurados nos filtros
       # continua sendo atendido — o recorte só se aplica a quem varre o Brasil
       # inteiro, e o próprio serviço descarta o que estiver fora do perfil.
+      #
+      # ⚠️ Três estados por lote, não cinco (26/10/2026): o PNCP só aceita
+      # ~20 consultas por minuto, e o cliente passou a respeitar esse ritmo
+      # (3 s entre consultas). Medido contra o portal real, um lote de três
+      # estados leva ~90 s — dentro do orçamento de 150 s da rota, com folga
+      # para um bloqueio de 30 s. Cinco estados nesse ritmo não caberiam.
       - name: Executar a varredura do Buscador
         run: |
           set -uo pipefail
@@ -34,12 +40,15 @@ jobs:
           echo "::add-mask::$SCOUT_DISPATCH_TOKEN"
           falhas=0
           for lote in \
-            '["AC","AL","AM","AP","BA"]' \
-            '["CE","DF","ES","GO","MA"]' \
-            '["MG","MS","MT","PA","PB"]' \
-            '["PE","PI","PR","RJ","RN"]' \
-            '["RO","RR","RS","SC","SE"]' \
-            '["SP","TO"]' ; do
+            '["AC","AL","AM"]' \
+            '["AP","BA","CE"]' \
+            '["DF","ES","GO"]' \
+            '["MA","MG","MS"]' \
+            '["MT","PA","PB"]' \
+            '["PE","PI","PR"]' \
+            '["RJ","RN","RO"]' \
+            '["RR","RS","SC"]' \
+            '["SE","SP","TO"]' ; do
             echo "lote: ${lote}"
             if ! curl --fail --silent --show-error \
               --max-time 600 \
@@ -53,7 +62,7 @@ jobs:
             fi
           done
           echo "lotes com falha: ${falhas}"
-          test "${falhas}" -lt 6
+          test "${falhas}" -lt 9
 
       # Passo à parte, de propósito: resolução de duplicata e leitura de
       # edital já tentaram rodar dentro da varredura acima e o ingress cortou

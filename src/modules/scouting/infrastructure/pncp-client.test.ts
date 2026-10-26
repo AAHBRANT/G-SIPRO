@@ -197,6 +197,57 @@ describe("PncpClient", () => {
     expect(calls).toBeGreaterThan(3);
   });
 
+  /**
+   * Achado na varredura de 25/10/2026: 24 combinações de UF e modalidade
+   * perdidas toda semana, sempre por 429. Medido contra o portal real: ele
+   * aceita cerca de 20 consultas por minuto e, ao bloquear, só libera depois
+   * de 20 a 30 s — sem cabeçalho Retry-After. A escada antiga (1,5 s, 3 s,
+   * 4,5 s) desistia antes de o bloqueio passar.
+   */
+  it("espera o bloqueio do portal passar antes de reenviar após 429", async () => {
+    const sleeps: number[] = [];
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) return new Response("", { status: 429 });
+      return jsonResponse({ data: [baseRecord], totalPaginas: 1 });
+    });
+
+    const client = new PncpClient({ finalDate: new Date("2027-12-31T00:00:00.000Z"), states: ["CE"], fetchImpl: fetchImpl as unknown as typeof fetch, sleepImpl: async (ms) => { sleeps.push(ms); } });
+    await client.fetchOpenTenders();
+
+    expect(sleeps[0]).toBeGreaterThanOrEqual(30_000);
+  });
+
+  it("consulta no ritmo que o portal aceita, sem provocar o bloqueio", async () => {
+    const sleeps: number[] = [];
+    const fetchImpl = vi.fn(async () => jsonResponse({ data: [], totalPaginas: 0 }));
+
+    const client = new PncpClient({ finalDate: new Date("2027-12-31T00:00:00.000Z"), states: ["CE"], fetchImpl: fetchImpl as unknown as typeof fetch, sleepImpl: async (ms) => { sleeps.push(ms); } });
+    await client.fetchOpenTenders();
+
+    expect(sleeps.length).toBeGreaterThan(0);
+    expect(sleeps.every((ms) => ms >= 3_000)).toBe(true);
+  });
+
+  it("registra como falha a UF cujas páginas ficaram pela metade quando o prazo acabou", async () => {
+    let clock = 0;
+    // Quatro páginas; cada uma consome 60 s do orçamento de 150 s — a quarta fica de fora.
+    const fetchImpl = vi.fn(async () => { clock += 60_000; return jsonResponse({ data: [baseRecord], totalPaginas: 4 }); });
+
+    const client = new PncpClient({
+      finalDate: new Date("2027-12-31T00:00:00.000Z"),
+      states: ["SP"],
+      budgetMs: 150_000,
+      nowImpl: () => clock,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      sleepImpl: async () => {},
+    });
+    const { failures } = await client.fetchOpenTenders();
+
+    expect(failures).toContain("SP/4");
+  });
+
   it("restringe a consulta às unidades federativas configuradas", async () => {
     const urls: string[] = [];
     const fetchImpl = vi.fn(async (url: string) => {

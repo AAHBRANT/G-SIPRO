@@ -30,8 +30,20 @@ const PAGE_SIZE = 50;
 const MAX_PAGES_PER_MODALITY = 40;
 const REQUEST_TIMEOUT_MS = 25_000;
 const MAX_ATTEMPTS = 4;
-/** O portal limita a frequência de requisições e responde 429 quando excedida. */
-const THROTTLE_DELAY_MS = 700;
+/**
+ * O portal limita a frequência de requisições e responde 429 quando excedida.
+ * Medido contra o serviço real (26/10/2026): uma consulta a cada 3 s passa sem
+ * bloqueio; a cada 2 s, bloqueia na 12ª. Com 0,7 s, a varredura perdia toda
+ * semana as mesmas combinações de UF e modalidade.
+ */
+const THROTTLE_DELAY_MS = 3_000;
+/**
+ * Bloqueado, o portal só volta a responder depois de 20 a 30 s e não informa
+ * quanto esperar (sem Retry-After). Reenviar antes disso só prolonga o bloqueio.
+ */
+const RATE_LIMIT_WAIT_MS = 30_000;
+
+class RateLimitedError extends Error {}
 
 type PncpRecord = Readonly<{
   numeroControlePNCP?: string;
@@ -206,11 +218,12 @@ export class PncpClient {
         signal: AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, restante)),
       });
       if (response.status === 204) return { data: [], totalPaginas: 0 };
-      if (response.status === 429 || response.status >= 500) throw new Error(`HTTP ${response.status}`);
+      if (response.status === 429) throw new RateLimitedError("HTTP 429");
+      if (response.status >= 500) throw new Error(`HTTP ${response.status}`);
       if (!response.ok) return { data: [], totalPaginas: 0 };
       return (await response.json()) as PncpPage;
     } catch (error) {
-      const espera = Math.min(1_500 * attempt, 12_000);
+      const espera = error instanceof RateLimitedError ? RATE_LIMIT_WAIT_MS : Math.min(1_500 * attempt, 12_000);
       // Não adianta esperar para tentar de novo se a espera já estoura o prazo.
       if (attempt >= MAX_ATTEMPTS || now() + espera >= deadline) {
         throw error instanceof Error ? error : new Error(String(error));
@@ -259,6 +272,9 @@ export class PncpClient {
             await this.sleepImpl(THROTTLE_DELAY_MS);
             page += 1;
           } while (page <= totalPages && now() < deadline);
+          // Prazo esgotado com páginas por ler: o que ficou de fora precisa
+          // aparecer como pendência, e não sumir em silêncio.
+          if (page <= totalPages) failures.push(`${state}/${modality}`);
         } catch {
           failures.push(`${state}/${modality}`);
         }
